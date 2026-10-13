@@ -58,10 +58,6 @@
           Caractéristiques clés : ★ {{ keyAbilities(classDef.priority).map((a) => ABILITY_NAMES[a]).join(" et ") }}.
           {{ classDef.advice }}
         </p>
-        <ion-button size="small" :disabled="draft.method === 'roll' && !draft.rolledPool" @click="applyAdvice">
-          Appliquer la répartition conseillée
-        </ion-button>
-        <small v-if="draft.method === 'roll' && !draft.rolledPool">Tirez d'abord les dés.</small>
       </div>
       <p v-else class="hint">Choisissez une classe pour recevoir un conseil de répartition.</p>
 
@@ -187,7 +183,7 @@ import { SPECIES } from "../data/species";
 import {
   POINT_BUY_BUDGET, POINT_BUY_MAX, POINT_BUY_MIN, STANDARD_ARRAY, defaultScores, pointBuyCost, pointBuyTotal, rollAbilityPool,
 } from "../engine/abilities";
-import { assignByPriority, keyAbilities, recommendedBonus } from "../engine/advice";
+import { keyAbilities } from "../engine/advice";
 import { applyBackgroundBonus, buildCharacter, validateDraft, type CharacterDraft } from "../engine/character";
 import { ABILITIES, abilityModifier, type Ability } from "../engine/rules";
 import { newId, useCharacters } from "../stores/characters";
@@ -277,15 +273,6 @@ function available(a: Ability, v: number) {
 // --- conseils et descriptions
 const isKey = (a: Ability) => !!classDef.value && keyAbilities(classDef.value.priority).includes(a);
 
-function applyAdvice() {
-  const cls = classDef.value;
-  if (!cls) return;
-  const pool = draft.method === "roll" ? draft.rolledPool : [...STANDARD_ARRAY]; // 15,14,13,12,10,8 = exactement 27 points
-  if (!pool) return;
-  draft.baseScores = assignByPriority(cls.priority, pool);
-  if (background.value) draft.bonus = recommendedBonus(background.value, cls.priority);
-}
-
 function choose(kind: "species" | "class", id: string) {
   if (kind === "species") draft.speciesId = id;
   else draft.classId = id;
@@ -317,7 +304,7 @@ function create() {
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
 .advice { background: var(--ion-color-step-100, #222); border-radius: 8px; padding: 12px; margin: 12px 0; }
-.advice p { margin: 6px 0 10px; }
+.advice p { margin: 6px 0 0; }
 .star { color: var(--ion-color-warning, #fc0); }
 .detail { padding: 0 16px 16px; }
 h3 { margin: 20px 0 8px; }
