@@ -6,6 +6,8 @@ import {
   POINT_BUY_BUDGET, POINT_BUY_MAX, POINT_BUY_MIN, pointBuyTotal, usesPoolExactly, STANDARD_ARRAY,
   type AbilityScores, type ScoreMethod,
 } from "./abilities";
+import type { AttackDef } from "./combat";
+import { computeEquipment, getKit, type CharacterEquipment } from "./equipment";
 import { ABILITIES, abilityModifier, proficiencyBonus, type Ability } from "./rules";
 
 /** Bonus de caractéristiques de l'historique (règles 2024). */
@@ -25,6 +27,8 @@ export interface CharacterDraft {
   rolledPool?: number[];
   bonus: BackgroundBonus;
   classSkills: SkillId[];
+  /** Lot d'équipement de départ (le premier de la classe par défaut). */
+  kitId?: string;
 }
 
 export interface SkillEntry {
@@ -53,6 +57,9 @@ export interface Character {
   saves: Record<Ability, { proficient: boolean; bonus: number }>;
   skills: SkillEntry[];
   originFeat: string;
+  equipment: CharacterEquipment;
+  /** Attaques disponibles en combat, la meilleure en premier. */
+  attacks: AttackDef[];
 }
 
 const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id);
@@ -94,6 +101,14 @@ export function validateDraft(d: CharacterDraft): string[] {
       errors.push("Le bonus d'historique doit viser deux caractéristiques différentes proposées par l'historique.");
   }
 
+  if (cls && d.kitId) {
+    try {
+      getKit(cls.id, d.kitId);
+    } catch {
+      errors.push("Ce lot d'équipement n'existe pas pour cette classe.");
+    }
+  }
+
   if (cls && bg) {
     const picked = new Set(d.classSkills);
     if (picked.size !== d.classSkills.length || picked.size !== cls.skillChoices.count)
@@ -130,13 +145,20 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
     }),
   ) as Character["saves"];
 
+  const eq = computeEquipment(
+    { classId: classDef.id, scores, modifiers, proficiencyBonus: prof, baseSpeed: species.speed },
+    d.kitId,
+  );
+
   return {
     id, name: d.name.trim(), level: 1, species, classDef, background, scores, modifiers,
     proficiencyBonus: prof,
     maxHp: Math.max(1, classDef.hitDie + modifiers.CON), // niveau 1 : dé de vie max + mod. CON
-    armorClass: 10 + modifiers.DEX, // sans armure
+    armorClass: eq.armorClass,
     initiative: modifiers.DEX,
-    speed: species.speed,
+    speed: eq.speed,
+    equipment: eq.equipment,
+    attacks: eq.attacks,
     passivePerception: 10 + skills.find((s) => s.id === "perception")!.bonus,
     saves, skills, originFeat: background.originFeat,
   };

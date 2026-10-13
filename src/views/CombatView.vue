@@ -16,8 +16,8 @@
     <ion-content v-else-if="!state" class="ion-padding">
       <p>{{ character.name }} · {{ character.classDef.name }} · {{ character.maxHp }} PV · CA {{ character.armorClass }}</p>
       <p class="hint">
-        Attaque : {{ attack.name }} ({{ signed(attack.toHit) }} pour toucher, {{ attack.damage.count }}d{{ attack.damage.sides }}{{ attack.damage.bonus ? signed(attack.damage.bonus) : "" }}).
-        Les PV sont remis à fond au début de chaque combat. L'équipement n'est pas encore géré : la CA est celle d'un personnage sans armure.
+        Équipement : {{ outfit }}. Vous choisirez votre arme ou votre sort à chaque attaque.
+        Les PV sont remis à fond au début de chaque combat.
       </p>
       <ion-list inset>
         <ion-list-header><ion-label>Choisir une rencontre</ion-label></ion-list-header>
@@ -59,7 +59,13 @@
       <!-- Actions -->
       <div v-else-if="state.status === 'ongoing'" class="actions">
         <h3>À vous de jouer, {{ currentName }}</h3>
-        <p class="hint">Attaquer : {{ attack.name }} · Choisissez une cible</p>
+        <ion-item v-if="attacks.length > 1" lines="none">
+          <ion-select v-model="attackIndex" label="Arme ou sort" label-placement="stacked" interface="action-sheet">
+            <ion-select-option v-for="(a, i) in attacks" :key="a.name" :value="i">{{ attackLabel(a) }}</ion-select-option>
+          </ion-select>
+        </ion-item>
+        <p v-else class="hint">Attaque : {{ attackLabel(attacks[0]) }}</p>
+        <p class="hint">Choisissez une cible.</p>
         <ion-button v-for="e in livingEnemies" :key="e.id" expand="block" @click="attackTarget(e.id)">
           Attaquer {{ e.name }} ({{ e.hp }}/{{ e.maxHp }} PV, CA {{ e.ac }})
         </ion-button>
@@ -82,14 +88,14 @@
 <script setup lang="ts">
 import {
   IonBackButton, IonBadge, IonButton, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader,
-  IonPage, IonProgressBar, IonTitle, IonToggle, IonToolbar,
+  IonPage, IonProgressBar, IonSelect, IonSelectOption, IonTitle, IonToggle, IonToolbar,
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
 import DiceRoll from "../components/DiceRoll.vue";
 import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";
-import { characterToCombatant, defaultAttack } from "../engine/attacks";
+import { characterToCombatant } from "../engine/attacks";
 import { currentCombatant, playerAttack, playerDodge, startCombat, type Combatant, type CombatState, type RollEvent } from "../engine/combat";
 import { useCharacters } from "../stores/characters";
 import { ROLL_BUTTON_LABEL, signed } from "../ui/format";
@@ -98,7 +104,10 @@ const route = useRoute();
 const store = useCharacters();
 const characterId = computed(() => String(route.params.id));
 const character = computed(() => store.get(characterId.value));
-const attack = computed(() => defaultAttack(character.value!));
+const attacks = computed(() => character.value?.attacks ?? []);
+const attackIndex = ref(0);
+const attackLabel = (a: (typeof attacks.value)[number]) =>
+  `${a.name} · ${signed(a.toHit)} · ${a.damage.count}d${a.damage.sides}${a.damage.bonus ? signed(a.damage.bonus) : ""}${a.ranged ? " · distance" : ""}`;
 
 const state = ref<CombatState | null>(null);
 const badge = { Facile: "success", Moyen: "warning", Difficile: "danger" } as const;
@@ -208,7 +217,15 @@ async function act(run: (s: CombatState) => void) {
   await play(s.rolls.slice(before));
 }
 
+const outfit = computed(() => {
+  const eq = character.value?.equipment;
+  if (!eq) return "aucun";
+  const parts = [eq.armor?.name, eq.shield ? "Bouclier" : undefined].filter(Boolean);
+  return `${parts.length ? parts.join(" + ") : "aucune armure"}, CA ${character.value!.armorClass}`;
+});
+
 async function start(e: EncounterDef) {
+  attackIndex.value = 0;
   const s = startCombat([characterToCombatant(character.value!)], buildEnemies(e));
   state.value = s;
   // Affichage de départ : tout le monde à pleins PV (les ennemis qui jouent en premier le seront après leur jet).
@@ -217,7 +234,7 @@ async function start(e: EncounterDef) {
   shown.value = { combatants: fresh, logLen: 0, round: 1 };
   await play(s.rolls);
 }
-const attackTarget = (id: string) => act((s) => playerAttack(s, id));
+const attackTarget = (id: string) => act((s) => playerAttack(s, id, Math.random, attackIndex.value));
 const dodge = () => act((s) => playerDodge(s));
 </script>
 
