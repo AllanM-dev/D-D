@@ -10,26 +10,26 @@ export interface WeaponDef {
   properties: WeaponProperty[];
   /** Dé de dégâts quand l'arme polyvalente est tenue à deux mains. */
   versatileSides?: number;
-  /** Portée normale / maximale en pieds (armes à distance et armes de jet). */
+  /** Portée normale / maximale en mètres (armes à distance et armes de jet). */
   range?: [number, number];
 }
 
 /** Armes de départ du SRD 5.2 (les autres armes seront ajoutées avec la boutique). */
 export const WEAPONS: readonly WeaponDef[] = [
   { id: "greataxe", name: "Hache à deux mains", category: "martial", ranged: false, damage: { count: 1, sides: 12 }, damageType: "tranchant", properties: ["heavy", "two-handed"] },
-  { id: "handaxe", name: "Hachette", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "tranchant", properties: ["light", "thrown"], range: [20, 60] },
-  { id: "dagger", name: "Dague", category: "simple", ranged: false, damage: { count: 1, sides: 4 }, damageType: "perforant", properties: ["finesse", "light", "thrown"], range: [20, 60] },
+  { id: "handaxe", name: "Hachette", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "tranchant", properties: ["light", "thrown"], range: [6, 18] },
+  { id: "dagger", name: "Dague", category: "simple", ranged: false, damage: { count: 1, sides: 4 }, damageType: "perforant", properties: ["finesse", "light", "thrown"], range: [6, 18] },
   { id: "mace", name: "Masse d'armes", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "contondant", properties: [] },
   { id: "sickle", name: "Serpe", category: "simple", ranged: false, damage: { count: 1, sides: 4 }, damageType: "tranchant", properties: ["light"] },
   { id: "quarterstaff", name: "Bâton", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "contondant", properties: ["versatile"], versatileSides: 8 },
   { id: "greatsword", name: "Épée à deux mains", category: "martial", ranged: false, damage: { count: 2, sides: 6 }, damageType: "tranchant", properties: ["heavy", "two-handed"] },
   { id: "flail", name: "Fléau d'armes", category: "martial", ranged: false, damage: { count: 1, sides: 8 }, damageType: "contondant", properties: [] },
-  { id: "javelin", name: "Javeline", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["thrown"], range: [30, 120] },
+  { id: "javelin", name: "Javeline", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["thrown"], range: [9, 36] },
   { id: "scimitar", name: "Cimeterre", category: "martial", ranged: false, damage: { count: 1, sides: 6 }, damageType: "tranchant", properties: ["finesse", "light"] },
   { id: "shortsword", name: "Épée courte", category: "martial", ranged: false, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["finesse", "light"] },
-  { id: "longbow", name: "Arc long", category: "martial", ranged: true, damage: { count: 1, sides: 8 }, damageType: "perforant", properties: ["ammunition", "heavy", "two-handed"], range: [150, 600] },
-  { id: "shortbow", name: "Arc court", category: "simple", ranged: true, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["ammunition", "two-handed"], range: [80, 320] },
-  { id: "spear", name: "Lance", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["thrown", "versatile"], versatileSides: 8, range: [20, 60] },
+  { id: "longbow", name: "Arc long", category: "martial", ranged: true, damage: { count: 1, sides: 8 }, damageType: "perforant", properties: ["ammunition", "heavy", "two-handed"], range: [45, 180] },
+  { id: "shortbow", name: "Arc court", category: "simple", ranged: true, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["ammunition", "two-handed"], range: [24, 96] },
+  { id: "spear", name: "Lance", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["thrown", "versatile"], versatileSides: 8, range: [6, 18] },
   { id: "longsword", name: "Épée longue", category: "martial", ranged: false, damage: { count: 1, sides: 8 }, damageType: "tranchant", properties: ["versatile"], versatileSides: 10 },
 ];
 
@@ -41,7 +41,7 @@ export interface ArmorDef {
   baseAc: number;
   /** Plafond du bonus de Dextérité : undefined = aucun, 0 = aucun bonus. */
   dexCap?: number;
-  /** Force minimale ; en dessous, la vitesse baisse de 3 m (10 pieds). */
+  /** Force minimale ; en dessous, la vitesse baisse de 3 m. */
   minStr?: number;
   stealthDisadvantage?: boolean;
 }

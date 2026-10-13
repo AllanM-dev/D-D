@@ -13,6 +13,7 @@
 - [ ] Équipement de l'historique, option « or à la place », boutique, inventaire modifiable
 - [ ] Traits d'espèce et de classe de niveau 1 appliqués, sorts de départ, don d'origine appliqué
 
+- [x] Distances en mètres partout (vitesses, portées, malus d'armure), anciennes sauvegardes converties
 - [x] Menu latéral et page Aide : règles de base, caractéristiques, fiches des 12 classes, 9 espèces et 4 historiques
 
 ## Jalon 2 — Combat

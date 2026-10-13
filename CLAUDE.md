@@ -22,6 +22,7 @@ Les tests (`src/engine/__tests__/help.test.ts`) échouent si une capacité, un t
 Avant de proposer une PR, relire l'Aide : chaque phrase est-elle encore vraie ? Le modèle de PR (`.github/pull_request_template.md`) contient une case « Page Aide » à renseigner.
 
 ## Contenu de règles
+- **Toutes les distances sont en mètres** (jamais de pieds à l'écran) : une case = 1,5 m, 30 pieds = 9 m. Les données du SRD sont converties à la source (`src/data/`) ; afficher avec `formatMeters` (virgule décimale).
 - Seul le contenu du **SRD 5.2** (ou 5.1 pour les monstres actuels) est autorisé, en CC-BY-4.0 ; l'attribution est dans `LICENSE-CONTENT.md`. Pas de texte du Player's Handbook / DMG / Monster Manual hors SRD, ni d'univers protégé (Royaumes Oubliés, Beholder, etc.).
 - Les textes d'aide et de description sont rédigés en français, **en texte original** (pas de citation du SRD).
 - Les chiffres précis des règles sont écrits de mémoire : les signaler dans la PR pour relecture.

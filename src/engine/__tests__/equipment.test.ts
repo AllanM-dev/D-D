@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { ARMORS, CLASS_TRAINING, STARTING_KITS, WEAPONS } from "../../data/equipment";
+import { SPECIES } from "../../data/species";
+import { fmtNumber, formatMeters } from "../../ui/format";
 import { CLASSES } from "../../data/classes";
 import { buildCharacter, validateDraft, type CharacterDraft } from "../character";
-import { computeEquipment, getKit, isWeaponProficient, migrateCharacter, type EquipmentInput } from "../equipment";
+import { computeEquipment, feetToMeters, getKit, isWeaponProficient, migrateCharacter, type EquipmentInput } from "../equipment";
 import { abilityModifier } from "../rules";
 import type { AbilityScores } from "../abilities";
 
 const mods = (s: AbilityScores): AbilityScores =>
   ({ STR: abilityModifier(s.STR), DEX: abilityModifier(s.DEX), CON: abilityModifier(s.CON), INT: abilityModifier(s.INT), WIS: abilityModifier(s.WIS), CHA: abilityModifier(s.CHA) });
 
-const input = (classId: string, scores: Partial<AbilityScores> = {}, baseSpeed = 30): EquipmentInput => {
+const input = (classId: string, scores: Partial<AbilityScores> = {}, baseSpeed = 9): EquipmentInput => {
   const full: AbilityScores = { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10, ...scores };
   return { classId, scores: full, modifiers: mods(full), proficiencyBonus: 2, baseSpeed };
 };
@@ -69,9 +71,9 @@ describe("classe d'armure", () => {
     expect(ac("druid", { DEX: 12 })).toBe(11 + 1 + 2);
   });
   it("la cotte de mailles ralentit sous Force 13", () => {
-    expect(computeEquipment(input("fighter", { STR: 8 })).speed).toBe(20);
-    expect(computeEquipment(input("fighter", { STR: 13 })).speed).toBe(30);
-    expect(computeEquipment(input("fighter", { STR: 8 }), "B").speed).toBe(30);
+    expect(computeEquipment(input("fighter", { STR: 8 })).speed).toBe(6); // 9 m − 3 m
+    expect(computeEquipment(input("fighter", { STR: 13 })).speed).toBe(9);
+    expect(computeEquipment(input("fighter", { STR: 8 }), "B").speed).toBe(9);
   });
 });
 
@@ -145,5 +147,45 @@ describe("inventaire et personnage", () => {
     expect(migrated.equipment.gold).toBe(5);
     // un personnage déjà équipé n'est pas modifié
     expect(migrateCharacter(old)).toBe(old);
+  });
+});
+
+describe("unités : mètres", () => {
+  it("les vitesses d'espèce sont en mètres (par demi-mètre)", () => {
+    for (const sp of SPECIES) {
+      expect(sp.speed, sp.id).toBeGreaterThanOrEqual(6);
+      expect(sp.speed, sp.id).toBeLessThanOrEqual(12); // 12 m = 40 pieds ; des pieds seraient 30 ou 35
+      expect((sp.speed * 2) % 1, sp.id).toBe(0);
+    }
+    expect(SPECIES.find((s) => s.id === "human")!.speed).toBe(9);
+    expect(SPECIES.find((s) => s.id === "goliath")!.speed).toBe(10.5);
+  });
+  it("les portées d'armes sont en mètres", () => {
+    expect(WEAPONS.find((w) => w.id === "longbow")!.range).toEqual([45, 180]);
+    expect(WEAPONS.find((w) => w.id === "dagger")!.range).toEqual([6, 18]);
+    for (const w of WEAPONS) if (w.range) expect(w.range[1]).toBeGreaterThan(w.range[0]);
+  });
+  it("convertit les pieds en mètres", () => {
+    expect([20, 25, 30, 35].map(feetToMeters)).toEqual([6, 7.5, 9, 10.5]);
+  });
+  it("formate à la française", () => {
+    expect(fmtNumber(10.5)).toBe("10,5");
+    expect(formatMeters(9)).toBe("9 m");
+    expect(formatMeters(10.5)).toBe("10,5 m");
+  });
+  it("convertit les personnages sauvegardés en pieds, une seule fois", () => {
+    const legacy = {
+      classDef: { id: "fighter" }, species: { speed: 30 }, scores: { STR: 17, DEX: 14, CON: 14, INT: 9, WIS: 12, CHA: 8 },
+      modifiers: { STR: 3, DEX: 2, CON: 2, INT: -1, WIS: 1, CHA: -1 }, proficiencyBonus: 2, speed: 30,
+    };
+    const once = migrateCharacter(legacy as never) as unknown as typeof legacy;
+    expect(once.species.speed).toBe(9);
+    expect(once.speed).toBe(9);
+    const twice = migrateCharacter(once as never) as unknown as typeof legacy;
+    expect(twice.species.speed).toBe(9);
+    expect(twice.speed).toBe(9);
+    // Sans équipement enregistré, tout est recalculé : la cotte de mailles avec Force 8 ralentit de 3 m.
+    const weak = { ...legacy, scores: { ...legacy.scores, STR: 8 }, modifiers: { ...legacy.modifiers, STR: -1 }, speed: 20 };
+    expect((migrateCharacter(weak as never) as unknown as typeof legacy).speed).toBe(6);
   });
 });

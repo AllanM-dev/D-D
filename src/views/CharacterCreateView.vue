@@ -133,7 +133,7 @@
           <ion-item v-for="line in kitLines" :key="line" lines="none"><ion-label class="ion-text-wrap">{{ line }}</ion-label></ion-item>
           <ion-item lines="none"><ion-label>{{ currentKit?.gold }} po</ion-label></ion-item>
         </ion-list>
-        <p class="hint" v-if="preview">Avec cet équipement : CA {{ preview.armorClass }}, vitesse {{ preview.speed }} pieds.</p>
+        <p class="hint" v-if="preview">Avec cet équipement : CA {{ preview.armorClass }}, vitesse {{ formatMeters(preview.speed) }}.</p>
         <p class="hint" v-else>Répartissez vos caractéristiques pour voir votre classe d'armure.</p>
         <p class="hint">L'équipement de votre historique et l'option « or à la place » ne sont pas encore gérés.</p>
       </template>
@@ -156,7 +156,7 @@
               <ion-item slot="header"><ion-label>{{ s.name }}</ion-label></ion-item>
               <div slot="content" class="detail">
                 <p>{{ s.description }}</p>
-                <p><small>Taille : {{ s.size }} · Vitesse : {{ s.speed }} ft</small></p>
+                <p><small>Taille : {{ s.size }} · Vitesse : {{ formatMeters(s.speed) }}</small></p>
                 <ul><li v-for="t in s.traits" :key="t">{{ t }}</li></ul>
                 <p><small>Les traits sont indiqués à titre d'information : ils ne sont pas encore appliqués automatiquement.</small></p>
                 <ion-button size="small" @click="choose('species', s.id)">Choisir cette espèce</ion-button>
@@ -205,7 +205,7 @@ import { ARMORS, WEAPONS, type KitEntry } from "../data/equipment";
 import { applyBackgroundBonus, buildCharacter, validateDraft, type CharacterDraft } from "../engine/character";
 import { ABILITIES, abilityModifier, type Ability } from "../engine/rules";
 import { newId, useCharacters } from "../stores/characters";
-import { ABILITY_NAMES, signed } from "../ui/format";
+import { ABILITY_NAMES, formatMeters, signed } from "../ui/format";
 
 const store = useCharacters();
 const router = useIonRouter();

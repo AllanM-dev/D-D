@@ -68,24 +68,24 @@ export const SPECIES_TRAIT_TEXT: Record<string, Record<string, string>> = {
     "Ascendance draconique": "Tu choisis un dragon (chromatique ou métallique) : il détermine le type de dégâts de ton souffle et de ta résistance.",
     "Arme de souffle": "Au lieu d'une attaque, tu exhales de l'énergie en cône : les créatures touchées font un jet de sauvegarde de Dextérité ou subissent des dégâts (1d10 au niveau 1) du type de ton ascendance. Utilisable autant de fois que ton bonus de maîtrise, par repos long.",
     "Résistance aux dégâts": "Tu résistes au type de dégâts de ton ascendance : tu n'en subis que la moitié.",
-    "Vision dans le noir": "Tu vois dans l'obscurité jusqu'à 18 m (60 pieds).",
+    "Vision dans le noir": "Tu vois dans l'obscurité jusqu'à 18 m.",
     "Vol draconique (niv. 5)": "Au niveau 5, tu peux faire apparaître des ailes spectrales et voler pendant 10 minutes, une fois par repos long.",
   },
   dwarf: {
-    "Vision dans le noir (36 m)": "Tu vois dans l'obscurité jusqu'à 36 m (120 pieds).",
+    "Vision dans le noir (36 m)": "Tu vois dans l'obscurité jusqu'à 36 m.",
     "Résilience naine (poison)": "Tu résistes aux dégâts de poison et tu as l'avantage aux jets de sauvegarde contre l'état empoisonné.",
     "Robustesse naine (+1 PV par niveau)": "Tes PV maximum augmentent de 1 à chaque niveau, y compris le premier.",
     "Connaissance de la pierre": "Action bonus : pendant 10 minutes, tu perçois les vibrations de la pierre autour de toi (vision à 18 m si tu touches la pierre). Utilisable autant de fois que ton bonus de maîtrise, par repos long.",
   },
   elf: {
-    "Vision dans le noir": "Tu vois dans l'obscurité jusqu'à 18 m (60 pieds).",
+    "Vision dans le noir": "Tu vois dans l'obscurité jusqu'à 18 m.",
     "Lignées elfiques (drow, haut-elfe, elfe des bois)": "Ta lignée apporte des sorts et un petit avantage : le drow voit plus loin dans le noir, le haut-elfe maîtrise un tour de magie des arcanes, l'elfe des bois est plus rapide.",
     "Ascendance féerique": "Tu as l'avantage aux jets de sauvegarde pour ne pas être charmé.",
     "Sens aiguisés": "Tu maîtrises une compétence au choix parmi Perspicacité, Perception et Survie.",
     "Transe": "Tu n'as pas besoin de dormir : 4 heures de méditation consciente te suffisent pour un repos long.",
   },
   gnome: {
-    "Vision dans le noir": "Tu vois dans l'obscurité jusqu'à 18 m (60 pieds).",
+    "Vision dans le noir": "Tu vois dans l'obscurité jusqu'à 18 m.",
     "Ruse gnome": "Tu as l'avantage aux jets de sauvegarde d'Intelligence, de Sagesse et de Charisme.",
     "Lignées gnomes (forêt ou roche)": "Le gnome des forêts a des talents d'illusion et parle aux petits animaux ; le gnome des roches est un bricoleur qui fabrique de petits mécanismes.",
   },
@@ -107,13 +107,13 @@ export const SPECIES_TRAIT_TEXT: Record<string, Record<string, string>> = {
   },
   orc: {
     "Poussée d'adrénaline": "Action bonus : tu te précipites (course) et tu gagnes des PV temporaires égaux à ton bonus de maîtrise. Utilisable autant de fois que ce bonus, par repos court ou long.",
-    "Vision dans le noir (36 m)": "Tu vois dans l'obscurité jusqu'à 36 m (120 pieds).",
+    "Vision dans le noir (36 m)": "Tu vois dans l'obscurité jusqu'à 36 m.",
     "Endurance implacable": "Une fois par repos long, quand tu tombes à 0 PV sans mourir sur le coup, tu restes à 1 PV.",
   },
   tiefling: {
     "Héritage fiélon": "Tu choisis un héritage (abyssal, chtonien ou infernal) qui t'accorde une résistance (poison, nécrotique ou feu) et quelques sorts.",
     "Présence d'un autre monde": "Tu connais le tour de magie Thaumaturgie.",
-    "Vision dans le noir": "Tu vois dans l'obscurité jusqu'à 18 m (60 pieds).",
+    "Vision dans le noir": "Tu vois dans l'obscurité jusqu'à 18 m.",
   },
 };
 
@@ -156,6 +156,7 @@ export const BASIC_RULES: RuleEntry[] = [
   { title: "Armures et boucliers", text: "Une armure légère donne sa CA de base + ta Dextérité ; une armure intermédiaire, sa CA de base + ta Dextérité (au maximum +2) ; une armure lourde, une CA fixe sans Dextérité, avec une Force minimale (en dessous, ta vitesse baisse de 3 m). Chaque classe ne sait porter que certaines armures : voir sa fiche. Le détail de chaque armure est dans Armures." },
   { title: "Armes et maîtrise", text: "Une attaque d'arme utilise la Force (mêlée) ou la Dextérité (distance, ou arme à finesse). Si ta classe maîtrise l'arme, tu ajoutes ton bonus de maîtrise au jet d'attaque ; sinon non. Les dégâts ajoutent le même modificateur. Le détail de chaque arme est dans Armes." },
   { title: "Propriétés d'armes", text: "Finesse, légère, lourde, deux mains, lancer, polyvalente, munitions : chaque propriété est expliquée dans la fiche des armes qui la portent, avec ce que le jeu applique déjà et ce qu'il n'applique pas encore." },
+  { title: "Distances et unités", text: "Toutes les distances sont en mètres : une case de combat mesure 1,5 m, une vitesse de 9 m permet de parcourir six cases par tour. Les règles d'origine comptent en pieds (5 pieds = 1,5 m) ; l'application les convertit pour vous." },
   { title: "Initiative", text: "Au début d'un combat, chacun lance un d20 et ajoute son modificateur de Dextérité. On joue ensuite dans l'ordre décroissant, round après round." },
   { title: "Un tour de combat (dans l'application)", text: "À votre tour, vous choisissez une action : Attaquer une cible (avec l'arme ou le sort de votre choix) ou Esquiver (désavantage aux attaques contre vous jusqu'à votre prochain tour). Les ennemis jouent ensuite à leur tour. Pour l'instant, il n'y a ni déplacement ni action bonus." },
   { title: "Jets de mort", text: "À 0 PV, un héros est inconscient et lance un d20 à chaque tour : 10 ou plus est une réussite, moins de 10 un échec, un 1 compte pour deux échecs, un 20 le relève avec 1 PV. Trois réussites le stabilisent, trois échecs le tuent. Un coup reçu à terre compte comme un échec." },
@@ -186,7 +187,7 @@ export const WEAPON_PROPERTY_TEXT: Record<string, { name: string; text: string }
 export const ARMOR_KIND_TEXT: Record<string, { name: string; text: string }> = {
   light: { name: "Armure légère", text: "CA = valeur de l'armure + ton modificateur de Dextérité." },
   medium: { name: "Armure intermédiaire", text: "CA = valeur de l'armure + ton modificateur de Dextérité, au maximum +2." },
-  heavy: { name: "Armure lourde", text: "CA fixe : la Dextérité ne compte pas. Exige une Force minimale ; en dessous, ta vitesse baisse de 3 m (10 pieds)." },
+  heavy: { name: "Armure lourde", text: "CA fixe : la Dextérité ne compte pas. Exige une Force minimale ; en dessous, ta vitesse baisse de 3 m." },
   shield: { name: "Bouclier", text: "Ajoute 2 à ta CA, avec ou sans armure." },
 };
 

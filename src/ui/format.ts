@@ -13,3 +13,8 @@ export const ROLL_BUTTON_LABEL = {
   damage: "Lancer les dégâts",
   deathSave: "Lancer le jet de mort",
 } as const;
+
+/** Nombre à la française : 10.5 → « 10,5 ». */
+export const fmtNumber = (n: number) => String(n).replace(".", ",");
+/** Distance en mètres : 9 → « 9 m », 10.5 → « 10,5 m ». */
+export const formatMeters = (n: number) => `${fmtNumber(n)} m`;
