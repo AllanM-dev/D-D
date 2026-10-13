@@ -204,6 +204,12 @@ describe("jets de dés (animation)", () => {
     expect(dmg.dice).toHaveLength(2);
     expect(dmg.outcome).toBe("crit");
   });
+  it("enregistre le round de chaque jet", () => {
+    const s = fresh(hero({ ac: 1 }), foe({ ac: 30, maxHp: 50 }));
+    playerAttack(s, "foe", seq(D20.one, 0, D20.one));
+    expect(s.rolls.filter((r) => r.kind === "attack").map((r) => r.round)).toEqual([1, 1]);
+    expect(s.round).toBe(2);
+  });
   it("avec avantage, les deux d20 sont enregistrés et le dé retenu est indiqué", () => {
     const s = fresh(hero(), foe({ ac: 40, maxHp: 50 }));
     getCombatant(s, "foe").dodging = true; // désavantage : on garde le plus petit

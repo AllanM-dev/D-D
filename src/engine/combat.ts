@@ -60,6 +60,8 @@ export interface RollEvent {
   outcome?: RollOutcome;
   /** Nombre de lignes du journal à afficher une fois ce jet révélé. */
   logLen: number;
+  /** Round en cours au moment de ce jet. */
+  round: number;
   /** État des combattants juste après ce jet (pour mettre l'affichage à jour au bon moment). */
   after: Combatant[];
 }
@@ -111,10 +113,10 @@ export const rollDamage = (d: DamageDice, crit: boolean, rng: Rng): number => ro
 /** Copie indépendante (fonctionne aussi sur un objet réactif Vue, contrairement à structuredClone). */
 const snapshot = (combatants: Combatant[]): Combatant[] => JSON.parse(JSON.stringify(combatants));
 
-type RollInit = Omit<RollEvent, "id" | "after" | "logLen" | "keptIndex"> & { keptIndex?: number };
+type RollInit = Omit<RollEvent, "id" | "after" | "logLen" | "round" | "keptIndex"> & { keptIndex?: number };
 
 function pushRoll(state: CombatState, init: RollInit, logLen = state.log.length) {
-  state.rolls.push({ keptIndex: 0, ...init, id: state.rolls.length, logLen, after: snapshot(state.combatants) });
+  state.rolls.push({ keptIndex: 0, ...init, id: state.rolls.length, logLen, round: state.round, after: snapshot(state.combatants) });
 }
 
 /** Initiative : d20 + bonus. Égalité : meilleur bonus, puis le groupe du joueur. */

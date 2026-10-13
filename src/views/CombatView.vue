@@ -3,9 +3,9 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start"><ion-back-button :default-href="`/character/${characterId}`" /></ion-buttons>
-        <ion-title>{{ state ? `Combat · round ${state.round}` : "Combat" }}</ion-title>
+        <ion-title>{{ state ? `Combat · round ${shown?.round ?? state.round}` : "Combat" }}</ion-title>
         <ion-buttons slot="end">
-          <ion-toggle v-model="animateDice" aria-label="Animation des dés">Dés</ion-toggle>
+          <ion-toggle v-model="animateDice" aria-label="Animation de mes jets de dés">Mes dés</ion-toggle>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -53,7 +53,7 @@
       </ion-list>
 
       <!-- Lancer de dés -->
-      <DiceRoll v-if="currentRoll" :key="currentRoll.id" :event="currentRoll" :animate="animateDice" @done="nextRoll" />
+      <DiceRoll v-if="currentRoll" :key="currentRoll.id" :event="currentRoll" :start-mode="startMode" :next-label="nextLabel" @done="nextRoll" />
       <ion-button v-if="busy" expand="block" fill="clear" size="small" @click="skipAll">Passer l'animation</ion-button>
 
       <!-- Actions -->
@@ -92,7 +92,7 @@ import { MONSTERS } from "../data/monsters";
 import { characterToCombatant, defaultAttack } from "../engine/attacks";
 import { currentCombatant, playerAttack, playerDodge, startCombat, type Combatant, type CombatState, type RollEvent } from "../engine/combat";
 import { useCharacters } from "../stores/characters";
-import { signed } from "../ui/format";
+import { ROLL_BUTTON_LABEL, signed } from "../ui/format";
 
 const route = useRoute();
 const store = useCharacters();
@@ -123,11 +123,16 @@ watch(animateDice, (v) => {
 });
 
 const currentRoll = ref<RollEvent | null>(null);
+const startMode = ref<"button" | "auto">("button");
+const nextLabel = ref<string | null>(null);
 /** Affichage figé sur l'état qui suit le jet en cours ; null = on montre l'état réel. */
-const shown = ref<{ combatants: Combatant[]; logLen: number } | null>(null);
-const busy = computed(() => currentRoll.value !== null);
+const shown = ref<{ combatants: Combatant[]; logLen: number; round: number } | null>(null);
+const busy = ref(false);
 let queue: RollEvent[] = [];
 let stepDone: (() => void) | null = null;
+let skipping = false;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function showRoll(ev: RollEvent): Promise<void> {
   currentRoll.value = ev;
@@ -135,21 +140,49 @@ function showRoll(ev: RollEvent): Promise<void> {
 }
 const nextRoll = () => stepDone?.();
 function skipAll() {
+  skipping = true;
   queue = [];
   nextRoll();
 }
 
-/** Joue les jets (déjà calculés par le moteur) l'un après l'autre, en mettant l'affichage à jour après chacun. */
+/** Met l'affichage (PV, journal) à l'état qui suit ce jet. */
+function reveal(ev: RollEvent) {
+  // L'initiative est déjà affichée (liste triée) : on ne remplace l'affichage qu'à partir des attaques.
+  if (ev.kind !== "initiative") shown.value = { combatants: ev.after, logLen: ev.logLen, round: ev.round };
+}
+
+/**
+ * Rejoue les jets (déjà calculés par le moteur). Seuls vos jets ont une scène de dés, déclenchée par un bouton ;
+ * ceux des ennemis mettent simplement l'affichage à jour, avec une courte pause pour suivre le journal.
+ */
 async function play(events: RollEvent[]) {
+  skipping = false;
+  busy.value = true;
   queue = [...events];
+  let auto = false; // vrai si le joueur vient d'appuyer sur « Lancer… » pour ce jet
   while (queue.length) {
     const ev = queue.shift()!;
-    await showRoll(ev);
-    // L'initiative est déjà affichée (liste triée) : on ne remplace l'affichage qu'à partir des attaques.
-    if (ev.kind !== "initiative") shown.value = { combatants: ev.after, logLen: ev.logLen };
+    const mine = ev.side === "party";
+    if (!animateDice.value || skipping) {
+      reveal(ev);
+    } else if (mine) {
+      const next = queue[0];
+      const nextMine = !!next && next.side === "party";
+      nextLabel.value = nextMine ? ROLL_BUTTON_LABEL[next.kind] : null;
+      startMode.value = auto ? "auto" : "button";
+      await showRoll(ev);
+      reveal(ev);
+      auto = nextMine;
+      if (!nextMine) currentRoll.value = null;
+    } else {
+      auto = false;
+      reveal(ev);
+      if (ev.kind !== "initiative") await sleep(500);
+    }
   }
   currentRoll.value = null;
   shown.value = null;
+  busy.value = false;
 }
 
 const orderedCombatants = computed(() => {
@@ -170,7 +203,7 @@ async function act(run: (s: CombatState) => void) {
   const s = state.value!;
   const before = s.rolls.length;
   // Fige l'affichage sur l'état d'avant l'action : les PV ne bougent qu'au fil des jets.
-  shown.value = { combatants: JSON.parse(JSON.stringify(s.combatants)), logLen: s.log.length };
+  shown.value = { combatants: JSON.parse(JSON.stringify(s.combatants)), logLen: s.log.length, round: s.round };
   run(s);
   await play(s.rolls.slice(before));
 }
@@ -181,7 +214,7 @@ async function start(e: EncounterDef) {
   // Affichage de départ : tout le monde à pleins PV (les ennemis qui jouent en premier le seront après leur jet).
   const fresh: Combatant[] = JSON.parse(JSON.stringify(s.combatants));
   for (const c of fresh) Object.assign(c, { hp: c.maxHp, dead: false, stable: false, dodging: false, deathSaves: { successes: 0, failures: 0 } });
-  shown.value = { combatants: fresh, logLen: 0 };
+  shown.value = { combatants: fresh, logLen: 0, round: 1 };
   await play(s.rolls);
 }
 const attackTarget = (id: string) => act((s) => playerAttack(s, id));

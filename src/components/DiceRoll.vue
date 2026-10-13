@@ -1,5 +1,5 @@
 <template>
-  <div class="stage" role="status" aria-live="polite" @click="tap">
+  <div class="stage" role="status" aria-live="polite">
     <p class="title">{{ event.title }}</p>
 
     <div class="dice">
@@ -7,43 +7,56 @@
         v-for="(value, i) in shown"
         :key="i"
         class="die"
-        :class="[{ rolling, dropped: !rolling && isDropped(i) }, settledClass]"
+        :class="[{ rolling: phase === 'rolling', dropped: phase === 'settled' && isDropped(i) }, settledClass]"
       >
         <span>{{ value }}</span>
       </div>
     </div>
-    <p class="sides">d{{ event.sides }}<template v-if="event.dice.length > 1 && event.sides === 20"> · on garde le {{ keepsHighest ? "meilleur" : "pire" }}</template></p>
+    <p v-if="event.sides" class="sides">
+      d{{ event.sides }}<template v-if="event.dice.length > 1 && event.sides === 20"> · on garde le {{ keepsHighest ? "meilleur" : "pire" }}</template>
+    </p>
 
-    <template v-if="!rolling">
+    <template v-if="phase === 'settled'">
       <p class="calc">{{ calc }}</p>
       <p v-if="outcomeText" class="outcome" :class="event.outcome">{{ outcomeText }}</p>
     </template>
-    <p v-else class="calc">…</p>
-    <small class="hint">Touchez pour passer</small>
+    <p v-else-if="phase === 'rolling'" class="calc">…</p>
+
+    <ion-button v-if="phase === 'ready'" expand="block" @click="roll">{{ ROLL_BUTTON_LABEL[event.kind] }}</ion-button>
+    <ion-button v-else-if="phase === 'rolling'" expand="block" fill="outline" @click="settle">Voir le résultat</ion-button>
+    <ion-button v-else expand="block" @click="finish">{{ nextLabel ?? "Continuer" }}</ion-button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { IonButton } from "@ionic/vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type { RollEvent } from "../engine/combat";
-import { signed } from "../ui/format";
+import { ROLL_BUTTON_LABEL, signed } from "../ui/format";
 
-const props = defineProps<{ event: RollEvent; animate: boolean }>();
+const props = defineProps<{
+  event: RollEvent;
+  /** « button » : le joueur doit appuyer pour lancer ; « auto » : il vient d'appuyer sur « Lancer… » à l'étape précédente. */
+  startMode: "button" | "auto";
+  /** Libellé du bouton de suite quand le jet suivant est aussi un jet du joueur. */
+  nextLabel: string | null;
+}>();
 const emit = defineEmits<{ done: [] }>();
 
-const ROLL_MS = 750;
-const HOLD_MS = 900;
+const reducedMotion = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+const ROLL_MS = reducedMotion ? 250 : 750;
 
-const rolling = ref(props.animate);
-const randoms = ref<number[]>(props.event.dice.map(() => 1));
+type Phase = "ready" | "rolling" | "settled";
+const phase = ref<Phase>(props.startMode === "button" ? "ready" : "rolling");
+const randoms = ref<(number | string)[]>(props.event.dice.map(() => "?"));
 let tick: ReturnType<typeof setInterval> | undefined;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let finished = false;
 
-const shown = computed(() => (rolling.value ? randoms.value : props.event.dice));
+const shown = computed(() => (phase.value === "settled" ? props.event.dice : randoms.value));
 const keepsHighest = computed(() => props.event.dice[props.event.keptIndex] === Math.max(...props.event.dice));
 const isDropped = (i: number) => props.event.dice.length > 1 && props.event.sides === 20 && i !== props.event.keptIndex;
-const settledClass = computed(() => (rolling.value ? "" : props.event.outcome ?? ""));
+const settledClass = computed(() => (phase.value === "settled" ? props.event.outcome ?? "" : ""));
 
 const kept = computed(() =>
   props.event.sides === 20 && props.event.dice.length > 1 ? props.event.dice[props.event.keptIndex] : null,
@@ -70,39 +83,32 @@ const outcomeText = computed(() => {
   return OUTCOMES[e.outcome] ?? "";
 });
 
+function roll() {
+  phase.value = "rolling";
+  if (!reducedMotion) {
+    tick = setInterval(() => {
+      randoms.value = props.event.dice.map(() => 1 + Math.floor(Math.random() * props.event.sides));
+    }, 70);
+  }
+  timer = setTimeout(settle, ROLL_MS);
+}
+
 function settle() {
-  if (!rolling.value) return;
+  if (phase.value !== "rolling") return;
   clearInterval(tick);
   clearTimeout(timer);
-  rolling.value = false;
-  timer = setTimeout(finish, HOLD_MS);
+  phase.value = "settled";
 }
 
 function finish() {
   if (finished) return;
   finished = true;
-  clearInterval(tick);
-  clearTimeout(timer);
   emit("done");
 }
 
-/** Un premier toucher révèle le résultat, un second passe au jet suivant. */
-function tap() {
-  if (rolling.value) settle();
-  else finish();
-}
-
 onMounted(() => {
-  if (!props.animate) {
-    timer = setTimeout(finish, HOLD_MS);
-    return;
-  }
-  tick = setInterval(() => {
-    randoms.value = props.event.dice.map(() => 1 + Math.floor(Math.random() * props.event.sides));
-  }, 70);
-  timer = setTimeout(settle, ROLL_MS);
+  if (props.startMode === "auto") roll();
 });
-
 onBeforeUnmount(() => {
   clearInterval(tick);
   clearTimeout(timer);
@@ -116,7 +122,6 @@ onBeforeUnmount(() => {
   padding: 12px;
   margin: 12px 0;
   text-align: center;
-  cursor: pointer;
   user-select: none;
 }
 .title { margin: 0 0 8px; font-weight: 600; }
@@ -141,12 +146,12 @@ onBeforeUnmount(() => {
 .die.dropped { opacity: 0.35; transform: scale(0.85); }
 .sides { margin: 6px 0 0; opacity: 0.7; font-size: 0.85rem; }
 .calc { margin: 8px 0 0; font-size: 1.05rem; }
-.outcome { margin: 4px 0 0; font-weight: 700; font-size: 1.1rem; }
+.outcome { margin: 4px 0 8px; font-weight: 700; font-size: 1.1rem; }
 .outcome.hit, .outcome.success { color: var(--ion-color-success, #2dd36f); }
 .outcome.crit { color: var(--ion-color-warning, #ffc409); }
 .outcome.miss, .outcome.failure { color: var(--ion-color-medium, #92949c); }
 .outcome.fumble { color: var(--ion-color-danger, #eb445a); }
-.hint { display: block; margin-top: 6px; opacity: 0.5; font-size: 0.75rem; }
+ion-button { margin-top: 10px; }
 
 @keyframes tumble {
   0% { transform: rotate(0deg) scale(1); }
