@@ -4,6 +4,7 @@
       <ion-toolbar>
         <ion-buttons slot="start"><ion-back-button default-href="/" /></ion-buttons>
         <ion-title>{{ c?.name ?? "Personnage" }}</ion-title>
+        <ion-buttons slot="end"><ion-menu-button /></ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content v-if="c" class="ion-padding">
@@ -53,7 +54,7 @@
 <script setup lang="ts">
 import {
   IonBackButton, IonButton, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader,
-  IonNote, IonPage, IonTitle, IonToolbar, useIonRouter,
+  IonMenuButton, IonNote, IonPage, IonTitle, IonToolbar, useIonRouter,
 } from "@ionic/vue";
 import { computed } from "vue";
 import { useRoute } from "vue-router";

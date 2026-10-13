@@ -11,6 +11,8 @@
 - [x] Persistance locale (localStorage) — à migrer vers @capacitor/preferences / SQLite pour l'app native
 - [ ] Traits d'espèce et de classe de niveau 1, équipement de départ, sorts de départ, don d'origine détaillé
 
+- [x] Menu latéral et page Aide : règles de base, caractéristiques, fiches des 12 classes, 9 espèces et 4 historiques
+
 ## Jalon 2 — Combat
 - [x] Initiative, tours, action Attaquer / Esquiver (combat 1 contre N, sans positions)
 - [x] Animation de vos jets de dés (initiative, attaque, dégâts, jets de mort), déclenchée par un bouton, désactivable ; les jets ennemis se résolvent sans dés

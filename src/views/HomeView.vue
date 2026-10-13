@@ -1,7 +1,10 @@
 <template>
   <ion-page>
     <ion-header>
-      <ion-toolbar><ion-title>D&amp;D Mobile</ion-title></ion-toolbar>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button /></ion-buttons>
+        <ion-title>D&amp;D Mobile</ion-title>
+      </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
       <ion-button expand="block" router-link="/create">Créer un personnage</ion-button>
@@ -21,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader, IonPage, IonTitle, IonToolbar } from "@ionic/vue";
+import { IonButton, IonButtons, IonMenuButton, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader, IonPage, IonTitle, IonToolbar } from "@ionic/vue";
 import { useCharacters } from "../stores/characters";
 
 const store = useCharacters();

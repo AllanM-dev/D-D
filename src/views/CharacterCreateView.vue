@@ -4,6 +4,7 @@
       <ion-toolbar>
         <ion-buttons slot="start"><ion-back-button default-href="/" /></ion-buttons>
         <ion-title>Nouveau personnage</ion-title>
+        <ion-buttons slot="end"><ion-menu-button /></ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
@@ -171,7 +172,7 @@
 <script setup lang="ts">
 import {
   IonAccordion, IonAccordionGroup, IonBackButton, IonButton, IonButtons, IonCheckbox, IonContent, IonHeader, IonIcon,
-  IonInput, IonItem, IonLabel, IonList, IonModal, IonNote, IonPage, IonSegment, IonSegmentButton, IonSelect,
+  IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonModal, IonNote, IonPage, IonSegment, IonSegmentButton, IonSelect,
   IonSelectOption, IonTitle, IonToolbar, useIonRouter,
 } from "@ionic/vue";
 import { informationCircleOutline } from "ionicons/icons";
