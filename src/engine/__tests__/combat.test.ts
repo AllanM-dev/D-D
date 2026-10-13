@@ -175,6 +175,52 @@ describe("déroulement", () => {
   });
 });
 
+describe("jets de dés (animation)", () => {
+  it("enregistre un jet d'initiative par combattant", () => {
+    const s = fresh();
+    const init = s.rolls.filter((r) => r.kind === "initiative");
+    expect(init.map((r) => r.actorId).sort()).toEqual(["foe", "hero"]);
+    expect(init.find((r) => r.actorId === "hero")).toMatchObject({ sides: 20, dice: [20], modifier: 5, total: 25 });
+  });
+  it("un coup touché produit un jet d'attaque puis un jet de dégâts, avec l'état au bon moment", () => {
+    const s = fresh(hero(), foe({ ac: 10, maxHp: 50 }));
+    const before = s.rolls.length;
+    resolveAttack(s, getCombatant(s, "hero"), getCombatant(s, "foe"), sword, seq(0.5, 0.5)); // d20 = 11, d8 = 5
+    const [atk, dmg] = s.rolls.slice(before);
+    expect(atk).toMatchObject({ kind: "attack", dice: [11], total: 16, dc: 10, outcome: "hit" });
+    expect(dmg).toMatchObject({ kind: "damage", sides: 8, dice: [5], modifier: 3, total: 8 });
+    expect(atk.after.find((c) => c.id === "foe")!.hp).toBe(50); // les PV baissent seulement au jet de dégâts
+    expect(dmg.after.find((c) => c.id === "foe")!.hp).toBe(42);
+    expect(atk.logLen).toBeLessThan(dmg.logLen);
+  });
+  it("un raté ne produit qu'un jet d'attaque ; un critique lance les dés doublés", () => {
+    const s = fresh(hero(), foe({ ac: 15, maxHp: 50 }));
+    const n = s.rolls.length;
+    resolveAttack(s, getCombatant(s, "hero"), getCombatant(s, "foe"), sword, seq(0.2));
+    expect(s.rolls.slice(n)).toHaveLength(1);
+    expect(s.rolls[n]).toMatchObject({ outcome: "miss" });
+    resolveAttack(s, getCombatant(s, "hero"), getCombatant(s, "foe"), sword, seq(D20.twenty, 0.5, 0.5));
+    const dmg = s.rolls[s.rolls.length - 1];
+    expect(dmg.dice).toHaveLength(2);
+    expect(dmg.outcome).toBe("crit");
+  });
+  it("avec avantage, les deux d20 sont enregistrés et le dé retenu est indiqué", () => {
+    const s = fresh(hero(), foe({ ac: 40, maxHp: 50 }));
+    getCombatant(s, "foe").dodging = true; // désavantage : on garde le plus petit
+    resolveAttack(s, getCombatant(s, "hero"), getCombatant(s, "foe"), sword, seq(0.9, 0.2));
+    const atk = s.rolls[s.rolls.length - 1];
+    expect(atk.dice).toEqual([19, 5]);
+    expect(atk.keptIndex).toBe(1);
+  });
+  it("enregistre les jets de mort", () => {
+    const s = startCombat([hero({ initiativeBonus: 20 })], [foe({ initiativeBonus: -20, attacks: [] })], seq(0.5, 0.5));
+    getCombatant(s, "hero").hp = 0;
+    const n = s.rolls.length;
+    processTurns(s, seq(D20.twenty));
+    expect(s.rolls[n]).toMatchObject({ kind: "deathSave", dice: [20], outcome: "crit" });
+  });
+});
+
 describe("personnage → combattant", () => {
   const base: CharacterDraft = {
     name: "T", speciesId: "human", classId: "wizard", backgroundId: "sage", method: "standard",

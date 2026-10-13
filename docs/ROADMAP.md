@@ -13,6 +13,7 @@
 
 ## Jalon 2 — Combat
 - [x] Initiative, tours, action Attaquer / Esquiver (combat 1 contre N, sans positions)
+- [x] Animation des jets de dés (initiative, attaque, dégâts, jets de mort), désactivable
 - [ ] Actions bonus, réactions, déplacement, portée
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
 - [ ] Conditions, résistances, sorts de combat, soins, capacités de classe
