@@ -152,9 +152,53 @@ export const BASIC_RULES: RuleEntry[] = [
   { title: "Avantage et désavantage", text: "Avec l'avantage, tu lances deux d20 et gardes le meilleur ; avec le désavantage, tu gardes le pire. S'il y a les deux, ils s'annulent." },
   { title: "Coup critique et échec critique", text: "Un 20 naturel sur une attaque touche toujours et fait un coup critique : tu lances deux fois les dés de dégâts. Un 1 naturel rate toujours." },
   { title: "Points de vie (PV)", text: "Ils mesurent ta résistance. Au niveau 1, tu as le dé de vie de ta classe au maximum, plus ton modificateur de Constitution. À 0 PV, un ennemi est vaincu ; un héros tombe inconscient." },
-  { title: "Classe d'armure (CA)", text: "Elle indique la difficulté pour te toucher. Sans armure, elle vaut 10 + ton modificateur de Dextérité (certaines classes ont une formule différente)." },
+  { title: "Classe d'armure (CA)", text: "Elle indique la difficulté pour te toucher. Sans armure, elle vaut 10 + ton modificateur de Dextérité (le barbare ajoute sa Constitution, le moine sa Sagesse). Une armure remplace ce calcul, un bouclier ajoute 2." },
+  { title: "Armures et boucliers", text: "Une armure légère donne sa CA de base + ta Dextérité ; une armure intermédiaire, sa CA de base + ta Dextérité (au maximum +2) ; une armure lourde, une CA fixe sans Dextérité, avec une Force minimale (en dessous, ta vitesse baisse de 3 m). Chaque classe ne sait porter que certaines armures : voir sa fiche. Le détail de chaque armure est dans Armures." },
+  { title: "Armes et maîtrise", text: "Une attaque d'arme utilise la Force (mêlée) ou la Dextérité (distance, ou arme à finesse). Si ta classe maîtrise l'arme, tu ajoutes ton bonus de maîtrise au jet d'attaque ; sinon non. Les dégâts ajoutent le même modificateur. Le détail de chaque arme est dans Armes." },
+  { title: "Propriétés d'armes", text: "Finesse, légère, lourde, deux mains, lancer, polyvalente, munitions : chaque propriété est expliquée dans la fiche des armes qui la portent, avec ce que le jeu applique déjà et ce qu'il n'applique pas encore." },
   { title: "Initiative", text: "Au début d'un combat, chacun lance un d20 et ajoute son modificateur de Dextérité. On joue ensuite dans l'ordre décroissant, round après round." },
-  { title: "Un tour de combat (dans l'application)", text: "À votre tour, vous choisissez une action : Attaquer une cible ou Esquiver (désavantage aux attaques contre vous jusqu'à votre prochain tour). Les ennemis jouent ensuite à leur tour. Pour l'instant, il n'y a ni déplacement ni action bonus." },
+  { title: "Un tour de combat (dans l'application)", text: "À votre tour, vous choisissez une action : Attaquer une cible (avec l'arme ou le sort de votre choix) ou Esquiver (désavantage aux attaques contre vous jusqu'à votre prochain tour). Les ennemis jouent ensuite à leur tour. Pour l'instant, il n'y a ni déplacement ni action bonus." },
   { title: "Jets de mort", text: "À 0 PV, un héros est inconscient et lance un d20 à chaque tour : 10 ou plus est une réussite, moins de 10 un échec, un 1 compte pour deux échecs, un 20 le relève avec 1 PV. Trois réussites le stabilisent, trois échecs le tuent. Un coup reçu à terre compte comme un échec." },
   { title: "Repos", text: "Un repos court (1 heure) et un repos long (8 heures) permettent de récupérer des capacités et des PV. Ils ne sont pas encore gérés dans l'application." },
 ];
+
+/** Fonctionnement de l'application elle-même. À tenir à jour à chaque nouvelle fonctionnalité visible. */
+export const APP_GUIDE: RuleEntry[] = [
+  { title: "Créer un personnage", text: "Depuis l'accueil, « Créer un personnage » : donnez un nom, choisissez une espèce, une classe et un historique (le bouton ⓘ à côté des listes décrit chaque choix), répartissez vos caractéristiques, appliquez le bonus de l'historique, puis choisissez vos compétences de classe. Le bouton de création s'active quand tout est valide ; les messages en rouge indiquent ce qu'il reste à régler." },
+  { title: "Répartir les caractéristiques", text: "Trois méthodes : le tableau standard (15, 14, 13, 12, 10 et 8, chacun une seule fois), l'achat de points (27 points à dépenser, scores de 8 à 15, les hauts scores coûtent plus cher) ou le tirage (4d6 dont on retire le plus bas, six fois). Les deux caractéristiques marquées ★ sont les plus utiles à votre classe." },
+  { title: "Le bonus de l'historique", text: "Votre historique ajoute +2 à une caractéristique et +1 à une autre, ou +1 à trois, parmi les trois qu'il propose. Ce bonus s'ajoute à la répartition choisie, avec un maximum de 20." },
+  { title: "Équipement de départ", text: "Chaque classe reçoit un équipement de départ : armure, bouclier, armes, matériel et quelques pièces d'or. Le guerrier choisit entre deux lots. L'écran de création montre le contenu et la CA obtenue. Votre fiche liste ensuite l'armure portée, vos armes, vos objets et votre or. L'équipement de l'historique et l'option « or à la place » ne sont pas encore disponibles." },
+  { title: "Lancer un combat", text: "Sur la fiche d'un personnage, « Lancer un combat », puis choisissez une rencontre. Sa difficulté est indicative pour un personnage seul de niveau 1. Les PV sont remis à fond au début de chaque combat. Avant chaque attaque, choisissez l'arme ou le sort à utiliser : le bonus pour toucher et les dégâts sont affichés, et la meilleure option est proposée en premier. Sans positions, les munitions sont illimitées et les armes à distance n'ont pas de pénalité au contact." },
+  { title: "Lancer vos dés", text: "Vos jets (initiative, attaque, dégâts, jets de mort) se lancent en appuyant sur un bouton : « Lancer le d20 », puis « Lancer les dégâts » si votre attaque touche. Le dé s'anime et le résultat reste affiché jusqu'à « Continuer ». Les jets des ennemis se déroulent sans animation. L'interrupteur « Mes dés » en haut à droite, coupé, rend tout instantané ; « Passer l'animation » saute les jets restants." },
+  { title: "Sauvegarde de vos personnages", text: "Les personnages sont enregistrés dans le navigateur de votre appareil. Ils restent d'une visite à l'autre, mais ne sont pas partagés entre deux appareils, et effacer les données du site les supprime." },
+];
+
+export const WEAPON_PROPERTY_TEXT: Record<string, { name: string; text: string }> = {
+  finesse: { name: "Finesse", text: "Tu peux utiliser la Force ou la Dextérité, au choix, pour l'attaque et les dégâts. Le jeu retient automatiquement la meilleure." },
+  light: { name: "Légère", text: "Permet de combattre avec une arme dans chaque main. Cette option n'est pas encore gérée." },
+  heavy: { name: "Lourde", text: "Désavantage à l'attaque si ta Force (mêlée) ou ta Dextérité (distance) est inférieure à 13. Pas encore appliqué." },
+  "two-handed": { name: "Deux mains", text: "Se manie à deux mains. Le jeu ne vérifie pas encore l'incompatibilité avec un bouclier." },
+  thrown: { name: "Lancer", text: "Peut être lancée pour une attaque à distance, jusqu'à la portée indiquée. Le jeu propose alors une variante « (lancer) » de l'attaque." },
+  versatile: { name: "Polyvalente", text: "Inflige plus de dégâts tenue à deux mains. Dans le jeu : le dé le plus grand est utilisé si tu ne portes pas de bouclier." },
+  ammunition: { name: "Munitions", text: "Nécessite des munitions (flèches). Le jeu ne les compte pas encore : elles sont illimitées." },
+};
+
+export const ARMOR_KIND_TEXT: Record<string, { name: string; text: string }> = {
+  light: { name: "Armure légère", text: "CA = valeur de l'armure + ton modificateur de Dextérité." },
+  medium: { name: "Armure intermédiaire", text: "CA = valeur de l'armure + ton modificateur de Dextérité, au maximum +2." },
+  heavy: { name: "Armure lourde", text: "CA fixe : la Dextérité ne compte pas. Exige une Force minimale ; en dessous, ta vitesse baisse de 3 m (10 pieds)." },
+  shield: { name: "Bouclier", text: "Ajoute 2 à ta CA, avec ou sans armure." },
+};
+
+export const WEAPON_TRAINING_TEXT: Record<string, string> = {
+  simple: "armes courantes",
+  "simple+martial": "armes courantes et armes de guerre",
+  "simple+martial-light": "armes courantes et armes de guerre légères",
+  "simple+martial-finesse-or-light": "armes courantes et armes de guerre à finesse ou légères",
+};
+export const ARMOR_TRAINING_TEXT: Record<string, string> = {
+  light: "armures légères",
+  medium: "armures intermédiaires",
+  heavy: "armures lourdes",
+  shield: "boucliers",
+};

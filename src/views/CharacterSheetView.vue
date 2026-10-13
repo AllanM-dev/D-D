@@ -41,6 +41,30 @@
       </ion-list>
 
       <ion-list inset>
+        <ion-list-header><ion-label>Attaques</ion-label></ion-list-header>
+        <ion-item v-for="a in c.attacks" :key="a.name" lines="full">
+          <ion-label class="ion-text-wrap">
+            {{ a.name }}
+            <p>{{ a.damage.count }}d{{ a.damage.sides }}{{ a.damage.bonus ? signed(a.damage.bonus) : "" }} {{ a.damageType }}{{ a.ranged ? " · à distance" : " · corps à corps" }}</p>
+          </ion-label>
+          <ion-note slot="end">{{ signed(a.toHit) }}</ion-note>
+        </ion-item>
+      </ion-list>
+
+      <ion-list inset>
+        <ion-list-header><ion-label>Équipement</ion-label></ion-list-header>
+        <ion-item lines="full"><ion-label>Armure</ion-label><ion-note slot="end">{{ c.equipment.armor?.name ?? "Aucune" }}</ion-note></ion-item>
+        <ion-item lines="full"><ion-label>Bouclier</ion-label><ion-note slot="end">{{ c.equipment.shield ? "Oui (+2 CA)" : "Non" }}</ion-note></ion-item>
+        <ion-item v-for="w in c.equipment.weapons" :key="w.id" lines="full">
+          <ion-label>{{ w.name }}</ion-label><ion-note v-if="w.qty > 1" slot="end">× {{ w.qty }}</ion-note>
+        </ion-item>
+        <ion-item v-for="g in c.equipment.gear" :key="g.name" lines="full">
+          <ion-label class="ion-text-wrap">{{ g.name }}</ion-label><ion-note v-if="g.qty > 1" slot="end">× {{ g.qty }}</ion-note>
+        </ion-item>
+        <ion-item lines="none"><ion-label>Pièces d'or</ion-label><ion-note slot="end">{{ c.equipment.gold }} po</ion-note></ion-item>
+      </ion-list>
+
+      <ion-list inset>
         <ion-list-header><ion-label>Don d'origine</ion-label></ion-list-header>
         <ion-item><ion-label>{{ c.originFeat }}</ion-label></ion-item>
       </ion-list>

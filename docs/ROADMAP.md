@@ -9,7 +9,9 @@
 - [x] Création niveau 1 : espèce, classe, historique, caractéristiques (tableau standard, achat de points, tirage 4d6), bonus d'historique 2024, compétences
 - [x] Feuille de personnage (PV, CA, initiative, compétences, jets de sauvegarde)
 - [x] Persistance locale (localStorage) — à migrer vers @capacitor/preferences / SQLite pour l'app native
-- [ ] Traits d'espèce et de classe de niveau 1, équipement de départ, sorts de départ, don d'origine détaillé
+- [x] Équipement de départ par classe (armure, bouclier, armes, objets, or) : CA, vitesse et attaques calculées ; fiche et aide Armes/Armures
+- [ ] Équipement de l'historique, option « or à la place », boutique, inventaire modifiable
+- [ ] Traits d'espèce et de classe de niveau 1 appliqués, sorts de départ, don d'origine appliqué
 
 - [x] Menu latéral et page Aide : règles de base, caractéristiques, fiches des 12 classes, 9 espèces et 4 historiques
 
@@ -20,7 +22,7 @@
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
 - [ ] Conditions, résistances, sorts de combat, soins, capacités de classe
 - [x] Bestiaire de départ (7 monstres, SRD 5.1) et 7 rencontres
-- [ ] Bestiaire complet, capacités spéciales des monstres, équipement et armures, compagnons
+- [ ] Bestiaire complet, capacités spéciales des monstres, compagnons, propriétés d'armes (lourde, légère, maîtrises), munitions
 
 ## Jalon 3 — Aventure
 - [ ] Format de scénario (scènes, choix, tests de compétence)

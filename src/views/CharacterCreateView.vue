@@ -123,6 +123,21 @@
         </ion-list>
       </template>
 
+      <!-- Équipement de départ -->
+      <template v-if="classDef && kits.length">
+        <h3>Équipement de départ</h3>
+        <ion-segment v-if="kits.length > 1" v-model="draft.kitId">
+          <ion-segment-button v-for="k in kits" :key="k.id" :value="k.id"><ion-label>Lot {{ k.id }}</ion-label></ion-segment-button>
+        </ion-segment>
+        <ion-list inset>
+          <ion-item v-for="line in kitLines" :key="line" lines="none"><ion-label class="ion-text-wrap">{{ line }}</ion-label></ion-item>
+          <ion-item lines="none"><ion-label>{{ currentKit?.gold }} po</ion-label></ion-item>
+        </ion-list>
+        <p class="hint" v-if="preview">Avec cet équipement : CA {{ preview.armorClass }}, vitesse {{ preview.speed }} pieds.</p>
+        <p class="hint" v-else>Répartissez vos caractéristiques pour voir votre classe d'armure.</p>
+        <p class="hint">L'équipement de votre historique et l'option « or à la place » ne sont pas encore gérés.</p>
+      </template>
+
       <ion-note v-if="errors.length" color="danger" class="errors">
         <div v-for="e in errors" :key="e">• {{ e }}</div>
       </ion-note>
@@ -185,6 +200,8 @@ import {
   POINT_BUY_BUDGET, POINT_BUY_MAX, POINT_BUY_MIN, STANDARD_ARRAY, defaultScores, pointBuyCost, pointBuyTotal, rollAbilityPool,
 } from "../engine/abilities";
 import { keyAbilities } from "../engine/advice";
+import { computeEquipment, kitsFor } from "../engine/equipment";
+import { ARMORS, WEAPONS, type KitEntry } from "../data/equipment";
 import { applyBackgroundBonus, buildCharacter, validateDraft, type CharacterDraft } from "../engine/character";
 import { ABILITIES, abilityModifier, type Ability } from "../engine/rules";
 import { newId, useCharacters } from "../stores/characters";
@@ -231,7 +248,10 @@ watch(() => draft.backgroundId, () => {
   draft.bonus = { mode: "2/1", plus2: first, plus1: second };
   pruneSkills();
 });
-watch(() => draft.classId, () => { draft.classSkills = []; });
+watch(() => draft.classId, (id) => {
+  draft.classSkills = [];
+  draft.kitId = id ? kitsFor(id)[0].id : undefined;
+});
 
 function pruneSkills() {
   draft.classSkills = draft.classSkills.filter((s) => classSkillOptions.value.includes(s));
@@ -294,6 +314,25 @@ const final = computed(() => {
 });
 
 const errors = computed(() => validateDraft(draft));
+
+// --- équipement de départ
+const kits = computed(() => (classDef.value ? kitsFor(classDef.value.id) : []));
+const currentKit = computed(() => kits.value.find((k) => k.id === draft.kitId) ?? kits.value[0]);
+function describeEntry(e: KitEntry): string {
+  if ("weapon" in e) return `${WEAPONS.find((w) => w.id === e.weapon)!.name}${e.qty && e.qty > 1 ? ` × ${e.qty}` : ""}`;
+  if ("armor" in e) return ARMORS.find((a) => a.id === e.armor)!.name;
+  return `${e.gear}${e.qty && e.qty > 1 ? ` × ${e.qty}` : ""}`;
+}
+const kitLines = computed(() => currentKit.value?.entries.map(describeEntry) ?? []);
+/** CA et vitesse avec l'équipement choisi, une fois les caractéristiques réparties. */
+const preview = computed(() => {
+  const cls = classDef.value;
+  const sp = SPECIES.find((x) => x.id === draft.speciesId);
+  if (!cls || !sp || ABILITIES.some((a) => final.value[a] <= 0)) return null;
+  const scores = final.value;
+  const modifiers = Object.fromEntries(ABILITIES.map((a) => [a, abilityModifier(scores[a])])) as Record<Ability, number>;
+  return computeEquipment({ classId: cls.id, scores, modifiers, proficiencyBonus: 2, baseSpeed: sp.speed }, draft.kitId);
+});
 
 function create() {
   const c = buildCharacter(JSON.parse(JSON.stringify(draft)) as CharacterDraft, newId());

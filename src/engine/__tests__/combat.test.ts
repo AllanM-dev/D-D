@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ENCOUNTERS, buildEnemies } from "../../data/encounters";
 import { MONSTERS } from "../../data/monsters";
-import { characterToCombatant, defaultAttack } from "../attacks";
+import { characterToCombatant } from "../attacks";
 import { buildCharacter, type CharacterDraft } from "../character";
 import {
   applyDamage, currentCombatant, getCombatant, makeCombatant, playerAttack, playerDodge, processTurns, resolveAttack,
@@ -233,16 +233,19 @@ describe("personnage → combattant", () => {
     baseScores: { STR: 8, DEX: 13, CON: 14, INT: 15, WIS: 12, CHA: 10 },
     bonus: { mode: "2/1", plus2: "INT", plus1: "CON" }, classSkills: ["investigation", "medicine"],
   };
-  it("le magicien lance un trait de feu sans modificateur aux dégâts", () => {
+  it("le magicien combat d'abord avec son trait de feu, sans modificateur aux dégâts", () => {
     const c = buildCharacter(base, "w");
-    expect(defaultAttack(c)).toMatchObject({ name: "Trait de feu", toHit: 3 + 2, damage: { sides: 10, bonus: 0 }, ranged: true });
+    expect(c.attacks[0]).toMatchObject({ name: "Trait de feu", toHit: 3 + 2, damage: { sides: 10, bonus: 0 }, ranged: true });
     expect(characterToCombatant(c)).toMatchObject({ maxHp: 8, ac: 11, initiativeBonus: 1 });
+    expect(characterToCombatant(c).attacks.length).toBe(c.attacks.length);
   });
-  it("le guerrier agile utilise l'arc long", () => {
+  it("le guerrier en cotte de mailles a la CA de l'armure et plusieurs attaques", () => {
     const c = buildCharacter(
       { ...base, classId: "fighter", backgroundId: "soldier", baseScores: { STR: 10, DEX: 15, CON: 14, INT: 8, WIS: 12, CHA: 13 },
-        bonus: { mode: "2/1", plus2: "DEX", plus1: "CON" }, classSkills: ["perception", "survival"] }, "f");
-    expect(defaultAttack(c)).toMatchObject({ name: "Arc long", ranged: true });
+        bonus: { mode: "2/1", plus2: "STR", plus1: "CON" }, classSkills: ["perception", "survival"] }, "f");
+    expect(c.armorClass).toBe(16);
+    expect(characterToCombatant(c).ac).toBe(16);
+    expect(c.attacks.length).toBeGreaterThan(2);
   });
   it("les données de monstres et de rencontres sont cohérentes", () => {
     for (const e of ENCOUNTERS) expect(buildEnemies(e).length).toBeGreaterThan(0);

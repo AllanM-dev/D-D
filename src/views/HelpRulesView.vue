@@ -3,13 +3,13 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start"><ion-back-button default-href="/help" /></ion-buttons>
-        <ion-title>{{ abilities ? "Caractéristiques" : "Règles de base" }}</ion-title>
+        <ion-title>{{ title }}</ion-title>
         <ion-buttons slot="end"><ion-menu-button /></ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
       <ion-accordion-group v-if="!abilities" multiple>
-        <ion-accordion v-for="r in BASIC_RULES" :key="r.title" :value="r.title">
+        <ion-accordion v-for="r in entries" :key="r.title" :value="r.title">
           <ion-item slot="header"><ion-label class="ion-text-wrap">{{ r.title }}</ion-label></ion-item>
           <div slot="content" class="detail"><p>{{ r.text }}</p></div>
         </ion-accordion>
@@ -44,12 +44,15 @@ import {
 } from "@ionic/vue";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
-import { ABILITY_HELP, BASIC_RULES } from "../data/help";
+import { ABILITY_HELP, APP_GUIDE, BASIC_RULES } from "../data/help";
 import { SKILLS } from "../data/skills";
 import { ABILITY_NAMES } from "../ui/format";
 
 const route = useRoute();
 const abilities = computed(() => route.path.endsWith("/abilities"));
+const guide = computed(() => route.path.endsWith("/guide"));
+const title = computed(() => (abilities.value ? "Caractéristiques" : guide.value ? "Utiliser l'application" : "Règles de base"));
+const entries = computed(() => (guide.value ? APP_GUIDE : BASIC_RULES));
 </script>
 
 <style scoped>
