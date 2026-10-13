@@ -36,3 +36,7 @@ docs/         roadmap et architecture
 ```
 
 Voir [docs/ROADMAP.md](docs/ROADMAP.md) et [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Version en ligne
+
+Après fusion dans `main` et activation de *Settings → Pages → Source : GitHub Actions*, l'app est publiée sur `https://allanm-dev.github.io/D-D/` (utilisable sur téléphone, ajoutable à l'écran d'accueil).
