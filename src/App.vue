@@ -24,6 +24,7 @@ import { IonApp, IonContent, IonHeader, IonItem, IonLabel, IonList, IonMenu, Ion
 const items = [
   { path: "/", label: "Accueil", sub: false },
   { path: "/help", label: "Aide", sub: false },
+  { path: "/help/guide", label: "Utiliser l'application", sub: true },
   { path: "/help/rules", label: "Règles de base", sub: true },
   { path: "/help/classes", label: "Classes", sub: true },
   { path: "/help/species", label: "Espèces", sub: true },

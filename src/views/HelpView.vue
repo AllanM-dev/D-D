@@ -27,6 +27,7 @@
 import { IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonTitle, IonToolbar } from "@ionic/vue";
 
 const sections = [
+  { path: "/help/guide", title: "Utiliser l'application", text: "Créer un personnage, lancer un combat, lancer vos dés, sauvegarde." },
   { path: "/help/rules", title: "Règles de base", text: "Jet de d20, avantage, PV, CA, initiative, jets de mort…" },
   { path: "/help/abilities", title: "Caractéristiques", text: "À quoi servent Force, Dextérité, Constitution, Intelligence, Sagesse, Charisme." },
   { path: "/help/classes", title: "Classes", text: "Les 12 classes : rôle, capacités de niveau 1, caractéristiques à privilégier." },
