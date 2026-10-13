@@ -57,7 +57,7 @@
           <ion-item><ion-label>Catégorie</ion-label><ion-note slot="end">{{ wp.category === "simple" ? "Arme courante" : "Arme de guerre" }}</ion-note></ion-item>
           <ion-item><ion-label>Type</ion-label><ion-note slot="end">{{ wp.ranged ? "À distance" : "Corps à corps" }}</ion-note></ion-item>
           <ion-item><ion-label>Dégâts</ion-label><ion-note slot="end">{{ wp.damage.count }}d{{ wp.damage.sides }} {{ wp.damageType }}{{ wp.versatileSides ? ` (1d${wp.versatileSides} à deux mains)` : "" }}</ion-note></ion-item>
-          <ion-item v-if="wp.range"><ion-label>Portée</ion-label><ion-note slot="end">{{ wp.range[0] }} / {{ wp.range[1] }} pieds</ion-note></ion-item>
+          <ion-item v-if="wp.range"><ion-label>Portée</ion-label><ion-note slot="end">{{ fmtNumber(wp.range[0]) }} / {{ formatMeters(wp.range[1]) }}</ion-note></ion-item>
         </ion-list>
         <template v-if="wp.properties.length">
           <h3>Propriétés</h3>
@@ -87,7 +87,7 @@
         <p>{{ sp.description }}</p>
         <ion-list inset>
           <ion-item><ion-label>Taille</ion-label><ion-note slot="end">{{ sp.size }}</ion-note></ion-item>
-          <ion-item><ion-label>Vitesse</ion-label><ion-note slot="end">{{ sp.speed }} pieds ({{ (sp.speed * 0.3).toFixed(1).replace(".0", "") }} m)</ion-note></ion-item>
+          <ion-item><ion-label>Vitesse</ion-label><ion-note slot="end">{{ formatMeters(sp.speed) }}</ion-note></ion-item>
         </ion-list>
         <h3>Traits</h3>
         <ion-list inset>
@@ -148,7 +148,7 @@ import { kitsFor } from "../engine/equipment";
 import { SKILLS, type SkillId } from "../data/skills";
 import { SPECIES } from "../data/species";
 import { KEY_ABILITY_COUNT } from "../engine/advice";
-import { ABILITY_NAMES } from "../ui/format";
+import { ABILITY_NAMES, fmtNumber, formatMeters } from "../ui/format";
 
 const route = useRoute();
 const kind = computed(() => String(route.params.kind));

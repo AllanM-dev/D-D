@@ -3,6 +3,9 @@ import type { AbilityScores } from "./abilities";
 import type { AttackDef } from "./combat";
 import type { Ability } from "./rules";
 
+/** Malus de vitesse (en mètres) d'une armure lourde portée sans la Force requise. */
+export const HEAVY_ARMOR_SPEED_PENALTY = 3;
+
 export interface OwnedItem {
   id: string;
   name: string;
@@ -32,7 +35,7 @@ export interface EquipmentInput {
   scores: AbilityScores;
   modifiers: AbilityScores;
   proficiencyBonus: number;
-  /** Vitesse de l'espèce, avant malus d'armure. */
+  /** Vitesse de l'espèce en mètres, avant malus d'armure. */
   baseSpeed: number;
 }
 
@@ -128,7 +131,7 @@ export function computeEquipment(input: EquipmentInput, kitId?: string): Equipme
   if (shield) ac += armorById("shield").baseAc;
 
   // --- vitesse
-  const speed = armor?.minStr && scores.STR < armor.minStr ? Math.max(0, input.baseSpeed - 10) : input.baseSpeed;
+  const speed = armor?.minStr && scores.STR < armor.minStr ? Math.max(0, input.baseSpeed - HEAVY_ARMOR_SPEED_PENALTY) : input.baseSpeed;
 
   // --- attaques
   const attacks: AttackDef[] = [];
@@ -182,9 +185,20 @@ export function computeEquipment(input: EquipmentInput, kitId?: string): Equipme
 }
 
 /** Les personnages créés avant l'équipement n'ont ni équipement ni attaques : on leur donne leur lot de départ. */
+/** Pieds → mètres, arrondi au demi-mètre (30 → 9, 35 → 10,5). */
+export const feetToMeters = (ft: number) => Math.round(ft * 0.3 * 2) / 2;
+
 export function migrateCharacter<T extends { classDef: { id: string }; species: { speed: number }; scores: AbilityScores; modifiers: AbilityScores; proficiencyBonus: number }>(
   c: T & Partial<{ equipment: CharacterEquipment; attacks: AttackDef[]; armorClass: number; speed: number }>,
 ): T & { equipment: CharacterEquipment; attacks: AttackDef[]; armorClass: number; speed: number } {
+  // Les personnages sauvegardés avant le passage aux mètres ont des vitesses en pieds (20 à 35).
+  if (c.species.speed > 15) {
+    c = {
+      ...c,
+      species: { ...c.species, speed: feetToMeters(c.species.speed) },
+      speed: typeof c.speed === "number" ? feetToMeters(c.speed) : undefined,
+    };
+  }
   if (c.equipment && c.attacks && typeof c.armorClass === "number" && typeof c.speed === "number") {
     return c as T & { equipment: CharacterEquipment; attacks: AttackDef[]; armorClass: number; speed: number };
   }

@@ -14,7 +14,7 @@
         <div><strong>{{ c.maxHp }}</strong><small>PV</small></div>
         <div><strong>{{ c.armorClass }}</strong><small>CA</small></div>
         <div><strong>{{ signed(c.initiative) }}</strong><small>Initiative</small></div>
-        <div><strong>{{ c.speed }}</strong><small>Vitesse (ft)</small></div>
+        <div><strong>{{ fmtNumber(c.speed) }}</strong><small>Vitesse (m)</small></div>
         <div><strong>{{ signed(c.proficiencyBonus) }}</strong><small>Maîtrise</small></div>
         <div><strong>{{ c.passivePerception }}</strong><small>Perc. passive</small></div>
       </div>
@@ -83,7 +83,7 @@ import {
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { ABILITIES } from "../engine/rules";
-import { ABILITY_NAMES, signed } from "../ui/format";
+import { ABILITY_NAMES, fmtNumber, signed } from "../ui/format";
 import { useCharacters } from "../stores/characters";
 
 const store = useCharacters();
