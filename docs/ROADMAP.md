@@ -12,9 +12,12 @@
 - [ ] Traits d'espèce et de classe de niveau 1, équipement de départ, sorts de départ, don d'origine détaillé
 
 ## Jalon 2 — Combat
-- [ ] Initiative, tours, actions / actions bonus / réactions
-- [ ] Attaques, dégâts, conditions, jets contre la mort
-- [ ] Bestiaire SRD
+- [x] Initiative, tours, action Attaquer / Esquiver (combat 1 contre N, sans positions)
+- [ ] Actions bonus, réactions, déplacement, portée
+- [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
+- [ ] Conditions, résistances, sorts de combat, soins, capacités de classe
+- [x] Bestiaire de départ (7 monstres, SRD 5.1) et 7 rencontres
+- [ ] Bestiaire complet, capacités spéciales des monstres, équipement et armures, compagnons
 
 ## Jalon 3 — Aventure
 - [ ] Format de scénario (scènes, choix, tests de compétence)

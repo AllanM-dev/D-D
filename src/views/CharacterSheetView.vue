@@ -18,6 +18,8 @@
         <div><strong>{{ c.passivePerception }}</strong><small>Perc. passive</small></div>
       </div>
 
+      <ion-button expand="block" :router-link="`/combat/${c.id}`">Lancer un combat</ion-button>
+
       <ion-list inset>
         <ion-list-header><ion-label>Caractéristiques et sauvegardes</ion-label></ion-list-header>
         <ion-item v-for="a in ABILITIES" :key="a">
