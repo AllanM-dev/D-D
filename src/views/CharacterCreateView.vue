@@ -16,11 +16,17 @@
           <ion-select v-model="draft.speciesId" label="Espèce" label-placement="stacked" interface="action-sheet">
             <ion-select-option v-for="s in SPECIES" :key="s.id" :value="s.id">{{ s.name }}</ion-select-option>
           </ion-select>
+          <ion-button slot="end" fill="clear" aria-label="Décrire les espèces" @click="info = 'species'">
+            <ion-icon slot="icon-only" :icon="informationCircleOutline" />
+          </ion-button>
         </ion-item>
         <ion-item>
           <ion-select v-model="draft.classId" label="Classe" label-placement="stacked" interface="action-sheet">
             <ion-select-option v-for="c in CLASSES" :key="c.id" :value="c.id">{{ c.name }} (d{{ c.hitDie }})</ion-select-option>
           </ion-select>
+          <ion-button slot="end" fill="clear" aria-label="Décrire les classes" @click="info = 'class'">
+            <ion-icon slot="icon-only" :icon="informationCircleOutline" />
+          </ion-button>
         </ion-item>
         <ion-item>
           <ion-select v-model="draft.backgroundId" label="Historique" label-placement="stacked" interface="action-sheet">
@@ -46,10 +52,23 @@
         <p v-if="draft.rolledPool">Valeurs : {{ draft.rolledPool.join(", ") }}</p>
       </div>
 
+      <div v-if="classDef" class="advice">
+        <strong>Conseil pour {{ classDef.name }}</strong>
+        <p>
+          Caractéristiques clés : ★ {{ keyAbilities(classDef.priority).map((a) => ABILITY_NAMES[a]).join(" et ") }}.
+          {{ classDef.advice }}
+        </p>
+        <ion-button size="small" :disabled="draft.method === 'roll' && !draft.rolledPool" @click="applyAdvice">
+          Appliquer la répartition conseillée
+        </ion-button>
+        <small v-if="draft.method === 'roll' && !draft.rolledPool">Tirez d'abord les dés.</small>
+      </div>
+      <p v-else class="hint">Choisissez une classe pour recevoir un conseil de répartition.</p>
+
       <ion-list inset>
         <ion-item v-for="a in ABILITIES" :key="a">
           <ion-label>
-            {{ ABILITY_NAMES[a] }}
+            <span v-if="isKey(a)" class="star" title="Caractéristique clé pour cette classe">★ </span>{{ ABILITY_NAMES[a] }}
             <p>{{ final[a] > 0 ? `Total ${final[a]} (${signed(abilityModifier(final[a]))})` : "—" }}</p>
           </ion-label>
           <template v-if="draft.method === 'pointbuy'">
@@ -111,16 +130,56 @@
         <div v-for="e in errors" :key="e">• {{ e }}</div>
       </ion-note>
       <ion-button expand="block" :disabled="errors.length > 0" @click="create">Créer le personnage</ion-button>
+
+      <ion-modal :is-open="info !== null" @did-dismiss="info = null">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ info === "species" ? "Espèces" : "Classes" }}</ion-title>
+            <ion-buttons slot="end"><ion-button @click="info = null">Fermer</ion-button></ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <ion-accordion-group v-if="info === 'species'" :value="draft.speciesId || undefined">
+            <ion-accordion v-for="s in SPECIES" :key="s.id" :value="s.id">
+              <ion-item slot="header"><ion-label>{{ s.name }}</ion-label></ion-item>
+              <div slot="content" class="detail">
+                <p>{{ s.description }}</p>
+                <p><small>Taille : {{ s.size }} · Vitesse : {{ s.speed }} ft</small></p>
+                <ul><li v-for="t in s.traits" :key="t">{{ t }}</li></ul>
+                <p><small>Les traits sont indiqués à titre d'information : ils ne sont pas encore appliqués automatiquement.</small></p>
+                <ion-button size="small" @click="choose('species', s.id)">Choisir cette espèce</ion-button>
+              </div>
+            </ion-accordion>
+          </ion-accordion-group>
+          <ion-accordion-group v-else-if="info === 'class'" :value="draft.classId || undefined">
+            <ion-accordion v-for="c in CLASSES" :key="c.id" :value="c.id">
+              <ion-item slot="header"><ion-label>{{ c.name }}</ion-label></ion-item>
+              <div slot="content" class="detail">
+                <p>{{ c.description }}</p>
+                <p><small>
+                  Dé de vie : d{{ c.hitDie }} · Sauvegardes : {{ c.savingThrows.map((a) => ABILITY_NAMES[a]).join(", ") }}
+                  · Caractéristiques clés : {{ keyAbilities(c.priority).map((a) => ABILITY_NAMES[a]).join(", ") }}
+                </small></p>
+                <ul><li v-for="f in c.features" :key="f">{{ f }}</li></ul>
+                <p>{{ c.advice }}</p>
+                <ion-button size="small" @click="choose('class', c.id)">Choisir cette classe</ion-button>
+              </div>
+            </ion-accordion>
+          </ion-accordion-group>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import {
-  IonBackButton, IonButton, IonButtons, IonCheckbox, IonContent, IonHeader, IonInput, IonItem, IonLabel, IonList,
-  IonNote, IonPage, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTitle, IonToolbar, useIonRouter,
+  IonAccordion, IonAccordionGroup, IonBackButton, IonButton, IonButtons, IonCheckbox, IonContent, IonHeader, IonIcon,
+  IonInput, IonItem, IonLabel, IonList, IonModal, IonNote, IonPage, IonSegment, IonSegmentButton, IonSelect,
+  IonSelectOption, IonTitle, IonToolbar, useIonRouter,
 } from "@ionic/vue";
-import { computed, reactive, watch } from "vue";
+import { informationCircleOutline } from "ionicons/icons";
+import { computed, reactive, ref, watch } from "vue";
 import { BACKGROUNDS } from "../data/backgrounds";
 import { CLASSES } from "../data/classes";
 import { SKILLS, type SkillId } from "../data/skills";
@@ -128,6 +187,7 @@ import { SPECIES } from "../data/species";
 import {
   POINT_BUY_BUDGET, POINT_BUY_MAX, POINT_BUY_MIN, STANDARD_ARRAY, defaultScores, pointBuyCost, pointBuyTotal, rollAbilityPool,
 } from "../engine/abilities";
+import { assignByPriority, keyAbilities, recommendedBonus } from "../engine/advice";
 import { applyBackgroundBonus, buildCharacter, validateDraft, type CharacterDraft } from "../engine/character";
 import { ABILITIES, abilityModifier, type Ability } from "../engine/rules";
 import { newId, useCharacters } from "../stores/characters";
@@ -147,6 +207,8 @@ const draft = reactive<CharacterDraft>({
   bonus: { mode: "2/1", plus2: "STR", plus1: "CON" },
   classSkills: [],
 });
+
+const info = ref<"species" | "class" | null>(null);
 
 const classDef = computed(() => CLASSES.find((c) => c.id === draft.classId));
 const background = computed(() => BACKGROUNDS.find((b) => b.id === draft.backgroundId));
@@ -212,6 +274,24 @@ function available(a: Ability, v: number) {
   return used < total;
 }
 
+// --- conseils et descriptions
+const isKey = (a: Ability) => !!classDef.value && keyAbilities(classDef.value.priority).includes(a);
+
+function applyAdvice() {
+  const cls = classDef.value;
+  if (!cls) return;
+  const pool = draft.method === "roll" ? draft.rolledPool : [...STANDARD_ARRAY]; // 15,14,13,12,10,8 = exactement 27 points
+  if (!pool) return;
+  draft.baseScores = assignByPriority(cls.priority, pool);
+  if (background.value) draft.bonus = recommendedBonus(background.value, cls.priority);
+}
+
+function choose(kind: "species" | "class", id: string) {
+  if (kind === "species") draft.speciesId = id;
+  else draft.classId = id;
+  info.value = null;
+}
+
 function toggleSkill(id: SkillId, checked: boolean) {
   const has = draft.classSkills.includes(id);
   if (checked && !has) draft.classSkills.push(id);
@@ -236,6 +316,10 @@ function create() {
 
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
+.advice { background: var(--ion-color-step-100, #222); border-radius: 8px; padding: 12px; margin: 12px 0; }
+.advice p { margin: 6px 0 10px; }
+.star { color: var(--ion-color-warning, #fc0); }
+.detail { padding: 0 16px 16px; }
 h3 { margin: 20px 0 8px; }
 .hint { opacity: 0.8; font-size: 0.9rem; }
 .score { min-width: 2ch; text-align: center; margin: 0 8px; }
