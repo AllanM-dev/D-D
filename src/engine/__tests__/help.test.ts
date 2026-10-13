@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BACKGROUNDS } from "../../data/backgrounds";
 import { CLASSES } from "../../data/classes";
-import { ABILITY_HELP, BACKGROUND_TEXT, BASIC_RULES, CLASS_FEATURE_TEXT, FEAT_TEXT, SPECIES_TRAIT_TEXT } from "../../data/help";
+import { ABILITY_HELP, APP_GUIDE, BACKGROUND_TEXT, BASIC_RULES, CLASS_FEATURE_TEXT, FEAT_TEXT, SPECIES_TRAIT_TEXT } from "../../data/help";
 import { SPECIES } from "../../data/species";
 import { ABILITIES } from "../rules";
 
@@ -35,5 +35,6 @@ describe("contenu de la page Aide", () => {
   it("couvre les six caractéristiques et des règles de base", () => {
     expect(ABILITY_HELP.map((a) => a.id)).toEqual([...ABILITIES]);
     expect(BASIC_RULES.length).toBeGreaterThan(5);
+    expect(APP_GUIDE.length).toBeGreaterThan(3);
   });
 });

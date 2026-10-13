@@ -158,3 +158,13 @@ export const BASIC_RULES: RuleEntry[] = [
   { title: "Jets de mort", text: "À 0 PV, un héros est inconscient et lance un d20 à chaque tour : 10 ou plus est une réussite, moins de 10 un échec, un 1 compte pour deux échecs, un 20 le relève avec 1 PV. Trois réussites le stabilisent, trois échecs le tuent. Un coup reçu à terre compte comme un échec." },
   { title: "Repos", text: "Un repos court (1 heure) et un repos long (8 heures) permettent de récupérer des capacités et des PV. Ils ne sont pas encore gérés dans l'application." },
 ];
+
+/** Fonctionnement de l'application elle-même. À tenir à jour à chaque nouvelle fonctionnalité visible. */
+export const APP_GUIDE: RuleEntry[] = [
+  { title: "Créer un personnage", text: "Depuis l'accueil, « Créer un personnage » : donnez un nom, choisissez une espèce, une classe et un historique (le bouton ⓘ à côté des listes décrit chaque choix), répartissez vos caractéristiques, appliquez le bonus de l'historique, puis choisissez vos compétences de classe. Le bouton de création s'active quand tout est valide ; les messages en rouge indiquent ce qu'il reste à régler." },
+  { title: "Répartir les caractéristiques", text: "Trois méthodes : le tableau standard (15, 14, 13, 12, 10 et 8, chacun une seule fois), l'achat de points (27 points à dépenser, scores de 8 à 15, les hauts scores coûtent plus cher) ou le tirage (4d6 dont on retire le plus bas, six fois). Les deux caractéristiques marquées ★ sont les plus utiles à votre classe." },
+  { title: "Le bonus de l'historique", text: "Votre historique ajoute +2 à une caractéristique et +1 à une autre, ou +1 à trois, parmi les trois qu'il propose. Ce bonus s'ajoute à la répartition choisie, avec un maximum de 20." },
+  { title: "Lancer un combat", text: "Sur la fiche d'un personnage, « Lancer un combat », puis choisissez une rencontre. Sa difficulté est indicative pour un personnage seul de niveau 1. Les PV sont remis à fond au début de chaque combat. Pour l'instant, le personnage n'a pas d'armure : sa CA est celle d'un héros sans équipement." },
+  { title: "Lancer vos dés", text: "Vos jets (initiative, attaque, dégâts, jets de mort) se lancent en appuyant sur un bouton : « Lancer le d20 », puis « Lancer les dégâts » si votre attaque touche. Le dé s'anime et le résultat reste affiché jusqu'à « Continuer ». Les jets des ennemis se déroulent sans animation. L'interrupteur « Mes dés » en haut à droite, coupé, rend tout instantané ; « Passer l'animation » saute les jets restants." },
+  { title: "Sauvegarde de vos personnages", text: "Les personnages sont enregistrés dans le navigateur de votre appareil. Ils restent d'une visite à l'autre, mais ne sont pas partagés entre deux appareils, et effacer les données du site les supprime." },
+];

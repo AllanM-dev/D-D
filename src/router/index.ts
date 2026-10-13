@@ -18,6 +18,7 @@ export default createRouter({
     { path: "/help", component: HelpView },
     { path: "/help/rules", component: HelpRulesView },
     { path: "/help/abilities", component: HelpRulesView },
+    { path: "/help/guide", component: HelpRulesView },
     { path: "/help/:kind", component: HelpListView },
     { path: "/help/:kind/:id", component: HelpDetailView },
   ],
