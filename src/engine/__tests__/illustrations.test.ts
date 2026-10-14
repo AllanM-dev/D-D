@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BACKGROUNDS } from "../../data/backgrounds";
 import { CLASSES } from "../../data/classes";
 import { ENCOUNTERS, buildEnemies } from "../../data/encounters";
+import { GAME_ICONS } from "../../data/game-icons.generated";
 import { ART, artKey, getArt } from "../../data/illustrations";
 import { MONSTERS } from "../../data/monsters";
 import { SPECIES } from "../../data/species";
@@ -25,20 +26,20 @@ describe("illustrations", () => {
     ]);
     expect(Object.keys(ART).sort()).toEqual([...valid].sort());
   });
-  it("les glyphes sont du SVG simple et sûr (formes autofermantes autorisées seulement)", () => {
-    const allowed = new Set(["path", "circle", "ellipse", "rect"]);
+  it("chaque illustration pointe vers une icône embarquée, et il n'y en a pas d'inutilisée", () => {
+    const used = new Set(Object.values(ART).map((a) => a.icon));
     for (const [key, art] of Object.entries(ART)) {
       expect(art.hue, key).toBeGreaterThanOrEqual(0);
       expect(art.hue, key).toBeLessThanOrEqual(360);
-      const tags = art.glyph.match(/<[^>]+>/g) ?? [];
-      expect(tags.length, key).toBeGreaterThan(1);
-      for (const t of tags) {
-        const name = /^<(\w+)/.exec(t)?.[1];
-        expect(allowed.has(name!), `${key}: <${name}>`).toBe(true);
-        expect(t.endsWith("/>"), `${key}: ${t.slice(0, 40)}`).toBe(true);
-        expect(/\bon\w+\s*=|href|<script|javascript:/i.test(t), `${key}: attribut interdit`).toBe(false);
-      }
-      expect(art.glyph.replace(/<[^>]+>/g, "").trim(), `${key}: texte hors balise`).toBe("");
+      expect(GAME_ICONS[art.icon], `${key} → ${art.icon} (relancer scripts/extract-icons.mjs ?)`).toBeTruthy();
+      expect(getArt(key)!.glyph, key).toContain("<path");
+    }
+    expect(Object.keys(GAME_ICONS).sort()).toEqual([...used].sort());
+  });
+  it("les icônes embarquées sont de simples tracés, sans script ni lien externe", () => {
+    for (const [name, body] of Object.entries(GAME_ICONS)) {
+      expect(/^(<path [^>]*\/>)+$/.test(body), `${name}: balisage inattendu`).toBe(true);
+      expect(/script|href|xlink|on\w+\s*=|javascript:|url\(/i.test(body), `${name}: contenu interdit`).toBe(false);
     }
   });
   it("les ennemis et le personnage portent leur illustration en combat", () => {

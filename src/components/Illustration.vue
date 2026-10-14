@@ -44,13 +44,4 @@ const art = computed(() => data.value);
 <style scoped>
 .illustration { flex: none; display: block; }
 .glyph { color: #f4efe4; }
-/* Éléments pleins : seul le remplissage change ; tracés (fill="none") : seule la couleur du trait. */
-.glyph :deep(.a) { fill: #f2c14e; }
-.glyph :deep(.d) { fill: rgba(10, 8, 20, 0.62); }
-.glyph :deep(.p) { fill: #e58f9d; }
-.glyph :deep(.r) { fill: #d9534f; }
-.glyph :deep(.a[fill="none"]) { fill: none; stroke: #f2c14e; }
-.glyph :deep(.d[fill="none"]) { fill: none; stroke: rgba(10, 8, 20, 0.62); }
-.glyph :deep(.p[fill="none"]) { fill: none; stroke: #e58f9d; }
-.glyph :deep(.r[fill="none"]) { fill: none; stroke: #d9534f; }
 </style>
