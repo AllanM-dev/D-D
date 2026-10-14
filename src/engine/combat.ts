@@ -77,6 +77,8 @@ export interface Combatant {
   innateSorcery: boolean;
   innateUntilRound: number;
   turnState: TurnState;
+  /** Clé d'illustration (`class:fighter`, `monster:goblin`…). */
+  art?: string;
 }
 
 export type CombatStatus = "ongoing" | "victory" | "defeat";
@@ -123,7 +125,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "level" | "features">>;
+  Partial<Pick<Combatant, "level" | "features" | "art">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */

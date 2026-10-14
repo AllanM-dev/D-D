@@ -8,7 +8,14 @@
       </ion-toolbar>
     </ion-header>
     <ion-content v-if="c" class="ion-padding">
-      <p>{{ c.species.name }} · {{ c.classDef.name }} · {{ c.background.name }} · niveau {{ c.level }}</p>
+      <div class="hero">
+        <Illustration :art="artKey('species', c.species.id)" :size="68" :label="`Espèce : ${c.species.name}`" />
+        <Illustration :art="artKey('class', c.classDef.id)" :size="68" :label="`Classe : ${c.classDef.name}`" />
+        <div class="who">
+          <h2>{{ c.name }}</h2>
+          <p>{{ c.species.name }} · {{ c.classDef.name }}<br />{{ c.background.name }} · niveau {{ c.level }}</p>
+        </div>
+      </div>
 
       <div class="stats">
         <div><strong>{{ c.maxHp }}</strong><small>PV</small></div>
@@ -96,7 +103,9 @@ import {
 } from "@ionic/vue";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
+import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
+import { artKey } from "../data/illustrations";
 import { CLASS_FEATURE_TEXT, FEATURE_STATUS } from "../data/help";
 import { ABILITIES } from "../engine/rules";
 import { ABILITY_NAMES, fmtNumber, signed } from "../ui/format";
@@ -122,6 +131,10 @@ function del() {
 
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
+.hero { display: flex; align-items: center; gap: 10px; margin: 4px 0 8px; }
+.hero .who { min-width: 0; }
+.hero h2 { margin: 0; }
+.hero p { margin: 2px 0 0; opacity: 0.8; font-size: 0.9rem; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin: 12px 0; }
 .stats div { background: var(--ion-color-step-100, #222); border-radius: 8px; padding: 8px; }
 .stats strong { display: block; font-size: 1.4rem; }

@@ -8,6 +8,8 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
+      <div v-if="heroArt" class="hero-art"><Illustration :art="heroArt" :size="104" :label="title" /></div>
+
       <!-- Classe -->
       <template v-if="cls">
         <p>{{ cls.description }}</p>
@@ -165,7 +167,9 @@ import { kitsFor } from "../engine/equipment";
 import { SKILLS, type SkillId } from "../data/skills";
 import { SPECIES } from "../data/species";
 import { KEY_ABILITY_COUNT } from "../engine/advice";
+import Illustration from "../components/Illustration.vue";
 import { ABILITY_NAMES, fmtNumber, formatMeters } from "../ui/format";
+import { helpArt } from "../ui/helpLists";
 
 const route = useRoute();
 const kind = computed(() => String(route.params.kind));
@@ -175,6 +179,7 @@ const sp = computed(() => (kind.value === "species" ? SPECIES.find((s) => s.id =
 const bg = computed(() => (kind.value === "backgrounds" ? BACKGROUNDS.find((b) => b.id === id.value) : undefined));
 const wp = computed(() => (kind.value === "weapons" ? WEAPONS.find((w) => w.id === id.value) : undefined));
 const ar = computed(() => (kind.value === "armors" ? ARMORS.find((a) => a.id === id.value) : undefined));
+const heroArt = computed(() => helpArt(kind.value, id.value));
 const title = computed(() => cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? "Aide");
 const training = computed(() => CLASS_TRAINING[cls.value?.id ?? ""]);
 const kits = computed(() => (cls.value ? kitsFor(cls.value.id) : []));
@@ -189,6 +194,7 @@ const skillName = (s: SkillId) => SKILLS.find((x) => x.id === s)!.name;
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
 h3 { margin: 20px 0 8px; }
+.hero-art { display: flex; justify-content: center; margin: 4px 0 12px; }
 .note { opacity: 0.8; font-size: 0.9rem; }
 .status { margin-top: 4px; }
 .status.applied strong { color: var(--ion-color-success, #2dd36f); }

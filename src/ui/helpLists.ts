@@ -2,6 +2,7 @@ import { BACKGROUNDS } from "../data/backgrounds";
 import { CLASSES } from "../data/classes";
 import { SPECIES } from "../data/species";
 import { ARMORS, WEAPONS } from "../data/equipment";
+import { artKey } from "../data/illustrations";
 import { BACKGROUND_TEXT, WEAPON_PROPERTY_TEXT } from "../data/help";
 
 export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors";
@@ -31,4 +32,12 @@ export function helpEntries(kind: HelpKind): { id: string; name: string; summary
       summary: a.kind === "shield" ? "Bouclier · +2 CA" : `${a.kind === "light" ? "Légère" : a.kind === "medium" ? "Intermédiaire" : "Lourde"} · CA ${a.baseAc}`,
     }));
   return BACKGROUNDS.map((b) => ({ id: b.id, name: b.name, summary: BACKGROUND_TEXT[b.id] }));
+}
+
+/** Illustration d'une entrée d'aide (les armes et armures n'en ont pas). */
+export function helpArt(kind: HelpKind | string, id: string): string | undefined {
+  if (kind === "classes") return artKey("class", id);
+  if (kind === "species") return artKey("species", id);
+  if (kind === "backgrounds") return artKey("background", id);
+  return undefined;
 }

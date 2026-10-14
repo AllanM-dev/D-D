@@ -12,6 +12,7 @@
       <ion-list v-if="store.list.length" inset>
         <ion-list-header><ion-label>Mes personnages</ion-label></ion-list-header>
         <ion-item v-for="c in store.list" :key="c.id" button :router-link="`/character/${c.id}`">
+          <Illustration slot="start" :art="artKey('class', c.classDef.id)" :size="44" />
           <ion-label>
             <h2>{{ c.name }}</h2>
             <p>{{ c.species.name }} · {{ c.classDef.name }} · niveau {{ c.level }}</p>
@@ -25,6 +26,8 @@
 
 <script setup lang="ts">
 import { IonButton, IonButtons, IonMenuButton, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader, IonPage, IonTitle, IonToolbar } from "@ionic/vue";
+import Illustration from "../components/Illustration.vue";
+import { artKey } from "../data/illustrations";
 import { useCharacters } from "../stores/characters";
 
 const store = useCharacters();

@@ -10,6 +10,7 @@
     <ion-content class="ion-padding">
       <ion-list v-if="kind" inset>
         <ion-item v-for="e in helpEntries(kind)" :key="e.id" button detail :router-link="`/help/${kind}/${e.id}`">
+          <Illustration v-if="helpArt(kind, e.id)" slot="start" :art="helpArt(kind, e.id)" :size="48" />
           <ion-label class="ion-text-wrap">
             <h2>{{ e.name }}</h2>
             <p>{{ e.summary }}</p>
@@ -25,7 +26,8 @@
 import { IonBackButton, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonTitle, IonToolbar } from "@ionic/vue";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
-import { HELP_KINDS, helpEntries, isHelpKind } from "../ui/helpLists";
+import Illustration from "../components/Illustration.vue";
+import { HELP_KINDS, helpArt, helpEntries, isHelpKind } from "../ui/helpLists";
 
 const route = useRoute();
 const kind = computed(() => (isHelpKind(String(route.params.kind)) ? (String(route.params.kind) as keyof typeof HELP_KINDS) : null));
