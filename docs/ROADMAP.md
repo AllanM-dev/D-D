@@ -22,7 +22,8 @@
 - [x] Initiative, tours, action Attaquer / Esquiver (combat 1 contre N, sans positions)
 - [x] Animation de vos jets de dés (initiative, attaque, dégâts, jets de mort), déclenchée par un bouton, désactivable ; les jets ennemis se résolvent sans dés
 - [x] Action bonus et fin de tour ; capacités de classe de niveau 1 : Second souffle, Style de combat (Défense, Archerie), Rage, Imposition des mains, Magie innée, frappe bonus du moine
-- [ ] Réactions, déplacement, portée, repos court et long
+- [x] PV et ressources conservés entre les combats ; repos court (dés de vie, Second souffle, Rage, Magie de pacte, Récupération arcanique) et repos long, depuis la fiche
+- [ ] Réactions, déplacement, portée ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
 - [x] Sorts (lot 1) : 40 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
 - [ ] Sorts : réactions (Bouclier…), grimoire du magicien, niveaux supérieurs, zones à plusieurs cibles, soins des alliés

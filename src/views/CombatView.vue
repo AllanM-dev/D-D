@@ -14,10 +14,10 @@
 
     <!-- Choix de la rencontre -->
     <ion-content v-else-if="!state" class="ion-padding">
-      <p>{{ character.name }} · {{ character.classDef.name }} · {{ character.maxHp }} PV · CA {{ character.armorClass }}</p>
+      <p>{{ character.name }} · {{ character.classDef.name }} · {{ vitals.hp }}/{{ character.maxHp }} PV · CA {{ character.armorClass }}</p>
       <p class="hint">
         Équipement : {{ outfit }}. Vous choisirez votre arme ou votre sort à chaque attaque.
-        Les PV sont remis à fond au début de chaque combat.
+        Vous combattez avec les PV et les ressources qu'il vous reste : reposez-vous entre deux combats (fiche du personnage).
       </p>
       <ion-list inset>
         <ion-list-header><ion-label>Choisir une rencontre</ion-label></ion-list-header>
@@ -161,6 +161,7 @@ import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";
 import { characterToCombatant } from "../engine/attacks";
+import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
   currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, startCombat, useFeature,
   type Combatant, type CombatState, type FeatureId, type RollEvent,
@@ -172,6 +173,7 @@ const route = useRoute();
 const store = useCharacters();
 const characterId = computed(() => String(route.params.id));
 const character = computed(() => store.get(characterId.value));
+const vitals = computed(() => vitalsOf(character.value!));
 const attacks = computed(() => character.value?.attacks ?? []);
 const attackIndex = ref(0);
 const attackLabel = (a: (typeof attacks.value)[number]) =>
@@ -298,10 +300,15 @@ async function start(e: EncounterDef) {
   state.value = s;
   // Affichage de départ : tout le monde à pleins PV (les ennemis qui jouent en premier le seront après leur jet).
   const fresh: Combatant[] = JSON.parse(JSON.stringify(s.combatants));
-  for (const c of fresh) Object.assign(c, { hp: c.maxHp, dead: false, stable: false, dodging: false, deathSaves: { successes: 0, failures: 0 } });
+  const startHp = vitalsOf(character.value!).hp;
+  for (const c of fresh) Object.assign(c, { hp: c.side === "party" ? startHp : c.maxHp, dead: false, stable: false, dodging: false, deathSaves: { successes: 0, failures: 0 } });
   shown.value = { combatants: fresh, logLen: 0, round: 1 };
   await play(s.rolls);
 }
+// Le combat terminé, les PV et ressources restantes sont reportés sur le personnage.
+watch(() => state.value?.status, (st) => {
+  if (st && st !== "ongoing" && character.value) store.setVitals(character.value.id, vitalsAfterCombat(character.value, state.value!));
+});
 const attackTarget = (id: string) => act((s) => playerAttack(s, id, Math.random, attackIndex.value));
 const dodge = () => act((s) => playerDodge(s));
 const endTurn = () => act((s) => playerEndTurn(s));

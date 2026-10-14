@@ -18,7 +18,7 @@
       </div>
 
       <div class="stats">
-        <div><strong>{{ c.maxHp }}</strong><small>PV</small></div>
+        <div><strong>{{ vitals.hp }}/{{ c.maxHp }}</strong><small>PV</small></div>
         <div><strong>{{ c.armorClass }}</strong><small>CA</small></div>
         <div><strong>{{ signed(c.initiative) }}</strong><small>Initiative</small></div>
         <div><strong>{{ fmtNumber(c.speed) }}</strong><small>Vitesse (m)</small></div>
@@ -27,6 +27,38 @@
       </div>
 
       <ion-button expand="block" :router-link="`/combat/${c.id}`">Lancer un combat</ion-button>
+
+      <ion-list inset>
+        <ion-list-header><ion-label>Ressources et repos</ion-label></ion-list-header>
+        <ion-item lines="full">
+          <ion-label class="ion-text-wrap">
+            Dés de vie : {{ vitals.hitDice }}/{{ hitDiceMax(c) }} (d{{ c.classDef.hitDie }})
+            <p v-for="r in resources" :key="r">{{ r }}</p>
+          </ion-label>
+        </ion-item>
+        <ion-item lines="full">
+          <ion-label class="ion-text-wrap">
+            Repos court (1 heure)
+            <p>Dépensez des dés de vie pour regagner des PV ; quelques capacités reviennent.</p>
+          </ion-label>
+        </ion-item>
+        <div class="rest-row">
+          <ion-button size="small" fill="outline" :disabled="spend <= 0" aria-label="Un dé de moins" data-t="minus" @click="spend--">−</ion-button>
+          <span>{{ spend }} dé{{ spend > 1 ? "s" : "" }} de vie</span>
+          <ion-button size="small" fill="outline" :disabled="spend >= vitals.hitDice" aria-label="Un dé de plus" data-t="plus" @click="spend++">+</ion-button>
+          <ion-button size="small" class="grow" @click="short">Repos court</ion-button>
+        </div>
+        <ion-item lines="full">
+          <ion-label class="ion-text-wrap">
+            Repos long (8 heures)
+            <p>Tous les PV, toutes les capacités et tous les emplacements de sort reviennent, ainsi que la moitié des dés de vie (au moins un).</p>
+          </ion-label>
+        </ion-item>
+        <div class="rest-row"><ion-button size="small" expand="block" class="grow" @click="long">Repos long</ion-button></div>
+        <ion-item v-if="restReport" lines="none">
+          <ion-label class="ion-text-wrap report">{{ restReport }}</ion-label>
+        </ion-item>
+      </ion-list>
 
       <ion-list inset>
         <ion-list-header><ion-label>Caractéristiques et sauvegardes</ion-label></ion-list-header>
@@ -118,12 +150,15 @@ import {
   IonBackButton, IonButton, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader,
   IonMenuButton, IonNote, IonPage, IonTitle, IonToolbar, useIonRouter,
 } from "@ionic/vue";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
 import { SPELL_BY_ID, isPlayable } from "../data/spells";
 import { castingFor } from "../engine/spellcasting";
+import { hitDiceMax, longRest, shortRest, vitalsOf, type RestResult } from "../engine/rest";
+import { FEATURE_LABELS } from "../engine/combat";
+import { featuresFor } from "../engine/features";
 import { artKey } from "../data/illustrations";
 import { CLASS_FEATURE_TEXT, FEATURE_STATUS } from "../data/help";
 import { ABILITIES } from "../engine/rules";
@@ -142,6 +177,29 @@ const casting = computed(() =>
       })
     : undefined,
 );
+const vitals = computed(() => vitalsOf(c.value!));
+const resources = computed(() => {
+  const ch = c.value!;
+  const out = featuresFor(ch.classDef.id, ch.level)
+    .filter((f) => !f.unlimited)
+    .map((f) => `${FEATURE_LABELS[f.id]} : ${vitals.value.features[f.id] ?? f.max}/${f.max}`);
+  if (casting.value) {
+    out.push(`Emplacements de niveau 1 : ${Math.max(0, casting.value.slots.max - vitals.value.slotsUsed)}/${casting.value.slots.max}`);
+    for (const f of casting.value.free) out.push(`${SPELL_BY_ID[f.spellId]?.name ?? f.spellId} gratuit : ${vitals.value.free[f.spellId] ?? f.max}/${f.max}`);
+  }
+  return out;
+});
+const spend = ref(0);
+watch(() => vitals.value.hitDice, (n) => { if (spend.value > n) spend.value = n; });
+const restReport = ref("");
+function apply(r: RestResult, title: string) {
+  store.setVitals(c.value!.id, r.vitals);
+  const dice = r.rolls.map((x) => `d${x.sides} ${x.die}${x.modifier ? (x.modifier > 0 ? "+" : "−") + Math.abs(x.modifier) : ""} = ${x.healed} PV`).join(" ; ");
+  const parts = [dice, r.recovered.length ? `Récupéré : ${r.recovered.join(", ")}.` : ""].filter(Boolean);
+  restReport.value = `${title} : ${r.healed} PV regagnés (${vitals.value.hp}/${c.value!.maxHp}).${parts.length ? " " + parts.join(" ") : ""}`;
+}
+function short() { apply(shortRest(c.value!, spend.value), "Repos court"); spend.value = Math.min(spend.value, vitals.value.hitDice); }
+function long() { apply(longRest(c.value!), "Repos long"); }
 const knownSpells = computed(() =>
   casting.value ? [...casting.value.cantrips, ...casting.value.prepared].map((id) => SPELL_BY_ID[id]).filter(Boolean) : [],
 );
@@ -169,4 +227,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .stats div { background: var(--ion-color-step-100, #222); border-radius: 8px; padding: 8px; }
 .stats strong { display: block; font-size: 1.4rem; }
 .stats small { opacity: 0.7; }
+.rest-row { display: flex; align-items: center; gap: 8px; padding: 4px 16px 10px; }
+.rest-row .grow { flex: 1; }
+.report { font-size: 0.9rem; }
 </style>

@@ -176,7 +176,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "level" | "features" | "art" | "spellcasting" | "saveMods">>;
+  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
@@ -186,7 +186,7 @@ const RAGE_RESISTED = ["contondant", "perforant", "tranchant"];
 
 export function makeCombatant(init: CombatantInit): Combatant {
   return {
-    ...init, attacks: [...init.attacks], hp: init.maxHp, initiative: 0,
+    ...init, attacks: [...init.attacks], hp: init.hp ?? init.maxHp, initiative: 0,
     dodging: false, dead: false, stable: false, deathSaves: { successes: 0, failures: 0 },
     level: init.level ?? 1,
     features: (init.features ?? []).map((f) => ({ ...f })),
