@@ -14,6 +14,8 @@
 - [ ] Traits d'espèce et de classe de niveau 1 appliqués, sorts de départ, don d'origine appliqué
 
 - [x] Distances en mètres partout (vitesses, portées, malus d'armure), anciennes sauvegardes converties
+- [x] Illustrations (icônes game-icons.net, CC BY 3.0) : 12 classes, 9 espèces, 4 historiques, 7 monstres (création, fiche, accueil, Aide, combat) ; page Crédits
+- [ ] Illustrations des armes, armures et objets ; fonds d'écran d'ambiance ; images plus artistiques (si une source libre devient accessible)
 - [x] Menu latéral et page Aide : règles de base, caractéristiques, fiches des 12 classes, 9 espèces et 4 historiques
 
 ## Jalon 2 — Combat

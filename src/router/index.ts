@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "@ionic/vue-router";
 import CharacterCreateView from "../views/CharacterCreateView.vue";
 import CharacterSheetView from "../views/CharacterSheetView.vue";
+import CreditsView from "../views/CreditsView.vue";
 import CombatView from "../views/CombatView.vue";
 import HelpDetailView from "../views/HelpDetailView.vue";
 import HelpListView from "../views/HelpListView.vue";
@@ -15,6 +16,7 @@ export default createRouter({
     { path: "/create", component: CharacterCreateView },
     { path: "/character/:id", component: CharacterSheetView },
     { path: "/combat/:id", component: CombatView },
+    { path: "/credits", component: CreditsView },
     { path: "/help", component: HelpView },
     { path: "/help/rules", component: HelpRulesView },
     { path: "/help/abilities", component: HelpRulesView },

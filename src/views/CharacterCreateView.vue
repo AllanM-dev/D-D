@@ -36,6 +36,13 @@
         </ion-item>
       </ion-list>
 
+      <div v-if="portraits.length" class="portraits">
+        <figure v-for="pt in portraits" :key="pt.art">
+          <Illustration :art="pt.art" :size="60" :label="`${pt.kind} : ${pt.name}`" />
+          <figcaption>{{ pt.name }}</figcaption>
+        </figure>
+      </div>
+
       <!-- Caractéristiques -->
       <h3>Caractéristiques</h3>
       <ion-segment v-model="draft.method">
@@ -162,7 +169,7 @@
         <ion-content class="ion-padding">
           <ion-accordion-group v-if="info === 'species'" :value="draft.speciesId || undefined">
             <ion-accordion v-for="s in SPECIES" :key="s.id" :value="s.id">
-              <ion-item slot="header"><ion-label>{{ s.name }}</ion-label></ion-item>
+              <ion-item slot="header"><Illustration slot="start" :art="artKey('species', s.id)" :size="36" /><ion-label>{{ s.name }}</ion-label></ion-item>
               <div slot="content" class="detail">
                 <p>{{ s.description }}</p>
                 <p><small>Taille : {{ s.size }} · Vitesse : {{ formatMeters(s.speed) }}</small></p>
@@ -174,7 +181,7 @@
           </ion-accordion-group>
           <ion-accordion-group v-else-if="info === 'class'" :value="draft.classId || undefined">
             <ion-accordion v-for="c in CLASSES" :key="c.id" :value="c.id">
-              <ion-item slot="header"><ion-label>{{ c.name }}</ion-label></ion-item>
+              <ion-item slot="header"><Illustration slot="start" :art="artKey('class', c.id)" :size="36" /><ion-label>{{ c.name }}</ion-label></ion-item>
               <div slot="content" class="detail">
                 <p>{{ c.description }}</p>
                 <p><small>
@@ -210,7 +217,9 @@ import {
 } from "../engine/abilities";
 import { keyAbilities } from "../engine/advice";
 import { computeEquipment, kitsFor } from "../engine/equipment";
+import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
+import { artKey } from "../data/illustrations";
 import { ARMORS, WEAPONS, type KitEntry } from "../data/equipment";
 import { applyBackgroundBonus, buildCharacter, validateDraft, type CharacterDraft } from "../engine/character";
 import { ABILITIES, abilityModifier, type Ability } from "../engine/rules";
@@ -317,6 +326,17 @@ function toggleSkill(id: SkillId, checked: boolean) {
   else if (!checked && has) draft.classSkills = draft.classSkills.filter((s) => s !== id);
 }
 
+const portraits = computed(() => {
+  const out: { kind: string; name: string; art: string }[] = [];
+  const sp = SPECIES.find((x) => x.id === draft.speciesId);
+  const cl = classDef.value;
+  const bg = background.value;
+  if (sp) out.push({ kind: "Espèce", name: sp.name, art: artKey("species", sp.id) });
+  if (cl) out.push({ kind: "Classe", name: cl.name, art: artKey("class", cl.id) });
+  if (bg) out.push({ kind: "Historique", name: bg.name, art: artKey("background", bg.id) });
+  return out;
+});
+
 const final = computed(() => {
   const bg = background.value;
   const withBonus = bg ? applyBackgroundBonus(draft.baseScores, bg, draft.bonus) : { ...draft.baseScores };
@@ -358,6 +378,9 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .advice p { margin: 6px 0 0; }
 .star { color: var(--ion-color-warning, #fc0); }
 .detail { padding: 0 16px 16px; }
+.portraits { display: flex; gap: 16px; justify-content: center; margin: 12px 0 4px; }
+.portraits figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.portraits figcaption { font-size: 0.8rem; opacity: 0.85; }
 h3 { margin: 20px 0 8px; }
 .hint { opacity: 0.8; font-size: 0.9rem; }
 .score { min-width: 2ch; text-align: center; margin: 0 8px; }

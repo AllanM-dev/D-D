@@ -22,6 +22,7 @@
       <ion-list inset>
         <ion-list-header><ion-label>Choisir une rencontre</ion-label></ion-list-header>
         <ion-item v-for="e in ENCOUNTERS" :key="e.id" button @click="start(e)">
+          <Illustration slot="start" :art="artKey('monster', e.monsters[0].monsterId)" :size="44" />
           <ion-label>
             <h2>{{ e.name }}</h2>
             <p>{{ describe(e) }}</p>
@@ -35,6 +36,7 @@
     <ion-content v-else class="ion-padding">
       <ion-list inset>
         <ion-item v-for="c in orderedCombatants" :key="c.id" :class="{ active: c.id === currentId && !busy && state.status === 'ongoing' }">
+          <Illustration v-if="c.art" slot="start" :art="c.art" :size="44" />
           <ion-label>
             <h2>
               <span v-if="c.id === currentId && !busy && state.status === 'ongoing'">▶ </span>{{ c.name }}
@@ -123,6 +125,8 @@ import {
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
 import DiceRoll from "../components/DiceRoll.vue";
+import Illustration from "../components/Illustration.vue";
+import { artKey } from "../data/illustrations";
 import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";

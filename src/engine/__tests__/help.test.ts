@@ -10,6 +10,7 @@ import { SPECIES } from "../../data/species";
 import { HELP_KINDS, helpEntries, type HelpKind } from "../../ui/helpLists";
 import { ABILITIES } from "../rules";
 import { featuresFor } from "../features";
+import { CREDITS } from "../../data/credits";
 
 describe("contenu de la page Aide", () => {
   it("explique chaque capacité de chaque classe", () => {
@@ -85,5 +86,14 @@ describe("contenu de la page Aide", () => {
   it("chaque capacité appliquée ou partielle a une explication de ce que fait le jeu", () => {
     for (const feats of Object.values(FEATURE_STATUS))
       for (const [n, v] of Object.entries(feats)) if (v.status !== "todo") expect(v.note, n).toBeTruthy();
+  });
+
+  it("cite les sources libres embarquées dans les crédits, avec leur mention de licence", () => {
+    const text = JSON.stringify(CREDITS);
+    expect(text).toContain("System Reference Document 5.2");
+    expect(text).toContain("System Reference Document 5.1");
+    expect(text).toContain("game-icons.net");
+    expect(text).toContain("CC BY 3.0");
+    for (const c of CREDITS) for (const l of c.links) expect(l.url.startsWith("https://"), l.url).toBe(true);
   });
 });
