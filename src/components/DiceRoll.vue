@@ -19,6 +19,7 @@
     <template v-if="phase === 'settled'">
       <p class="calc">{{ calc }}</p>
       <p v-if="outcomeText" class="outcome" :class="event.outcome">{{ outcomeText }}</p>
+      <p v-if="event.note" class="note">{{ event.note }}</p>
     </template>
     <p v-else-if="phase === 'rolling'" class="calc">…</p>
 
@@ -66,8 +67,10 @@ const calc = computed(() => {
   const e = props.event;
   const base = kept.value ?? e.dice.join(" + ");
   const mod = e.modifier ? ` ${signed(e.modifier).replace("-", "− ").replace("+", "+ ")}` : "";
-  const dc = e.dc !== undefined ? ` contre CA ${e.dc}` : "";
+  const dc = e.dc !== undefined ? ` contre ${e.kind === "save" ? "DD" : "CA"} ${e.dc}` : "";
   const unit = e.kind === "damage" ? " dégâts" : e.kind === "heal" ? " PV" : "";
+  // Dégâts réduits (moitié, résistance) : on montre le total lancé puis le total appliqué.
+  if (e.rolled !== undefined && e.rolled !== e.total) return `${base}${mod} = ${e.rolled} → ${e.total}${unit}`;
   return `${base}${mod} = ${e.total}${dc}${unit}`;
 });
 
@@ -80,6 +83,7 @@ const outcomeText = computed(() => {
   if (!e.outcome) return "";
   if (e.kind === "damage") return e.outcome === "crit" ? "Dégâts critiques !" : "";
   if (e.kind === "heal") return `Vous récupérez ${e.total} PV`;
+  if (e.kind === "save") return e.outcome === "success" ? "Jet réussi" : "Jet raté";
   if (e.kind === "deathSave" && e.outcome === "crit") return "Vous vous relevez !";
   return OUTCOMES[e.outcome] ?? "";
 });
@@ -152,6 +156,7 @@ onBeforeUnmount(() => {
 .outcome.crit { color: var(--ion-color-warning, #ffc409); }
 .outcome.miss, .outcome.failure { color: var(--ion-color-medium, #92949c); }
 .outcome.fumble { color: var(--ion-color-danger, #eb445a); }
+.note { margin: 0 0 6px; font-size: 0.85rem; opacity: 0.8; }
 ion-button { margin-top: 10px; }
 
 @keyframes tumble {

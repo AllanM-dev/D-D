@@ -88,12 +88,6 @@ const average = (a: AttackDef) => a.damage.count * ((a.damage.sides + 1) / 2) + 
 /** Estimation grossière de l'intérêt d'une attaque, pour proposer la meilleure en premier. */
 const score = (a: AttackDef) => average(a) * Math.min(1, Math.max(0.05, (a.toHit + 10) / 20));
 
-const SPELL_ATTACK: Record<string, { name: string; ability: Ability; damageType: string }> = {
-  sorcerer: { name: "Trait de feu", ability: "CHA", damageType: "feu" },
-  warlock: { name: "Décharge occulte", ability: "CHA", damageType: "force" },
-  wizard: { name: "Trait de feu", ability: "INT", damageType: "feu" },
-};
-
 /** Calcule CA, vitesse et attaques à partir de l'équipement de départ choisi. */
 export function computeEquipment(input: EquipmentInput, kitId?: string): EquipmentResult {
   const { classId, scores, modifiers: mod, proficiencyBonus: prof } = input;
@@ -138,13 +132,6 @@ export function computeEquipment(input: EquipmentInput, kitId?: string): Equipme
 
   // --- attaques
   const attacks: AttackDef[] = [];
-  const spell = SPELL_ATTACK[classId];
-  if (spell) {
-    attacks.push({
-      name: spell.name, toHit: mod[spell.ability] + prof, damage: { count: 1, sides: 10, bonus: 0 },
-      damageType: spell.damageType, ranged: true, ability: spell.ability, spell: true,
-    });
-  }
   if (classId === "monk") {
     attacks.push({
       name: "Frappe à mains nues", toHit: mod.DEX + prof, damage: { count: 1, sides: 6, bonus: mod.DEX },

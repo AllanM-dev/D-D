@@ -7,6 +7,7 @@ import {
   SPECIES_TRAIT_TEXT, WEAPON_PROPERTY_TEXT, WEAPON_TRAINING_TEXT,
 } from "../../data/help";
 import { SPECIES } from "../../data/species";
+import { CLASS_SPELLCASTING, SPELLS, isPlayable } from "../../data/spells";
 import { HELP_KINDS, helpEntries, type HelpKind } from "../../ui/helpLists";
 import { ABILITIES } from "../rules";
 import { featuresFor } from "../features";
@@ -54,7 +55,7 @@ describe("contenu de la page Aide", () => {
     }
   });
   it("liste toutes les entrées de chaque section d'aide", () => {
-    const counts: Record<HelpKind, number> = { classes: CLASSES.length, species: SPECIES.length, backgrounds: BACKGROUNDS.length, weapons: WEAPONS.length, armors: ARMORS.length };
+    const counts: Record<HelpKind, number> = { classes: CLASSES.length, species: SPECIES.length, backgrounds: BACKGROUNDS.length, weapons: WEAPONS.length, armors: ARMORS.length, spells: SPELLS.length };
     for (const k of Object.keys(HELP_KINDS) as HelpKind[]) {
       const entries = helpEntries(k);
       expect(entries.length, k).toBe(counts[k]);
@@ -95,5 +96,26 @@ describe("contenu de la page Aide", () => {
     expect(text).toContain("game-icons.net");
     expect(text).toContain("CC BY 3.0");
     for (const c of CREDITS) for (const l of c.links) expect(l.url.startsWith("https://"), l.url).toBe(true);
+  });
+
+  it("indique le statut de l'incantation de chaque classe qui lance des sorts, et seulement d'elles", () => {
+    const names = ["Incantation", "Magie de pacte"];
+    for (const c of CLASSES) {
+      const status = FEATURE_STATUS[c.id];
+      const has = names.filter((n) => status[n]);
+      if (CLASS_SPELLCASTING[c.id]) {
+        expect(has.length, `${c.id} doit avoir Incantation ou Magie de pacte`).toBe(1);
+        expect(status[has[0]].status, c.id).toBe("partial"); // niveau 1 seulement, sorts partiellement jouables
+      } else {
+        expect(has, c.id).toEqual([]);
+      }
+    }
+  });
+  it("la fiche d'un sort dit s'il est jouable, avec une note quand le jeu simplifie la règle", () => {
+    for (const sp of SPELLS) {
+      if (!isPlayable(sp)) expect(sp.note, `${sp.id} : pourquoi pas jouable ?`).toBeTruthy();
+    }
+    const entries = helpEntries("spells");
+    expect(entries.filter((e) => e.summary.includes("pas encore jouable")).length).toBe(SPELLS.filter((sp) => !isPlayable(sp)).length);
   });
 });

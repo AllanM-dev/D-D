@@ -61,6 +61,23 @@
         </ion-item>
       </ion-list>
 
+      <ion-list v-if="casting" inset>
+        <ion-list-header><ion-label>Sorts</ion-label></ion-list-header>
+        <ion-item lines="full">
+          <ion-label class="ion-text-wrap">
+            {{ ABILITY_NAMES[casting.ability] }} · DD {{ casting.saveDc }} · attaque de sort {{ signed(casting.attackBonus) }}
+            <p>{{ casting.slots.max }} emplacement{{ casting.slots.max > 1 ? "s" : "" }} de niveau 1</p>
+          </ion-label>
+        </ion-item>
+        <ion-item v-for="sp in knownSpells" :key="sp.id" lines="full">
+          <ion-label class="ion-text-wrap">
+            {{ sp.name }}
+            <p>{{ sp.level === 0 ? "Sort mineur" : "Niveau 1" }} · {{ sp.description }}</p>
+          </ion-label>
+          <ion-note slot="end">{{ isPlayable(sp) ? "Jouable" : "À venir" }}</ion-note>
+        </ion-item>
+      </ion-list>
+
       <ion-list inset>
         <ion-list-header><ion-label>Attaques</ion-label></ion-list-header>
         <ion-item v-for="a in c.attacks" :key="a.name" lines="full">
@@ -105,6 +122,8 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
+import { SPELL_BY_ID, isPlayable } from "../data/spells";
+import { castingFor } from "../engine/spellcasting";
 import { artKey } from "../data/illustrations";
 import { CLASS_FEATURE_TEXT, FEATURE_STATUS } from "../data/help";
 import { ABILITIES } from "../engine/rules";
@@ -115,6 +134,17 @@ const store = useCharacters();
 const router = useIonRouter();
 const route = useRoute();
 const c = computed(() => store.get(String(route.params.id)));
+const casting = computed(() =>
+  c.value
+    ? castingFor({
+        classId: c.value.classDef.id, modifiers: c.value.modifiers, proficiencyBonus: c.value.proficiencyBonus,
+        conSaveBonus: c.value.saves.CON.bonus, unarmored: !c.value.equipment.armor, spells: c.value.spells ?? { cantrips: [], prepared: [] },
+      })
+    : undefined,
+);
+const knownSpells = computed(() =>
+  casting.value ? [...casting.value.cantrips, ...casting.value.prepared].map((id) => SPELL_BY_ID[id]).filter(Boolean) : [],
+);
 const style = computed(() => FIGHTING_STYLES.find((st) => st.id === c.value?.fightingStyle));
 const statusShort = (feature: string) => {
   const st = FEATURE_STATUS[c.value!.classDef.id]?.[feature]?.status;

@@ -7,6 +7,7 @@ import {
   type AbilityScores, type ScoreMethod,
 } from "./abilities";
 import { isFightingStyle, type FightingStyleId } from "../data/fighting-styles";
+import { CLASS_SPELLCASTING, defaultSpells, spellsFor } from "../data/spells";
 import type { AttackDef } from "./combat";
 import { computeEquipment, getKit, type CharacterEquipment } from "./equipment";
 import { ABILITIES, abilityModifier, proficiencyBonus, type Ability } from "./rules";
@@ -32,6 +33,15 @@ export interface CharacterDraft {
   kitId?: string;
   /** Style de combat (guerrier). */
   fightingStyle?: FightingStyleId;
+  /** Sorts choisis (classes qui lancent des sorts). */
+  spells?: SpellChoice;
+}
+
+export interface SpellChoice {
+  /** Sorts mineurs connus. */
+  cantrips: string[];
+  /** Sorts de niveau 1 préparés (hors sorts toujours préparés). */
+  prepared: string[];
 }
 
 export interface SkillEntry {
@@ -64,6 +74,7 @@ export interface Character {
   /** Attaques disponibles en combat, la meilleure en premier. */
   attacks: AttackDef[];
   fightingStyle?: FightingStyleId;
+  spells?: SpellChoice;
 }
 
 const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id);
@@ -106,6 +117,18 @@ export function validateDraft(d: CharacterDraft): string[] {
   }
 
   if (cls?.id === "fighter" && !isFightingStyle(d.fightingStyle)) errors.push("Choisissez un style de combat.");
+
+  const casting = cls ? CLASS_SPELLCASTING[cls.id] : undefined;
+  if (cls && casting) {
+    for (const [level, count, label, chosen] of [
+      [0, casting.cantrips, "sorts mineurs", d.spells?.cantrips ?? []],
+      [1, casting.prepared, "sorts de niveau 1", d.spells?.prepared ?? []],
+    ] as const) {
+      const allowed = new Set(spellsFor(cls.id, level).map((x) => x.id));
+      if (new Set(chosen).size !== chosen.length || chosen.length !== count) errors.push(`Choisissez ${count} ${label}.`);
+      else if (chosen.some((id) => !allowed.has(id))) errors.push(`Un des ${label} choisis n'est pas disponible pour cette classe.`);
+    }
+  }
 
   if (cls && d.kitId) {
     try {
@@ -167,7 +190,21 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
     equipment: eq.equipment,
     attacks: eq.attacks,
     fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined,
+    spells: CLASS_SPELLCASTING[classDef.id] && d.spells ? { cantrips: [...d.spells.cantrips], prepared: [...d.spells.prepared] } : undefined,
     passivePerception: 10 + skills.find((s) => s.id === "perception")!.bonus,
     saves, skills, originFeat: background.originFeat,
   };
+}
+
+/**
+ * Personnages sauvegardés avant les sorts : les lanceurs de sorts reçoivent des sorts par défaut, et les anciens
+ * « sorts mineurs d'attaque » enregistrés comme des armes sont retirés (ils se lancent maintenant comme des sorts).
+ */
+export function migrateSpells<T extends { classDef: { id: string }; spells?: SpellChoice; attacks?: AttackDef[] }>(c: T): T {
+  let out = c;
+  if (out.attacks?.some((a) => a.spell || a.name === "Trait de feu" || a.name === "Décharge occulte")) {
+    out = { ...out, attacks: out.attacks.filter((a) => !a.spell && a.name !== "Trait de feu" && a.name !== "Décharge occulte") };
+  }
+  if (CLASS_SPELLCASTING[out.classDef.id] && !out.spells) out = { ...out, spells: defaultSpells(out.classDef.id) };
+  return out;
 }

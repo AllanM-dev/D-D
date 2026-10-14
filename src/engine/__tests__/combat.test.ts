@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ENCOUNTERS, buildEnemies } from "../../data/encounters";
 import { MONSTERS } from "../../data/monsters";
 import { characterToCombatant } from "../attacks";
+import { defaultSpells } from "../../data/spells";
 import { buildCharacter, type CharacterDraft } from "../character";
 import {
   applyDamage, currentCombatant, getCombatant, makeCombatant, playerAttack, playerDodge, processTurns, resolveAttack,
@@ -233,10 +234,15 @@ describe("personnage → combattant", () => {
     baseScores: { STR: 8, DEX: 13, CON: 14, INT: 15, WIS: 12, CHA: 10 },
     bonus: { mode: "2/1", plus2: "INT", plus1: "CON" }, classSkills: ["investigation", "medicine"],
   };
-  it("le magicien combat d'abord avec son trait de feu, sans modificateur aux dégâts", () => {
-    const c = buildCharacter(base, "w");
-    expect(c.attacks[0]).toMatchObject({ name: "Trait de feu", toHit: 3 + 2, damage: { sides: 10, bonus: 0 }, ranged: true });
-    expect(characterToCombatant(c)).toMatchObject({ maxHp: 8, ac: 11, initiativeBonus: 1 });
+  it("le magicien a des armes ordinaires et ses sorts à part (DD, bonus d'attaque, emplacements)", () => {
+    const c = buildCharacter({ ...base, spells: defaultSpells("wizard") }, "w");
+    expect(c.attacks.every((a) => !a.spell)).toBe(true);
+    expect(c.attacks[0].name).toMatch(/Dague|Bâton/);
+    const init = characterToCombatant(c);
+    expect(init).toMatchObject({ maxHp: 8, ac: 11, initiativeBonus: 1 });
+    expect(init.spellcasting).toMatchObject({ ability: "INT", attackBonus: 3 + 2, saveDc: 8 + 2 + 3, slots: { max: 2, used: 0 } });
+    expect(init.spellcasting!.cantrips).toHaveLength(3);
+    expect(init.spellcasting!.prepared).toHaveLength(4);
     expect(characterToCombatant(c).attacks.length).toBe(c.attacks.length);
   });
   it("le guerrier en cotte de mailles a la CA de l'armure et plusieurs attaques", () => {

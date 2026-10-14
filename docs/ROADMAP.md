@@ -24,14 +24,16 @@
 - [x] Action bonus et fin de tour ; capacités de classe de niveau 1 : Second souffle, Style de combat (Défense, Archerie), Rage, Imposition des mains, Magie innée, frappe bonus du moine
 - [ ] Réactions, déplacement, portée, repos court et long
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
-- [ ] Conditions, sorts de combat (Incantation), soins des alliés, autres capacités de classe (Attaque sournoise, Expertise, Inspiration bardique…), autres styles de combat
+- [x] Sorts (lot 1) : 40 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
+- [ ] Sorts : réactions (Bouclier…), grimoire du magicien, niveaux supérieurs, zones à plusieurs cibles, soins des alliés
+- [ ] Conditions, autres capacités de classe (Attaque sournoise, Expertise, Inspiration bardique…), autres styles de combat
 - [x] Bestiaire de départ (7 monstres, SRD 5.1) et 7 rencontres
 - [ ] Bestiaire complet, capacités spéciales des monstres, compagnons, propriétés d'armes (lourde, légère, maîtrises), munitions
 
 ## Jalon 3 — Aventure
 - [ ] Format de scénario (scènes, choix, tests de compétence)
 - [ ] Une aventure courte jouable de bout en bout
-- [ ] Sorts et inventaire
+- [ ] Inventaire
 
 ## Plus tard
 - [ ] Narration générée (MJ IA), multijoueur, repos, montée de niveau

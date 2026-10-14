@@ -5,6 +5,7 @@ import { ENCOUNTERS, buildEnemies } from "../../data/encounters";
 import { GAME_ICONS } from "../../data/game-icons.generated";
 import { ART, artKey, getArt } from "../../data/illustrations";
 import { MONSTERS } from "../../data/monsters";
+import { defaultSpells } from "../../data/spells";
 import { SPECIES } from "../../data/species";
 import { helpArt } from "../../ui/helpLists";
 import { characterToCombatant } from "../attacks";
@@ -49,7 +50,7 @@ describe("illustrations", () => {
     const c = buildCharacter(
       { name: "T", speciesId: "elf", classId: "wizard", backgroundId: "sage", method: "standard",
         baseScores: { STR: 8, DEX: 13, CON: 14, INT: 15, WIS: 12, CHA: 10 }, bonus: { mode: "2/1", plus2: "INT", plus1: "CON" },
-        classSkills: ["investigation", "medicine"] }, "w");
+        classSkills: ["investigation", "medicine"], spells: defaultSpells("wizard") }, "w");
     expect(characterToCombatant(c).art).toBe("class:wizard");
   });
   it("les pages d'aide trouvent l'illustration de chaque entrée (sauf armes et armures)", () => {
