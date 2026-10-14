@@ -130,6 +130,39 @@
         </ion-list>
       </template>
 
+      <!-- Sorts -->
+      <template v-if="spellCfg">
+        <h3>Sorts</h3>
+        <p class="hint">
+          Caractéristique d'incantation : {{ ABILITY_NAMES[spellCfg.ability] }} · {{ spellCfg.slots }} emplacement{{ spellCfg.slots > 1 ? "s" : "" }}
+          de niveau 1. Les sorts marqués « sans effet en combat » ne servent pas encore en combat.
+        </p>
+        <template v-for="group in spellGroups" :key="group.level">
+          <h4 v-if="group.count > 0" class="subtitle">{{ group.title }} ({{ group.chosen.length }}/{{ group.count }})</h4>
+          <ion-list v-if="group.count > 0" inset>
+            <ion-item v-for="sp in group.options" :key="sp.id" lines="full">
+              <ion-checkbox
+                label-placement="end"
+                justify="start"
+                :checked="group.chosen.includes(sp.id)"
+                :disabled="!group.chosen.includes(sp.id) && group.chosen.length >= group.count"
+                @ion-change="toggleSpell(group.level, sp.id, $event.detail.checked)"
+              >
+                <div class="spell">
+                  <strong>{{ sp.name }}</strong>
+                  <span v-if="!isPlayable(sp)" class="tag">sans effet en combat</span>
+                  <small>{{ sp.description }}</small>
+                </div>
+              </ion-checkbox>
+            </ion-item>
+          </ion-list>
+        </template>
+        <p v-if="alwaysPrepared.length" class="hint">
+          Toujours préparé : {{ alwaysPrepared.map((id) => SPELL_BY_ID[id].name).join(", ") }}
+          ({{ spellCfg.free?.uses }} lancers gratuits par repos long).
+        </p>
+      </template>
+
       <!-- Style de combat (guerrier) -->
       <template v-if="classDef?.id === 'fighter'">
         <h3>Style de combat</h3>
@@ -219,6 +252,7 @@ import { keyAbilities } from "../engine/advice";
 import { computeEquipment, kitsFor } from "../engine/equipment";
 import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
+import { CLASS_SPELLCASTING, SPELL_BY_ID, defaultSpells, isPlayable, spellsFor } from "../data/spells";
 import { artKey } from "../data/illustrations";
 import { ARMORS, WEAPONS, type KitEntry } from "../data/equipment";
 import { applyBackgroundBonus, buildCharacter, validateDraft, type CharacterDraft } from "../engine/character";
@@ -271,6 +305,7 @@ watch(() => draft.classId, (id) => {
   draft.classSkills = [];
   draft.kitId = id ? kitsFor(id)[0].id : undefined;
   draft.fightingStyle = id === "fighter" ? "defense" : undefined;
+  draft.spells = id && CLASS_SPELLCASTING[id] ? defaultSpells(id) : undefined;
 });
 
 function pruneSkills() {
@@ -337,6 +372,26 @@ const portraits = computed(() => {
   return out;
 });
 
+// --- sorts
+const spellCfg = computed(() => (classDef.value ? CLASS_SPELLCASTING[classDef.value.id] : undefined));
+const alwaysPrepared = computed(() => spellCfg.value?.alwaysPrepared ?? []);
+const spellGroups = computed(() => {
+  const cfg = spellCfg.value;
+  const cls = classDef.value;
+  if (!cfg || !cls) return [];
+  return [
+    { level: 0 as const, title: "Sorts mineurs", count: cfg.cantrips, options: spellsFor(cls.id, 0), chosen: draft.spells?.cantrips ?? [] },
+    { level: 1 as const, title: "Sorts de niveau 1 préparés", count: cfg.prepared, options: spellsFor(cls.id, 1), chosen: draft.spells?.prepared ?? [] },
+  ];
+});
+function toggleSpell(level: 0 | 1, id: string, checked: boolean) {
+  if (!draft.spells) return;
+  const key = level === 0 ? "cantrips" : "prepared";
+  const list = draft.spells[key];
+  if (checked && !list.includes(id)) list.push(id);
+  else if (!checked && list.includes(id)) draft.spells[key] = list.filter((x) => x !== id);
+}
+
 const final = computed(() => {
   const bg = background.value;
   const withBonus = bg ? applyBackgroundBonus(draft.baseScores, bg, draft.bonus) : { ...draft.baseScores };
@@ -378,6 +433,10 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .advice p { margin: 6px 0 0; }
 .star { color: var(--ion-color-warning, #fc0); }
 .detail { padding: 0 16px 16px; }
+.subtitle { margin: 14px 0 4px; opacity: 0.85; font-size: 0.95rem; }
+.spell { display: flex; flex-direction: column; gap: 2px; white-space: normal; padding: 4px 0; }
+.spell small { opacity: 0.75; }
+.tag { color: var(--ion-color-warning, #ffc409); font-size: 0.75rem; }
 .portraits { display: flex; gap: 16px; justify-content: center; margin: 12px 0 4px; }
 .portraits figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .portraits figcaption { font-size: 0.8rem; opacity: 0.85; }

@@ -1,4 +1,6 @@
 import { rollD20, rollDie, type AdvantageMode, type Rng } from "./dice";
+import { SPELL_BY_ID } from "../data/spells";
+import { hasBonusSpell, spellOptionsFor, type SpellOption } from "./spellcasting";
 import type { Ability } from "./rules";
 
 export type Side = "party" | "enemies";
@@ -44,10 +46,42 @@ export const FEATURE_LABELS: Record<FeatureId, string> = {
   "martial-arts": "Frappe bonus (arts martiaux)",
 };
 
+/** Capacité d'incantation d'un combattant (voir `spellcasting.ts`). */
+export interface Spellcasting {
+  ability: Ability;
+  modifier: number;
+  attackBonus: number;
+  saveDc: number;
+  cantrips: string[];
+  prepared: string[];
+  /** Emplacements de sort de niveau 1. */
+  slots: { max: number; used: number };
+  /** Lancers gratuits (Ennemi juré du rôdeur). */
+  free: { spellId: string; uses: number; max: number }[];
+  /** Bonus au jet de sauvegarde de Constitution pour garder sa concentration. */
+  concentrationBonus: number;
+  /** Ne porte pas d'armure (condition de l'Armure du mage). */
+  unarmored: boolean;
+}
+
+/** Marque sur une cible (Maléfice, Marque du chasseur) : dégâts supplémentaires à chaque coup. */
+export interface Mark {
+  spellId: string;
+  name: string;
+  targetId: string;
+  count: number;
+  sides: number;
+  damageType: string;
+  /** Ne s'applique qu'aux attaques d'arme (Marque du chasseur). */
+  weaponOnly: boolean;
+}
+
 /** État du tour en cours d'un combattant. */
 export interface TurnState {
   action: boolean;
   bonus: boolean;
+  /** Sorts lancés ce tour (règle : un sort à action bonus limite les autres sorts). */
+  spells: { level: number; time: "action" | "bonus" | "reaction" }[];
   /** A utilisé l'action Attaquer ce tour (condition de la frappe bonus des arts martiaux). */
   attacked: boolean;
 }
@@ -79,11 +113,24 @@ export interface Combatant {
   turnState: TurnState;
   /** Clé d'illustration (`class:fighter`, `monster:goblin`…). */
   art?: string;
+  spellcasting?: Spellcasting;
+  /** Sort de concentration en cours. */
+  concentrating?: { spellId: string };
+  mark?: Mark;
+  /** Bonus de CA d'un sort (Bouclier de la foi), à retirer quand il se termine. */
+  acBonus: number;
+  /** Éclair guidé : la prochaine attaque contre ce combattant a l'avantage. */
+  guided: boolean;
+  guidedUntilRound: number;
+  /** Moquerie cruelle : désavantage à sa prochaine attaque. */
+  mocked: boolean;
+  /** Modificateurs de caractéristiques pour les jets de sauvegarde (monstres). */
+  saveMods?: Partial<Record<Ability, number>>;
 }
 
 export type CombatStatus = "ongoing" | "victory" | "defeat";
 
-export type RollKind = "initiative" | "attack" | "damage" | "deathSave" | "heal";
+export type RollKind = "initiative" | "attack" | "damage" | "deathSave" | "heal" | "save";
 export type RollOutcome = "hit" | "miss" | "crit" | "fumble" | "success" | "failure";
 
 /** Un jet de dés, avec de quoi l'animer : dés lancés, dé retenu, résultat. */
@@ -101,8 +148,12 @@ export interface RollEvent {
   keptIndex: number;
   modifier: number;
   total: number;
-  /** CA visée (jets d'attaque). */
+  /** CA visée (jets d'attaque) ou DD (jets de sauvegarde). */
   dc?: number;
+  /** Total lancé avant réduction (moitié des dégâts, résistance) ; `total` est le total réellement appliqué. */
+  rolled?: number;
+  /** Précision affichée sous le résultat (« moitié : jet de sauvegarde réussi »). */
+  note?: string;
   outcome?: RollOutcome;
   /** Nombre de lignes du journal à afficher une fois ce jet révélé. */
   logLen: number;
@@ -125,7 +176,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "level" | "features" | "art">>;
+  Partial<Pick<Combatant, "level" | "features" | "art" | "spellcasting" | "saveMods">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
@@ -140,7 +191,9 @@ export function makeCombatant(init: CombatantInit): Combatant {
     level: init.level ?? 1,
     features: (init.features ?? []).map((f) => ({ ...f })),
     raging: false, ragingUntilRound: 0, innateSorcery: false, innateUntilRound: 0,
-    turnState: { action: false, bonus: false, attacked: false },
+    turnState: { action: false, bonus: false, attacked: false, spells: [] },
+    spellcasting: init.spellcasting ? JSON.parse(JSON.stringify(init.spellcasting)) : undefined,
+    acBonus: 0, guided: false, guidedUntilRound: 0, mocked: false,
   };
 }
 
@@ -166,11 +219,11 @@ export function rollDamageDetailed(d: DamageDice, crit: boolean, rng: Rng): { di
 export const rollDamage = (d: DamageDice, crit: boolean, rng: Rng): number => rollDamageDetailed(d, crit, rng).total;
 
 /** Copie indépendante (fonctionne aussi sur un objet réactif Vue, contrairement à structuredClone). */
-const snapshot = (combatants: Combatant[]): Combatant[] => JSON.parse(JSON.stringify(combatants));
+export const snapshot = (combatants: Combatant[]): Combatant[] => JSON.parse(JSON.stringify(combatants));
 
-type RollInit = Omit<RollEvent, "id" | "after" | "logLen" | "round" | "keptIndex"> & { keptIndex?: number };
+export type RollInit = Omit<RollEvent, "id" | "after" | "logLen" | "round" | "keptIndex"> & { keptIndex?: number };
 
-function pushRoll(state: CombatState, init: RollInit, logLen = state.log.length) {
+export function pushRoll(state: CombatState, init: RollInit, logLen = state.log.length) {
   state.rolls.push({ keptIndex: 0, ...init, id: state.rolls.length, logLen, round: state.round, after: snapshot(state.combatants) });
 }
 
@@ -210,6 +263,35 @@ function updateStatus(state: CombatState) {
   }
 }
 
+/** Met fin à la concentration d'un combattant et aux effets qui en dépendent. */
+export function endConcentration(state: CombatState, c: Combatant, reason: string) {
+  if (!c.concentrating) return;
+  const spell = SPELL_BY_ID[c.concentrating.spellId];
+  if (c.acBonus) {
+    c.ac -= c.acBonus;
+    c.acBonus = 0;
+  }
+  c.mark = undefined;
+  c.concentrating = undefined;
+  state.log.push(`${c.name} ${reason} : ${spell?.name ?? "le sort"} prend fin.`);
+}
+
+/** Jet de sauvegarde de Constitution pour garder sa concentration après avoir subi des dégâts. */
+export function concentrationCheck(state: CombatState, c: Combatant, damage: number, rng: Rng) {
+  if (!c.concentrating || c.dead || c.hp <= 0 || damage <= 0) return;
+  const bonus = c.spellcasting?.concentrationBonus ?? 0;
+  const dc = Math.max(10, Math.floor(damage / 2));
+  const roll = rollD20(bonus, "normal", rng);
+  const ok = roll.total >= dc;
+  state.log.push(`${c.name} : concentration, jet de sauvegarde de Constitution ${roll.natural}${bonus >= 0 ? "+" : ""}${bonus} = ${roll.total} contre DD ${dc} — ${ok ? "maintenue" : "perdue"}.`);
+  pushRoll(state, {
+    kind: "save", actorId: c.id, actorName: c.name, side: c.side, title: `Concentration de ${c.name} : sauvegarde de Constitution`,
+    sides: 20, dice: roll.rolls, modifier: bonus, total: roll.total, dc, outcome: ok ? "success" : "failure",
+    note: ok ? "Concentration maintenue" : "Concentration perdue",
+  });
+  if (!ok) endConcentration(state, c, "perd sa concentration");
+}
+
 /** Applique des dégâts. Le joueur tombe à 0 PV (inconscient) ; un ennemi à 0 PV meurt. */
 export function applyDamage(state: CombatState, target: Combatant, amount: number, crit: boolean) {
   if (amount <= 0 || target.dead) return;
@@ -217,6 +299,7 @@ export function applyDamage(state: CombatState, target: Combatant, amount: numbe
     const overflow = amount - target.hp;
     target.hp = Math.max(0, target.hp - amount);
     if (target.hp > 0) return;
+    endConcentration(state, target, "perd connaissance");
     if (target.side === "enemies") {
       target.dead = true;
       state.log.push(`${target.name} est vaincu.`);
@@ -237,17 +320,28 @@ export function applyDamage(state: CombatState, target: Combatant, amount: numbe
   state.log.push(`${target.name} est touché alors qu'il est à terre.`);
   if (target.deathSaves.failures >= 3) {
     target.dead = true;
+    endConcentration(state, target, "meurt");
     state.log.push(`${target.name} succombe à ses blessures.`);
   }
 }
 
-export function resolveAttack(state: CombatState, attacker: Combatant, target: Combatant, attack: AttackDef, rng: Rng) {
+export interface AttackResult {
+  hit: boolean;
+  crit: boolean;
+  damage: number;
+}
+
+export function resolveAttack(state: CombatState, attacker: Combatant, target: Combatant, attack: AttackDef, rng: Rng): AttackResult {
   const melee = !attack.ranged;
   const unconscious = isDown(target);
   let mode: AdvantageMode = "normal";
-  // Avantage : cible inconsciente au corps à corps, ou attaque de sort sous Magie innée.
-  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell);
-  const disadvantage = target.dodging;
+  // Avantage : cible inconsciente au corps à corps, attaque de sort sous Magie innée, ou cible marquée par Éclair guidé.
+  const guidedAdvantage = target.guided && attacker.side === "party";
+  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell) || guidedAdvantage;
+  // Désavantage : cible qui esquive, ou attaquant visé par Moquerie cruelle.
+  const disadvantage = target.dodging || attacker.mocked;
+  if (guidedAdvantage) target.guided = false;
+  if (attacker.mocked) attacker.mocked = false;
   if (advantage && !disadvantage) mode = "advantage";
   else if (disadvantage && !advantage) mode = "disadvantage";
 
@@ -265,7 +359,7 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
   if (!hit) {
     state.log.push(`${label} — raté.`);
     pushRoll(state, attackRoll);
-    return;
+    return { hit: false, crit: false, damage: 0 };
   }
   pushRoll(state, attackRoll); // état et journal d'avant les dégâts
   // Rage : +2 aux dégâts des attaques de Force.
@@ -284,7 +378,27 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
     kind: "damage", actorId: attacker.id, actorName: attacker.name, side: attacker.side,
     title: `Dégâts de ${attacker.name} (${attack.damageType})`,
     sides: attack.damage.sides, dice, modifier: damageDef.bonus, total: damage, outcome: crit ? "crit" : "hit",
+    ...(resisted ? { rolled, note: "réduits de moitié (résistance de la rage)" } : {}),
   });
+  let total = damage;
+
+  // Maléfice, Marque du chasseur : dégâts supplémentaires sur la cible marquée.
+  const mark = attacker.mark;
+  if (mark && mark.targetId === target.id && !target.dead && (!attack.spell || !mark.weaponOnly)) {
+    const extra = rollDamageDetailed({ count: mark.count, sides: mark.sides, bonus: 0 }, crit, rng);
+    state.log.push(`${mark.name} : ${extra.total} dégâts supplémentaires (${mark.damageType}).`);
+    applyDamage(state, target, extra.total, crit);
+    pushRoll(state, {
+      kind: "damage", actorId: attacker.id, actorName: attacker.name, side: attacker.side,
+      title: `${mark.name} : dégâts supplémentaires (${mark.damageType})`,
+      sides: mark.sides, dice: extra.dice, modifier: 0, total: extra.total, outcome: crit ? "crit" : "hit",
+    });
+    total += extra.total;
+  }
+
+  // Un lanceur de sorts qui subit des dégâts doit garder sa concentration.
+  concentrationCheck(state, target, damage, rng);
+  return { hit: true, crit, damage: total };
 }
 
 function deathSave(state: CombatState, c: Combatant, rng: Rng) {
@@ -341,7 +455,8 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
     if (state.status !== "ongoing") return;
     const cur = currentCombatant(state);
     cur.dodging = false;
-    cur.turnState = { action: false, bonus: false, attacked: false };
+    cur.turnState = { action: false, bonus: false, attacked: false, spells: [] };
+    for (const c of state.combatants) if (c.guided && state.round > c.guidedUntilRound) c.guided = false;
     if (cur.raging && state.round > cur.ragingUntilRound) {
       cur.raging = false;
       state.log.push(`La rage de ${cur.name} retombe.`);
@@ -370,7 +485,7 @@ function endTurn(state: CombatState, rng: Rng) {
   processTurns(state, rng);
 }
 
-function assertPlayerTurn(state: CombatState): Combatant {
+export function assertPlayerTurn(state: CombatState): Combatant {
   if (state.status !== "ongoing") throw new Error("Le combat est terminé.");
   const cur = currentCombatant(state);
   if (cur.side !== "party" || !isConscious(cur)) throw new Error("Ce n'est pas le tour d'un personnage du joueur.");
@@ -396,6 +511,8 @@ export interface PlayerOptions {
   canAct: boolean;
   /** Actions bonus utilisables maintenant. */
   bonus: FeatureOption[];
+  /** Sorts du personnage (disponibles ou non, avec la raison). */
+  spells: SpellOption[];
   /** On peut terminer le tour (au moins une action utilisée). */
   canEnd: boolean;
 }
@@ -421,12 +538,13 @@ export function availableBonus(state: CombatState, c: Combatant): FeatureOption[
 
 /** Ce que le joueur peut faire maintenant (pour l'interface). */
 export function playerOptions(state: CombatState): PlayerOptions {
-  if (state.status !== "ongoing") return { canAct: false, bonus: [], canEnd: false };
+  if (state.status !== "ongoing") return { canAct: false, bonus: [], spells: [], canEnd: false };
   const cur = currentCombatant(state);
-  if (cur.side !== "party" || !isConscious(cur)) return { canAct: false, bonus: [], canEnd: false };
+  if (cur.side !== "party" || !isConscious(cur)) return { canAct: false, bonus: [], spells: [], canEnd: false };
   return {
     canAct: !cur.turnState.action,
     bonus: availableBonus(state, cur),
+    spells: spellOptionsFor(state, cur),
     canEnd: cur.turnState.action || cur.turnState.bonus,
   };
 }
@@ -435,14 +553,14 @@ export function playerOptions(state: CombatState): PlayerOptions {
  * Après une action : le tour se termine tout seul s'il ne reste plus rien à faire (action utilisée et aucune
  * action bonus possible) ; sinon le joueur peut utiliser son action bonus ou terminer son tour.
  */
-function afterPlayerAction(state: CombatState, rng: Rng) {
+export function afterPlayerAction(state: CombatState, rng: Rng) {
   updateStatus(state);
   if (state.status !== "ongoing") return;
   const cur = currentCombatant(state);
-  if (cur.turnState.action && availableBonus(state, cur).length === 0) endTurn(state, rng);
+  if (cur.turnState.action && availableBonus(state, cur).length === 0 && !hasBonusSpell(state, cur)) endTurn(state, rng);
 }
 
-function enemyTarget(state: CombatState, targetId: string): Combatant {
+export function enemyTarget(state: CombatState, targetId: string): Combatant {
   const target = getCombatant(state, targetId);
   if (target.side !== "enemies" || target.dead) throw new Error("Cible invalide.");
   return target;

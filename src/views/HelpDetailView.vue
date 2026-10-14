@@ -55,6 +55,17 @@
           </ion-list>
         </template>
 
+        <template v-if="spellCfg">
+          <h3>Incantation au niveau 1</h3>
+          <ion-list inset>
+            <ion-item lines="full"><ion-label>Caractéristique d'incantation</ion-label><ion-note slot="end">{{ ABILITY_NAMES[spellCfg.ability] }}</ion-note></ion-item>
+            <ion-item lines="full"><ion-label>Sorts mineurs connus</ion-label><ion-note slot="end">{{ spellCfg.cantrips }}</ion-note></ion-item>
+            <ion-item lines="full"><ion-label>Sorts de niveau 1 préparés</ion-label><ion-note slot="end">{{ spellCfg.prepared }}</ion-note></ion-item>
+            <ion-item lines="none"><ion-label>Emplacements de niveau 1</ion-label><ion-note slot="end">{{ spellCfg.slots }}</ion-note></ion-item>
+          </ion-list>
+          <p class="note">Les sorts sont décrits dans la section Sorts de l'Aide.</p>
+        </template>
+
         <h3>Maîtrises</h3>
         <ion-list inset>
           <ion-item lines="full"><ion-label class="ion-text-wrap">Armes<p>{{ WEAPON_TRAINING_TEXT[training.weapons] }}</p></ion-label></ion-item>
@@ -67,6 +78,22 @@
           <ion-item v-for="line in kitLines(k)" :key="line" lines="full"><ion-label class="ion-text-wrap">{{ line }}</ion-label></ion-item>
           <ion-item lines="none"><ion-label>{{ k.gold }} po</ion-label></ion-item>
         </ion-list>
+      </template>
+
+      <!-- Sort -->
+      <template v-else-if="sp2">
+        <ion-list inset>
+          <ion-item><ion-label>Niveau</ion-label><ion-note slot="end">{{ sp2.level === 0 ? "Sort mineur" : "Niveau 1" }} · {{ sp2.school }}</ion-note></ion-item>
+          <ion-item><ion-label>Incantation</ion-label><ion-note slot="end">{{ TIME_LABEL[sp2.time] }}</ion-note></ion-item>
+          <ion-item><ion-label>Portée</ion-label><ion-note slot="end">{{ sp2.range }}</ion-note></ion-item>
+          <ion-item><ion-label>Durée</ion-label><ion-note slot="end">{{ sp2.duration }}</ion-note></ion-item>
+          <ion-item><ion-label class="ion-text-wrap">Classes<p>{{ sp2.classes.map(className).join(", ") }}</p></ion-label></ion-item>
+        </ion-list>
+        <p>{{ sp2.description }}</p>
+        <p class="status" :class="isPlayable(sp2) ? 'applied' : 'todo'">
+          <strong>{{ isPlayable(sp2) ? "Jouable en combat." : "Pas encore jouable en combat." }}</strong>
+          {{ sp2.note ?? "" }}
+        </p>
       </template>
 
       <!-- Arme -->
@@ -163,6 +190,7 @@ import {
   ARMOR_KIND_TEXT, ARMOR_TRAINING_TEXT, BACKGROUND_TEXT, CLASS_FEATURE_TEXT, FEAT_TEXT, FEATURE_STATUS, FEATURE_STATUS_LABEL, SPECIES_TRAIT_TEXT,
   WEAPON_PROPERTY_TEXT, WEAPON_TRAINING_TEXT,
 } from "../data/help";
+import { CLASS_SPELLCASTING, SPELL_BY_ID, isPlayable } from "../data/spells";
 import { kitsFor } from "../engine/equipment";
 import { SKILLS, type SkillId } from "../data/skills";
 import { SPECIES } from "../data/species";
@@ -177,10 +205,14 @@ const id = computed(() => String(route.params.id));
 const cls = computed(() => (kind.value === "classes" ? CLASSES.find((c) => c.id === id.value) : undefined));
 const sp = computed(() => (kind.value === "species" ? SPECIES.find((s) => s.id === id.value) : undefined));
 const bg = computed(() => (kind.value === "backgrounds" ? BACKGROUNDS.find((b) => b.id === id.value) : undefined));
+const sp2 = computed(() => (kind.value === "spells" ? SPELL_BY_ID[id.value] : undefined));
+const spellCfg = computed(() => (cls.value ? CLASS_SPELLCASTING[cls.value.id] : undefined));
+const TIME_LABEL: Record<string, string> = { action: "Action", bonus: "Action bonus", reaction: "Réaction" };
+const className = (id: string) => CLASSES.find((c) => c.id === id)?.name ?? id;
 const wp = computed(() => (kind.value === "weapons" ? WEAPONS.find((w) => w.id === id.value) : undefined));
 const ar = computed(() => (kind.value === "armors" ? ARMORS.find((a) => a.id === id.value) : undefined));
 const heroArt = computed(() => helpArt(kind.value, id.value));
-const title = computed(() => cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? "Aide");
+const title = computed(() => cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? sp2.value?.name ?? "Aide");
 const training = computed(() => CLASS_TRAINING[cls.value?.id ?? ""]);
 const kits = computed(() => (cls.value ? kitsFor(cls.value.id) : []));
 const kitLines = (k: Kit) =>

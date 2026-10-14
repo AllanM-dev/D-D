@@ -29,6 +29,7 @@ const items = [
   { path: "/help/classes", label: "Classes", sub: true },
   { path: "/help/species", label: "Espèces", sub: true },
   { path: "/help/backgrounds", label: "Historiques", sub: true },
+  { path: "/help/spells", label: "Sorts", sub: true },
   { path: "/help/weapons", label: "Armes", sub: true },
   { path: "/help/armors", label: "Armures", sub: true },
   { path: "/help/abilities", label: "Caractéristiques", sub: true },

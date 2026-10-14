@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ARMORS, CLASS_TRAINING, STARTING_KITS, WEAPONS } from "../../data/equipment";
 import { SPECIES } from "../../data/species";
+import { defaultSpells } from "../../data/spells";
 import { fmtNumber, formatMeters } from "../../ui/format";
 import { CLASSES } from "../../data/classes";
 import { buildCharacter, validateDraft, type CharacterDraft } from "../character";
@@ -79,9 +80,9 @@ describe("classe d'armure", () => {
 
 describe("attaques", () => {
   const find = (r: ReturnType<typeof computeEquipment>, name: string) => r.attacks.find((a) => a.name === name)!;
-  it("le magicien a le trait de feu (Intelligence) et ses dagues", () => {
+  it("le magicien n'a que des armes dans sa liste d'attaques (les sorts se lancent à part)", () => {
     const r = computeEquipment(input("wizard", { INT: 16, DEX: 14, STR: 8 }));
-    expect(find(r, "Trait de feu")).toMatchObject({ toHit: 3 + 2, damage: { sides: 10, bonus: 0 }, ranged: true });
+    expect(r.attacks.some((a) => a.spell || a.name === "Trait de feu")).toBe(false);
     expect(find(r, "Dague")).toMatchObject({ toHit: 2 + 2, damage: { sides: 4, bonus: 2 } }); // finesse : Dextérité
   });
   it("une arme à distance utilise la Dextérité", () => {
@@ -112,7 +113,7 @@ describe("attaques", () => {
   });
   it("propose en premier l'attaque la plus intéressante", () => {
     expect(computeEquipment(input("fighter", { STR: 16 })).attacks[0].name).toBe("Épée à deux mains");
-    expect(computeEquipment(input("wizard", { INT: 16 })).attacks[0].name).toBe("Trait de feu");
+    expect(computeEquipment(input("wizard", { INT: 16 })).attacks[0].name).toMatch(/Dague|Bâton/);
   });
 });
 
@@ -138,7 +139,7 @@ describe("inventaire et personnage", () => {
     const old = buildCharacter(
       { name: "Ancien", speciesId: "human", classId: "wizard", backgroundId: "sage", method: "standard",
         baseScores: { STR: 8, DEX: 13, CON: 14, INT: 15, WIS: 12, CHA: 10 }, bonus: { mode: "2/1", plus2: "INT", plus1: "CON" },
-        classSkills: ["investigation", "medicine"] }, "old");
+        classSkills: ["investigation", "medicine"], spells: defaultSpells("wizard") }, "old");
     const legacy: Record<string, unknown> = { ...old };
     delete legacy.equipment;
     delete legacy.attacks;

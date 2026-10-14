@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { Character } from "../engine/character";
+import { migrateSpells } from "../engine/character";
 import { migrateCharacter } from "../engine/equipment";
 
 const KEY = "dd-mobile.characters";
@@ -8,7 +9,7 @@ const KEY = "dd-mobile.characters";
 function load(): Character[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Character[]).map((c) => migrateCharacter(c)) : [];
+    return raw ? (JSON.parse(raw) as Character[]).map((c) => migrateSpells(migrateCharacter(c))) : [];
   } catch {
     return [];
   }

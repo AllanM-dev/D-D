@@ -3,9 +3,10 @@ import { CLASSES } from "../data/classes";
 import { SPECIES } from "../data/species";
 import { ARMORS, WEAPONS } from "../data/equipment";
 import { artKey } from "../data/illustrations";
+import { SPELLS, isPlayable } from "../data/spells";
 import { BACKGROUND_TEXT, WEAPON_PROPERTY_TEXT } from "../data/help";
 
-export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors";
+export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors" | "spells";
 
 export const HELP_KINDS: Record<HelpKind, { title: string; singular: string }> = {
   classes: { title: "Classes", singular: "Classe" },
@@ -13,6 +14,7 @@ export const HELP_KINDS: Record<HelpKind, { title: string; singular: string }> =
   backgrounds: { title: "Historiques", singular: "Historique" },
   weapons: { title: "Armes", singular: "Arme" },
   armors: { title: "Armures", singular: "Armure" },
+  spells: { title: "Sorts", singular: "Sort" },
 };
 
 export const isHelpKind = (k: string): k is HelpKind => k in HELP_KINDS;
@@ -26,6 +28,13 @@ export function helpEntries(kind: HelpKind): { id: string; name: string; summary
       id: w.id, name: w.name,
       summary: `${w.category === "simple" ? "Courante" : "De guerre"} · ${w.damage.count}d${w.damage.sides} ${w.damageType}${w.properties.length ? " · " + w.properties.map((p) => WEAPON_PROPERTY_TEXT[p].name.toLowerCase()).join(", ") : ""}`,
     }));
+  if (kind === "spells")
+    return [...SPELLS]
+      .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, "fr"))
+      .map((sp) => ({
+        id: sp.id, name: sp.name,
+        summary: `${sp.level === 0 ? "Sort mineur" : "Niveau 1"} · ${sp.school}${isPlayable(sp) ? "" : " · pas encore jouable en combat"}`,
+      }));
   if (kind === "armors")
     return ARMORS.map((a) => ({
       id: a.id, name: a.name,

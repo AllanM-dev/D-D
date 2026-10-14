@@ -53,6 +53,11 @@
                 <template v-if="c.dodging"> · esquive</template>
                 <template v-if="c.raging"> · en rage</template>
                 <template v-if="c.innateSorcery"> · magie innée</template>
+                <template v-if="c.spellcasting"> · emplacements {{ c.spellcasting.slots.max - c.spellcasting.slots.used }}/{{ c.spellcasting.slots.max }}</template>
+                <template v-if="c.concentrating"> · concentré : {{ spellName(c.concentrating.spellId) }}</template>
+                <template v-if="isMarked(c.id)"> · marqué</template>
+                <template v-if="c.guided"> · éclairé</template>
+                <template v-if="c.mocked"> · tourné en ridicule</template>
               </template>
             </p>
           </ion-label>
@@ -83,6 +88,29 @@
               </ion-button>
             </template>
             <ion-button v-else expand="block" @click="bonus(o.id)">{{ o.label }} ({{ o.detail }})</ion-button>
+          </template>
+        </template>
+
+        <!-- Sorts -->
+        <template v-if="availableSpells.length">
+          <h4>Sorts</h4>
+          <ion-item lines="none">
+            <ion-select v-model="spellId" label="Sort" label-placement="stacked" interface="action-sheet">
+              <ion-select-option v-for="o in options.spells" :key="o.id" :value="o.id" :disabled="!o.available">
+                {{ o.name }} · {{ o.detail }}{{ o.time === "bonus" ? " · action bonus" : "" }}{{ o.available ? "" : " — " + o.reason }}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+          <template v-if="pickedSpell">
+            <p class="hint">{{ SPELL_BY_ID[pickedSpell.id].description }}</p>
+            <template v-if="pickedSpell.target === 'enemy'">
+              <ion-button v-for="e in livingEnemies" :key="e.id" expand="block" color="tertiary" @click="cast(pickedSpell.id, e.id)">
+                {{ pickedSpell.name }} sur {{ e.name }}{{ pickedSpell.time === "bonus" ? " (action bonus)" : "" }}
+              </ion-button>
+            </template>
+            <ion-button v-else expand="block" color="tertiary" @click="cast(pickedSpell.id)">
+              Lancer {{ pickedSpell.name }}{{ pickedSpell.time === "bonus" ? " (action bonus)" : "" }}
+            </ion-button>
           </template>
         </template>
 
@@ -127,6 +155,8 @@ import { computed, ref, watch } from "vue";
 import DiceRoll from "../components/DiceRoll.vue";
 import Illustration from "../components/Illustration.vue";
 import { artKey } from "../data/illustrations";
+import { SPELL_BY_ID } from "../data/spells";
+import { castSpell } from "../engine/spellcasting";
 import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";
@@ -279,6 +309,17 @@ const endTurn = () => act((s) => playerEndTurn(s));
 // --- actions bonus
 const options = computed(() => (state.value ? playerOptions(state.value) : null));
 const bonus = (id: FeatureId) => act((s) => useFeature(s, id));
+
+// --- sorts
+const spellId = ref("");
+const availableSpells = computed(() => options.value?.spells.filter((o) => o.available) ?? []);
+/** Le sort choisi s'il est encore possible, sinon le premier sort possible. */
+const pickedSpell = computed(() => availableSpells.value.find((o) => o.id === spellId.value) ?? availableSpells.value[0]);
+// Le sélecteur affiche toujours le sort réellement choisi (le premier possible tant que rien n'est choisi ou si le choix devient impossible).
+watch(availableSpells, (list) => { if (!list.some((o) => o.id === spellId.value)) spellId.value = list[0]?.id ?? ""; }, { immediate: true });
+const cast = (id: string, targetId?: string) => act((s) => castSpell(s, id, Math.random, { targetId }));
+const spellName = (id: string) => SPELL_BY_ID[id]?.name ?? id;
+const isMarked = (id: string) => !!state.value?.combatants.some((x) => x.mark?.targetId === id);
 const bonusStrike = (targetId: string) => act((s) => useFeature(s, "martial-arts", Math.random, { targetId }));
 /** Quantité de soins choisie (imposition des mains), toujours ramenée entre 1 et le maximum utile. */
 const layChoice = ref(5);

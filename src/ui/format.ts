@@ -13,6 +13,7 @@ export const ROLL_BUTTON_LABEL = {
   damage: "Lancer les dégâts",
   deathSave: "Lancer le jet de mort",
   heal: "Lancer les soins",
+  save: "Lancer le jet de sauvegarde",
 } as const;
 
 /** Nombre à la française : 10.5 → « 10,5 ». */
