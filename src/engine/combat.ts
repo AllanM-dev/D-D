@@ -1,4 +1,5 @@
 import { rollD20, rollDie, type AdvantageMode, type Rng } from "./dice";
+import type { Ability } from "./rules";
 
 export type Side = "party" | "enemies";
 
@@ -15,6 +16,40 @@ export interface AttackDef {
   damageType: string;
   /** Une attaque à distance ne profite pas de l'avantage contre une cible inconsciente. */
   ranged: boolean;
+  /** Caractéristique utilisée (la Rage ne renforce que les attaques de Force). */
+  ability?: Ability;
+  /** Attaque de sort (la Magie innée donne l'avantage). */
+  spell?: boolean;
+  /** Frappe à mains nues (arts martiaux). */
+  unarmed?: boolean;
+}
+
+/** Capacités de classe utilisables en combat (toutes en action bonus). */
+export type FeatureId = "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts";
+
+export interface FeatureUse {
+  id: FeatureId;
+  /** Utilisations restantes (pour l'imposition des mains : points de la réserve). */
+  uses: number;
+  max: number;
+  /** Utilisable sans limite (frappe bonus des arts martiaux). */
+  unlimited?: boolean;
+}
+
+export const FEATURE_LABELS: Record<FeatureId, string> = {
+  "second-wind": "Second souffle",
+  rage: "Rage",
+  "lay-on-hands": "Imposition des mains",
+  "innate-sorcery": "Magie innée",
+  "martial-arts": "Frappe bonus (arts martiaux)",
+};
+
+/** État du tour en cours d'un combattant. */
+export interface TurnState {
+  action: boolean;
+  bonus: boolean;
+  /** A utilisé l'action Attaquer ce tour (condition de la frappe bonus des arts martiaux). */
+  attacked: boolean;
 }
 
 export interface Combatant {
@@ -33,11 +68,20 @@ export interface Combatant {
   /** Stabilisé à 0 PV (3 réussites aux jets de mort). */
   stable: boolean;
   deathSaves: { successes: number; failures: number };
+  level: number;
+  features: FeatureUse[];
+  /** Rage : +2 aux dégâts des attaques de Force et résistance aux dégâts contondants, perforants et tranchants. */
+  raging: boolean;
+  ragingUntilRound: number;
+  /** Magie innée : avantage aux attaques de sort. */
+  innateSorcery: boolean;
+  innateUntilRound: number;
+  turnState: TurnState;
 }
 
 export type CombatStatus = "ongoing" | "victory" | "defeat";
 
-export type RollKind = "initiative" | "attack" | "damage" | "deathSave";
+export type RollKind = "initiative" | "attack" | "damage" | "deathSave" | "heal";
 export type RollOutcome = "hit" | "miss" | "crit" | "fumble" | "success" | "failure";
 
 /** Un jet de dés, avec de quoi l'animer : dés lancés, dé retenu, résultat. */
@@ -78,14 +122,23 @@ export interface CombatState {
   status: CombatStatus;
 }
 
-export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks">;
+export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
+  Partial<Pick<Combatant, "level" | "features">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
+/** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
+export const EFFECT_ROUNDS = 10;
+export const RAGE_DAMAGE = 2;
+const RAGE_RESISTED = ["contondant", "perforant", "tranchant"];
 
 export function makeCombatant(init: CombatantInit): Combatant {
   return {
     ...init, attacks: [...init.attacks], hp: init.maxHp, initiative: 0,
     dodging: false, dead: false, stable: false, deathSaves: { successes: 0, failures: 0 },
+    level: init.level ?? 1,
+    features: (init.features ?? []).map((f) => ({ ...f })),
+    raging: false, ragingUntilRound: 0, innateSorcery: false, innateUntilRound: 0,
+    turnState: { action: false, bonus: false, attacked: false },
   };
 }
 
@@ -190,7 +243,8 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
   const melee = !attack.ranged;
   const unconscious = isDown(target);
   let mode: AdvantageMode = "normal";
-  const advantage = unconscious && melee;
+  // Avantage : cible inconsciente au corps à corps, ou attaque de sort sous Magie innée.
+  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell);
   const disadvantage = target.dodging;
   if (advantage && !disadvantage) mode = "advantage";
   else if (disadvantage && !advantage) mode = "disadvantage";
@@ -212,13 +266,22 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
     return;
   }
   pushRoll(state, attackRoll); // état et journal d'avant les dégâts
-  const { dice, total: damage } = rollDamageDetailed(attack.damage, crit, rng);
-  state.log.push(`${label} — ${crit ? "coup critique" : "touché"} : ${damage} dégâts (${attack.damageType}).`);
+  // Rage : +2 aux dégâts des attaques de Force.
+  const rageBonus = attacker.raging && attack.ability === "STR" ? RAGE_DAMAGE : 0;
+  const damageDef = rageBonus ? { ...attack.damage, bonus: attack.damage.bonus + rageBonus } : attack.damage;
+  const { dice, total: rolled } = rollDamageDetailed(damageDef, crit, rng);
+  // Rage : résistance aux dégâts contondants, perforants et tranchants (moitié, arrondie à l'inférieur).
+  const resisted = target.raging && RAGE_RESISTED.includes(attack.damageType);
+  const damage = resisted ? Math.floor(rolled / 2) : rolled;
+  const notes = [rageBonus ? `rage +${rageBonus}` : "", resisted ? "réduits de moitié par la rage" : ""].filter(Boolean);
+  state.log.push(
+    `${label} — ${crit ? "coup critique" : "touché"} : ${damage} dégâts (${attack.damageType}${notes.length ? ", " + notes.join(", ") : ""}).`,
+  );
   applyDamage(state, target, damage, crit);
   pushRoll(state, {
     kind: "damage", actorId: attacker.id, actorName: attacker.name, side: attacker.side,
     title: `Dégâts de ${attacker.name} (${attack.damageType})`,
-    sides: attack.damage.sides, dice, modifier: attack.damage.bonus, total: damage, outcome: crit ? "crit" : "hit",
+    sides: attack.damage.sides, dice, modifier: damageDef.bonus, total: damage, outcome: crit ? "crit" : "hit",
   });
 }
 
@@ -276,6 +339,15 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
     if (state.status !== "ongoing") return;
     const cur = currentCombatant(state);
     cur.dodging = false;
+    cur.turnState = { action: false, bonus: false, attacked: false };
+    if (cur.raging && state.round > cur.ragingUntilRound) {
+      cur.raging = false;
+      state.log.push(`La rage de ${cur.name} retombe.`);
+    }
+    if (cur.innateSorcery && state.round > cur.innateUntilRound) {
+      cur.innateSorcery = false;
+      state.log.push(`La magie innée de ${cur.name} s'estompe.`);
+    }
     if (cur.dead) {
       advanceTurn(state);
     } else if (cur.side === "enemies") {
@@ -303,21 +375,174 @@ function assertPlayerTurn(state: CombatState): Combatant {
   return cur;
 }
 
-/** Action Attaquer du combattant dont c'est le tour, puis fin du tour (les ennemis jouent ensuite). */
-export function playerAttack(state: CombatState, targetId: string, rng: Rng = Math.random, attackIndex = 0) {
-  const cur = assertPlayerTurn(state);
+const feature = (c: Combatant, id: FeatureId) => c.features.find((f) => f.id === id);
+const hasUses = (f: FeatureUse | undefined): f is FeatureUse => !!f && (!!f.unlimited || f.uses > 0);
+
+export interface FeatureOption {
+  id: FeatureId;
+  label: string;
+  /** Précision affichée (utilisations restantes…). */
+  detail: string;
+  /** La capacité demande une cible ennemie. */
+  needsTarget?: boolean;
+  /** La capacité demande une quantité (imposition des mains) : maximum possible. */
+  amountMax?: number;
+}
+
+export interface PlayerOptions {
+  /** L'action (Attaquer, Esquiver) est encore disponible. */
+  canAct: boolean;
+  /** Actions bonus utilisables maintenant. */
+  bonus: FeatureOption[];
+  /** On peut terminer le tour (au moins une action utilisée). */
+  canEnd: boolean;
+}
+
+/** Actions bonus utilisables par ce combattant maintenant. Rien si l'action bonus est déjà utilisée. */
+export function availableBonus(state: CombatState, c: Combatant): FeatureOption[] {
+  if (c.turnState.bonus || c.side !== "party" || !isConscious(c)) return [];
+  const out: FeatureOption[] = [];
+  const missing = c.maxHp - c.hp;
+  const enemiesAlive = state.combatants.some((x) => x.side === "enemies" && !x.dead);
+  for (const f of c.features) {
+    if (!hasUses(f)) continue;
+    const label = FEATURE_LABELS[f.id];
+    if (f.id === "second-wind" && missing > 0) out.push({ id: f.id, label, detail: `${f.uses}/${f.max} · 1d10 + niveau PV` });
+    else if (f.id === "lay-on-hands" && missing > 0) out.push({ id: f.id, label, detail: `réserve ${f.uses}/${f.max} PV`, amountMax: Math.min(f.uses, missing) });
+    else if (f.id === "rage" && !c.raging) out.push({ id: f.id, label, detail: `${f.uses}/${f.max}` });
+    else if (f.id === "innate-sorcery" && !c.innateSorcery) out.push({ id: f.id, label, detail: `${f.uses}/${f.max}` });
+    else if (f.id === "martial-arts" && c.turnState.attacked && enemiesAlive && c.attacks.some((a) => a.unarmed))
+      out.push({ id: f.id, label, detail: "après l'action Attaquer", needsTarget: true });
+  }
+  return out;
+}
+
+/** Ce que le joueur peut faire maintenant (pour l'interface). */
+export function playerOptions(state: CombatState): PlayerOptions {
+  if (state.status !== "ongoing") return { canAct: false, bonus: [], canEnd: false };
+  const cur = currentCombatant(state);
+  if (cur.side !== "party" || !isConscious(cur)) return { canAct: false, bonus: [], canEnd: false };
+  return {
+    canAct: !cur.turnState.action,
+    bonus: availableBonus(state, cur),
+    canEnd: cur.turnState.action || cur.turnState.bonus,
+  };
+}
+
+/**
+ * Après une action : le tour se termine tout seul s'il ne reste plus rien à faire (action utilisée et aucune
+ * action bonus possible) ; sinon le joueur peut utiliser son action bonus ou terminer son tour.
+ */
+function afterPlayerAction(state: CombatState, rng: Rng) {
+  updateStatus(state);
+  if (state.status !== "ongoing") return;
+  const cur = currentCombatant(state);
+  if (cur.turnState.action && availableBonus(state, cur).length === 0) endTurn(state, rng);
+}
+
+function enemyTarget(state: CombatState, targetId: string): Combatant {
   const target = getCombatant(state, targetId);
   if (target.side !== "enemies" || target.dead) throw new Error("Cible invalide.");
+  return target;
+}
+
+/** Action Attaquer du combattant dont c'est le tour. */
+export function playerAttack(state: CombatState, targetId: string, rng: Rng = Math.random, attackIndex = 0) {
+  const cur = assertPlayerTurn(state);
+  if (cur.turnState.action) throw new Error("Action déjà utilisée ce tour.");
+  const target = enemyTarget(state, targetId);
   const attack = cur.attacks[attackIndex];
   if (!attack) throw new Error("Attaque inconnue.");
+  cur.turnState.action = true;
+  cur.turnState.attacked = true;
   resolveAttack(state, cur, target, attack, rng);
-  endTurn(state, rng);
+  afterPlayerAction(state, rng);
 }
 
 /** Action Esquiver : désavantage aux attaques contre vous jusqu'à votre prochain tour. */
 export function playerDodge(state: CombatState, rng: Rng = Math.random) {
   const cur = assertPlayerTurn(state);
+  if (cur.turnState.action) throw new Error("Action déjà utilisée ce tour.");
+  cur.turnState.action = true;
   cur.dodging = true;
   state.log.push(`${cur.name} esquive.`);
+  afterPlayerAction(state, rng);
+}
+
+/** Termine le tour (utile quand il reste une action bonus que l'on ne veut pas utiliser). */
+export function playerEndTurn(state: CombatState, rng: Rng = Math.random) {
+  assertPlayerTurn(state);
   endTurn(state, rng);
+}
+
+/** Rend des PV. À 0 PV, le personnage reprend connaissance. */
+export function healCombatant(state: CombatState, c: Combatant, amount: number): number {
+  const before = c.hp;
+  if (c.dead || amount <= 0) return 0;
+  if (c.hp === 0) {
+    c.deathSaves = { successes: 0, failures: 0 };
+    c.stable = false;
+  }
+  c.hp = Math.min(c.maxHp, c.hp + amount);
+  const healed = c.hp - before;
+  state.log.push(`${c.name} récupère ${healed} PV.`);
+  return healed;
+}
+
+export interface FeatureChoice {
+  /** Cible de la frappe bonus. */
+  targetId?: string;
+  /** Points à dépenser (imposition des mains). */
+  amount?: number;
+}
+
+/** Utilise une capacité de classe (action bonus). */
+export function useFeature(state: CombatState, id: FeatureId, rng: Rng = Math.random, choice: FeatureChoice = {}) {
+  const cur = assertPlayerTurn(state);
+  const option = availableBonus(state, cur).find((o) => o.id === id);
+  if (!option) throw new Error(`${FEATURE_LABELS[id]} n'est pas utilisable maintenant.`);
+  const f = feature(cur, id)!;
+
+  switch (id) {
+    case "second-wind": {
+      const die = rollDie(10, rng);
+      f.uses -= 1;
+      const healed = healCombatant(state, cur, die + cur.level);
+      state.log.push(`${cur.name} reprend son souffle (1d10 + ${cur.level} = ${die + cur.level}).`);
+      pushRoll(state, {
+        kind: "heal", actorId: cur.id, actorName: cur.name, side: cur.side, title: `Second souffle de ${cur.name}`,
+        sides: 10, dice: [die], modifier: cur.level, total: healed, outcome: "success",
+      });
+      break;
+    }
+    case "lay-on-hands": {
+      const amount = choice.amount ?? 0;
+      if (!Number.isInteger(amount) || amount < 1 || amount > (option.amountMax ?? 0)) throw new Error("Quantité de soins invalide.");
+      f.uses -= amount;
+      healCombatant(state, cur, amount);
+      break;
+    }
+    case "rage":
+      f.uses -= 1;
+      cur.raging = true;
+      cur.ragingUntilRound = state.round + EFFECT_ROUNDS - 1;
+      state.log.push(`${cur.name} entre en rage !`);
+      break;
+    case "innate-sorcery":
+      f.uses -= 1;
+      cur.innateSorcery = true;
+      cur.innateUntilRound = state.round + EFFECT_ROUNDS - 1;
+      state.log.push(`${cur.name} libère sa magie innée.`);
+      break;
+    case "martial-arts": {
+      const target = enemyTarget(state, choice.targetId ?? "");
+      const strike = cur.attacks.find((a) => a.unarmed)!;
+      cur.turnState.bonus = true;
+      resolveAttack(state, cur, target, strike, rng);
+      afterPlayerAction(state, rng);
+      return;
+    }
+  }
+  cur.turnState.bonus = true;
+  afterPlayerAction(state, rng);
 }

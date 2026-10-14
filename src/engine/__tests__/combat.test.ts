@@ -242,9 +242,9 @@ describe("personnage → combattant", () => {
   it("le guerrier en cotte de mailles a la CA de l'armure et plusieurs attaques", () => {
     const c = buildCharacter(
       { ...base, classId: "fighter", backgroundId: "soldier", baseScores: { STR: 10, DEX: 15, CON: 14, INT: 8, WIS: 12, CHA: 13 },
-        bonus: { mode: "2/1", plus2: "STR", plus1: "CON" }, classSkills: ["perception", "survival"] }, "f");
-    expect(c.armorClass).toBe(16);
-    expect(characterToCombatant(c).ac).toBe(16);
+        bonus: { mode: "2/1", plus2: "STR", plus1: "CON" }, classSkills: ["perception", "survival"], fightingStyle: "defense" }, "f");
+    expect(c.armorClass).toBe(17);
+    expect(characterToCombatant(c).ac).toBe(17);
     expect(c.attacks.length).toBeGreaterThan(2);
   });
   it("les données de monstres et de rencontres sont cohérentes", () => {

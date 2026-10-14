@@ -128,7 +128,7 @@ describe("inventaire et personnage", () => {
     const draft: CharacterDraft = {
       name: "T", speciesId: "human", classId: "fighter", backgroundId: "soldier", method: "standard",
       baseScores: { STR: 15, DEX: 13, CON: 14, INT: 8, WIS: 10, CHA: 12 }, bonus: { mode: "2/1", plus2: "STR", plus1: "CON" },
-      classSkills: ["perception", "survival"], kitId: "Z",
+      classSkills: ["perception", "survival"], kitId: "Z", fightingStyle: "defense",
     };
     expect(validateDraft(draft)).not.toEqual([]);
     expect(validateDraft({ ...draft, kitId: "B" })).toEqual([]);

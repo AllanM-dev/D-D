@@ -33,9 +33,25 @@
         <h3>Capacités de niveau 1</h3>
         <ion-list inset>
           <ion-item v-for="f in cls.features" :key="f" lines="full">
-            <ion-label class="ion-text-wrap"><h2>{{ f }}</h2><p>{{ CLASS_FEATURE_TEXT[cls.id]?.[f] }}</p></ion-label>
+            <ion-label class="ion-text-wrap">
+              <h2>{{ f }}</h2>
+              <p>{{ CLASS_FEATURE_TEXT[cls.id]?.[f] }}</p>
+              <p v-if="FEATURE_STATUS[cls.id]?.[f]" class="status" :class="FEATURE_STATUS[cls.id][f].status">
+                <strong>{{ FEATURE_STATUS_LABEL[FEATURE_STATUS[cls.id][f].status] }}.</strong>
+                {{ FEATURE_STATUS[cls.id][f].note }}
+              </p>
+            </ion-label>
           </ion-item>
         </ion-list>
+
+        <template v-if="cls.id === 'fighter'">
+          <h3>Styles de combat disponibles</h3>
+          <ion-list inset>
+            <ion-item v-for="st in FIGHTING_STYLES" :key="st.id" lines="full">
+              <ion-label class="ion-text-wrap"><h2>{{ st.name }}</h2><p>{{ st.text }}</p></ion-label>
+            </ion-item>
+          </ion-list>
+        </template>
 
         <h3>Maîtrises</h3>
         <ion-list inset>
@@ -140,8 +156,9 @@ import { useRoute } from "vue-router";
 import { BACKGROUNDS } from "../data/backgrounds";
 import { CLASSES } from "../data/classes";
 import { ARMORS, CLASS_TRAINING, WEAPONS, type Kit } from "../data/equipment";
+import { FIGHTING_STYLES } from "../data/fighting-styles";
 import {
-  ARMOR_KIND_TEXT, ARMOR_TRAINING_TEXT, BACKGROUND_TEXT, CLASS_FEATURE_TEXT, FEAT_TEXT, SPECIES_TRAIT_TEXT,
+  ARMOR_KIND_TEXT, ARMOR_TRAINING_TEXT, BACKGROUND_TEXT, CLASS_FEATURE_TEXT, FEAT_TEXT, FEATURE_STATUS, FEATURE_STATUS_LABEL, SPECIES_TRAIT_TEXT,
   WEAPON_PROPERTY_TEXT, WEAPON_TRAINING_TEXT,
 } from "../data/help";
 import { kitsFor } from "../engine/equipment";
@@ -173,5 +190,9 @@ const skillName = (s: SkillId) => SKILLS.find((x) => x.id === s)!.name;
 ion-content { --padding-start: 16px; --padding-end: 16px; }
 h3 { margin: 20px 0 8px; }
 .note { opacity: 0.8; font-size: 0.9rem; }
+.status { margin-top: 4px; }
+.status.applied strong { color: var(--ion-color-success, #2dd36f); }
+.status.partial strong { color: var(--ion-color-warning, #ffc409); }
+.status.todo strong { opacity: 0.7; }
 .star { color: var(--ion-color-warning, #fc0); }
 </style>

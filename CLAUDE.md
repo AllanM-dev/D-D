@@ -10,7 +10,7 @@ La page Aide (menu → Aide) doit **toujours refléter ce que l'application fait
 |---|---|
 | une règle ou un mécanisme (déplacement, action bonus, conditions, repos, soins, sorts…) | `BASIC_RULES` dans `src/data/help.ts`. Corriger aussi les phrases devenues fausses (« pas encore géré », « pour l'instant, il n'y a ni… ») |
 | un écran, un bouton, un réglage, la sauvegarde | `APP_GUIDE` dans `src/data/help.ts` |
-| une classe, une capacité | `CLASS_FEATURE_TEXT` (et `features`/`priority`/`advice` dans `src/data/classes.ts`) |
+| une classe, une capacité | `CLASS_FEATURE_TEXT` (et `features`/`priority`/`advice` dans `src/data/classes.ts`) **et** `FEATURE_STATUS` (« appliqué », « partiel » ou « pas encore » + note de ce que fait le jeu). Une capacité branchée dans le moteur (`featuresFor`) doit être « appliquée » : les tests le vérifient dans les deux sens |
 | une espèce, un trait | `SPECIES_TRAIT_TEXT` (et `traits` dans `src/data/species.ts`) |
 | un historique, un don d'origine | `BACKGROUND_TEXT`, `FEAT_TEXT` |
 | une arme, une armure ou un lot d'équipement | `src/data/equipment.ts` ; les fiches Armes/Armures et la fiche de classe se mettent à jour seules, mais ajouter le texte de chaque nouvelle **propriété** d'arme (`WEAPON_PROPERTY_TEXT`) et retirer les mentions « pas encore appliqué » devenues fausses |

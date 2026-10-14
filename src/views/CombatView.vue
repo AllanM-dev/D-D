@@ -46,7 +46,12 @@
               <template v-else-if="c.hp === 0 && c.side === 'party'">
                 {{ c.stable ? "Inconscient, stable" : `À terre · jets de mort ${c.deathSaves.successes}✓ ${c.deathSaves.failures}✗` }}
               </template>
-              <template v-else>{{ c.hp }} / {{ c.maxHp }} PV<template v-if="c.dodging"> · esquive</template></template>
+              <template v-else>
+                {{ c.hp }} / {{ c.maxHp }} PV
+                <template v-if="c.dodging"> · esquive</template>
+                <template v-if="c.raging"> · en rage</template>
+                <template v-if="c.innateSorcery"> · magie innée</template>
+              </template>
             </p>
           </ion-label>
         </ion-item>
@@ -57,19 +62,45 @@
       <ion-button v-if="busy" expand="block" fill="clear" size="small" @click="skipAll">Passer l'animation</ion-button>
 
       <!-- Actions -->
-      <div v-else-if="state.status === 'ongoing'" class="actions">
+      <div v-else-if="state.status === 'ongoing' && options" class="actions">
         <h3>À vous de jouer, {{ currentName }}</h3>
-        <ion-item v-if="attacks.length > 1" lines="none">
-          <ion-select v-model="attackIndex" label="Arme ou sort" label-placement="stacked" interface="action-sheet">
-            <ion-select-option v-for="(a, i) in attacks" :key="a.name" :value="i">{{ attackLabel(a) }}</ion-select-option>
-          </ion-select>
-        </ion-item>
-        <p v-else class="hint">Attaque : {{ attackLabel(attacks[0]) }}</p>
-        <p class="hint">Choisissez une cible.</p>
-        <ion-button v-for="e in livingEnemies" :key="e.id" expand="block" @click="attackTarget(e.id)">
-          Attaquer {{ e.name }} ({{ e.hp }}/{{ e.maxHp }} PV, CA {{ e.ac }})
-        </ion-button>
-        <ion-button expand="block" fill="outline" @click="dodge">Esquiver (désavantage aux attaques contre vous)</ion-button>
+
+        <!-- Action bonus -->
+        <template v-if="options.bonus.length">
+          <h4>Action bonus</h4>
+          <template v-for="o in options.bonus" :key="o.id">
+            <div v-if="o.amountMax" class="stepper">
+              <ion-button size="small" fill="outline" :disabled="layAmount(o.amountMax) <= 1" @click="layDelta(-1, o.amountMax)">−</ion-button>
+              <span>{{ layAmount(o.amountMax) }} PV</span>
+              <ion-button size="small" fill="outline" :disabled="layAmount(o.amountMax) >= o.amountMax" @click="layDelta(1, o.amountMax)">+</ion-button>
+              <ion-button class="grow" @click="layOnHands(o.amountMax)">{{ o.label }} ({{ o.detail }})</ion-button>
+            </div>
+            <template v-else-if="o.needsTarget">
+              <ion-button v-for="e in livingEnemies" :key="e.id" expand="block" @click="bonusStrike(e.id)">
+                {{ o.label }} : {{ e.name }}
+              </ion-button>
+            </template>
+            <ion-button v-else expand="block" @click="bonus(o.id)">{{ o.label }} ({{ o.detail }})</ion-button>
+          </template>
+        </template>
+
+        <!-- Action -->
+        <template v-if="options.canAct">
+          <h4>Action</h4>
+          <ion-item v-if="attacks.length > 1" lines="none">
+            <ion-select v-model="attackIndex" label="Arme ou sort" label-placement="stacked" interface="action-sheet">
+              <ion-select-option v-for="(a, i) in attacks" :key="a.name" :value="i">{{ attackLabel(a) }}</ion-select-option>
+            </ion-select>
+          </ion-item>
+          <p v-else class="hint">Attaque : {{ attackLabel(attacks[0]) }}</p>
+          <p class="hint">Choisissez une cible.</p>
+          <ion-button v-for="e in livingEnemies" :key="e.id" expand="block" @click="attackTarget(e.id)">
+            Attaquer {{ e.name }} ({{ e.hp }}/{{ e.maxHp }} PV, CA {{ e.ac }})
+          </ion-button>
+          <ion-button expand="block" fill="outline" @click="dodge">Esquiver (désavantage aux attaques contre vous)</ion-button>
+        </template>
+
+        <ion-button v-if="options.canEnd" expand="block" fill="clear" @click="endTurn">Terminer le tour</ion-button>
       </div>
       <div v-else-if="finished" class="result" :class="state.status">
         <h2>{{ state.status === "victory" ? "Victoire !" : "Défaite…" }}</h2>
@@ -96,7 +127,10 @@ import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";
 import { characterToCombatant } from "../engine/attacks";
-import { currentCombatant, playerAttack, playerDodge, startCombat, type Combatant, type CombatState, type RollEvent } from "../engine/combat";
+import {
+  currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, startCombat, useFeature,
+  type Combatant, type CombatState, type FeatureId, type RollEvent,
+} from "../engine/combat";
 import { useCharacters } from "../stores/characters";
 import { ROLL_BUTTON_LABEL, signed } from "../ui/format";
 
@@ -236,6 +270,17 @@ async function start(e: EncounterDef) {
 }
 const attackTarget = (id: string) => act((s) => playerAttack(s, id, Math.random, attackIndex.value));
 const dodge = () => act((s) => playerDodge(s));
+const endTurn = () => act((s) => playerEndTurn(s));
+
+// --- actions bonus
+const options = computed(() => (state.value ? playerOptions(state.value) : null));
+const bonus = (id: FeatureId) => act((s) => useFeature(s, id));
+const bonusStrike = (targetId: string) => act((s) => useFeature(s, "martial-arts", Math.random, { targetId }));
+/** Quantité de soins choisie (imposition des mains), toujours ramenée entre 1 et le maximum utile. */
+const layChoice = ref(5);
+const layAmount = (max: number) => Math.min(Math.max(1, layChoice.value), max);
+const layDelta = (d: number, max: number) => { layChoice.value = Math.min(Math.max(1, layAmount(max) + d), max); };
+const layOnHands = (max: number) => act((s) => useFeature(s, "lay-on-hands", Math.random, { amount: layAmount(max) }));
 </script>
 
 <style scoped>
@@ -244,6 +289,9 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .active { --background: var(--ion-color-step-150, #333); }
 h2 small { opacity: 0.7; font-weight: normal; font-size: 0.8rem; margin-left: 6px; }
 .actions { margin: 12px 0; }
+.actions h4 { margin: 14px 0 6px; opacity: 0.8; font-size: 0.95rem; }
+.stepper { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.stepper .grow { flex: 1 1 160px; }
 .result { text-align: center; margin: 12px 0; }
 .result.victory h2 { color: var(--ion-color-success); }
 .result.defeat h2 { color: var(--ion-color-danger); }

@@ -158,9 +158,10 @@ export const BASIC_RULES: RuleEntry[] = [
   { title: "Propriétés d'armes", text: "Finesse, légère, lourde, deux mains, lancer, polyvalente, munitions : chaque propriété est expliquée dans la fiche des armes qui la portent, avec ce que le jeu applique déjà et ce qu'il n'applique pas encore." },
   { title: "Distances et unités", text: "Toutes les distances sont en mètres : une case de combat mesure 1,5 m, une vitesse de 9 m permet de parcourir six cases par tour. Les règles d'origine comptent en pieds (5 pieds = 1,5 m) ; l'application les convertit pour vous." },
   { title: "Initiative", text: "Au début d'un combat, chacun lance un d20 et ajoute son modificateur de Dextérité. On joue ensuite dans l'ordre décroissant, round après round." },
-  { title: "Un tour de combat (dans l'application)", text: "À votre tour, vous choisissez une action : Attaquer une cible (avec l'arme ou le sort de votre choix) ou Esquiver (désavantage aux attaques contre vous jusqu'à votre prochain tour). Les ennemis jouent ensuite à leur tour. Pour l'instant, il n'y a ni déplacement ni action bonus." },
+  { title: "Un tour de combat (dans l'application)", text: "À votre tour, vous avez une action et, selon votre classe, une action bonus. L'action : Attaquer une cible (avec l'arme ou le sort de votre choix) ou Esquiver (désavantage aux attaques contre vous jusqu'à votre prochain tour). L'action bonus (Second souffle, Rage, Imposition des mains, Magie innée, frappe bonus du moine) se prend avant ou après l'action. Le tour se termine tout seul quand il ne reste rien d'utile à faire ; sinon, « Terminer le tour ». Les ennemis jouent ensuite. Pour l'instant, il n'y a ni déplacement ni réactions." },
+  { title: "Capacités à utilisations limitées", text: "Beaucoup de capacités de classe ne se servent que quelques fois (2 Rages, 2 Seconds souffles…) : les utilisations restantes sont indiquées sur le bouton. Elles se rechargent au début de chaque combat, comme vos PV, puisque les repos ne sont pas encore gérés." },
   { title: "Jets de mort", text: "À 0 PV, un héros est inconscient et lance un d20 à chaque tour : 10 ou plus est une réussite, moins de 10 un échec, un 1 compte pour deux échecs, un 20 le relève avec 1 PV. Trois réussites le stabilisent, trois échecs le tuent. Un coup reçu à terre compte comme un échec." },
-  { title: "Repos", text: "Un repos court (1 heure) et un repos long (8 heures) permettent de récupérer des capacités et des PV. Ils ne sont pas encore gérés dans l'application." },
+  { title: "Repos", text: "Un repos court (1 heure) et un repos long (8 heures) permettent de récupérer des capacités et des PV. Ils ne sont pas encore gérés : dans l'application, tout est simplement rechargé au début de chaque combat." },
 ];
 
 /** Fonctionnement de l'application elle-même. À tenir à jour à chaque nouvelle fonctionnalité visible. */
@@ -170,6 +171,7 @@ export const APP_GUIDE: RuleEntry[] = [
   { title: "Le bonus de l'historique", text: "Votre historique ajoute +2 à une caractéristique et +1 à une autre, ou +1 à trois, parmi les trois qu'il propose. Ce bonus s'ajoute à la répartition choisie, avec un maximum de 20." },
   { title: "Équipement de départ", text: "Chaque classe reçoit un équipement de départ : armure, bouclier, armes, matériel et quelques pièces d'or. Le guerrier choisit entre deux lots. L'écran de création montre le contenu et la CA obtenue. Votre fiche liste ensuite l'armure portée, vos armes, vos objets et votre or. L'équipement de l'historique et l'option « or à la place » ne sont pas encore disponibles." },
   { title: "Lancer un combat", text: "Sur la fiche d'un personnage, « Lancer un combat », puis choisissez une rencontre. Sa difficulté est indicative pour un personnage seul de niveau 1. Les PV sont remis à fond au début de chaque combat. Avant chaque attaque, choisissez l'arme ou le sort à utiliser : le bonus pour toucher et les dégâts sont affichés, et la meilleure option est proposée en premier. Sans positions, les munitions sont illimitées et les armes à distance n'ont pas de pénalité au contact." },
+  { title: "Capacités de classe en combat", text: "Pendant votre tour, vos capacités à action bonus apparaissent dans « Action bonus » avec leurs utilisations restantes : Second souffle du guerrier, Rage du barbare, Imposition des mains du paladin (choisissez combien de points dépenser), Magie innée de l'ensorceleur, frappe bonus du moine (après avoir attaqué). Elles ne s'affichent que quand elles sont utiles : pas de soins à pleine santé. Les autres capacités, dont les sorts, ne sont pas encore jouables : l'Aide indique pour chacune si elle est appliquée. Les effets en cours (Rage, Magie innée) sont signalés dans la liste des combattants." },
   { title: "Lancer vos dés", text: "Vos jets (initiative, attaque, dégâts, jets de mort) se lancent en appuyant sur un bouton : « Lancer le d20 », puis « Lancer les dégâts » si votre attaque touche. Le dé s'anime et le résultat reste affiché jusqu'à « Continuer ». Les jets des ennemis se déroulent sans animation. L'interrupteur « Mes dés » en haut à droite, coupé, rend tout instantané ; « Passer l'animation » saute les jets restants." },
   { title: "Sauvegarde de vos personnages", text: "Les personnages sont enregistrés dans le navigateur de votre appareil. Ils restent d'une visite à l'autre, mais ne sont pas partagés entre deux appareils, et effacer les données du site les supprime." },
 ];
@@ -202,4 +204,72 @@ export const ARMOR_TRAINING_TEXT: Record<string, string> = {
   medium: "armures intermédiaires",
   heavy: "armures lourdes",
   shield: "boucliers",
+};
+
+export type FeatureStatusKind = "applied" | "partial" | "todo";
+
+/** Ce que le jeu applique réellement, par capacité de niveau 1. À tenir à jour avec le moteur (voir les tests). */
+export const FEATURE_STATUS: Record<string, Record<string, { status: FeatureStatusKind; note?: string }>> = {
+  barbarian: {
+    "Rage": { status: "applied", note: "Action bonus, 2 utilisations, 1 minute : +2 aux dégâts des attaques de Force et résistance aux dégâts physiques. Le maintien de la rage (attaquer à chaque tour) n'est pas appliqué." },
+    "Défense sans armure": { status: "applied", note: "Prise en compte dans le calcul de la CA." },
+    "Maîtrise des armes": { status: "todo", note: "Les effets spéciaux des armes ne sont pas encore appliqués." },
+  },
+  bard: {
+    "Inspiration bardique": { status: "todo", note: "Elle concerne les alliés : elle viendra avec les compagnons." },
+    "Incantation": { status: "todo", note: "Les sorts viendront dans un prochain chantier." },
+  },
+  cleric: {
+    "Incantation": { status: "todo", note: "Les sorts viendront dans un prochain chantier." },
+    "Ordre divin": { status: "todo", note: "Dépend des sorts et des maîtrises d'armure." },
+  },
+  druid: {
+    "Incantation": { status: "todo", note: "Les sorts viendront dans un prochain chantier." },
+    "Druidique": { status: "todo" },
+    "Ordre primordial": { status: "todo", note: "Dépend des sorts et des maîtrises d'armure." },
+  },
+  fighter: {
+    "Style de combat": { status: "partial", note: "Défense (+1 CA en armure) et Archerie (+2 aux armes à distance) sont disponibles ; les autres styles viendront plus tard." },
+    "Second souffle": { status: "applied", note: "Action bonus, 2 utilisations : vous récupérez 1d10 + niveau PV." },
+    "Maîtrise des armes": { status: "todo", note: "Les effets spéciaux des armes ne sont pas encore appliqués." },
+  },
+  monk: {
+    "Arts martiaux": { status: "applied", note: "Frappes à mains nues d6 + Dextérité, et frappe bonus après l'action Attaquer." },
+    "Défense sans armure": { status: "applied", note: "Prise en compte dans le calcul de la CA." },
+  },
+  paladin: {
+    "Imposition des mains": { status: "applied", note: "Action bonus : vous vous soignez en dépensant des points de la réserve (5 au niveau 1). Soigner un allié viendra avec les compagnons." },
+    "Incantation": { status: "todo", note: "Les sorts viendront dans un prochain chantier." },
+    "Maîtrise des armes": { status: "todo", note: "Les effets spéciaux des armes ne sont pas encore appliqués." },
+  },
+  ranger: {
+    "Incantation": { status: "todo", note: "Les sorts viendront dans un prochain chantier." },
+    "Ennemi juré": { status: "todo", note: "Dépend du sort Marque du chasseur." },
+    "Maîtrise des armes": { status: "todo", note: "Les effets spéciaux des armes ne sont pas encore appliqués." },
+  },
+  rogue: {
+    "Expertise": { status: "todo", note: "Pas encore appliquée à vos compétences." },
+    "Attaque sournoise": { status: "todo", note: "Elle exige l'avantage ou un allié au contact de la cible : impossible en combat solo pour l'instant." },
+    "Argot des voleurs": { status: "todo" },
+    "Maîtrise des armes": { status: "todo", note: "Les effets spéciaux des armes ne sont pas encore appliqués." },
+  },
+  sorcerer: {
+    "Incantation": { status: "todo", note: "Seul le trait de feu est disponible ; les autres sorts viendront dans un prochain chantier." },
+    "Magie innée": { status: "applied", note: "Action bonus, 2 utilisations, 1 minute : avantage aux attaques de sort. L'augmentation du DD des sorts n'est pas encore utilisée." },
+  },
+  warlock: {
+    "Invocations occultes": { status: "todo" },
+    "Magie de pacte": { status: "todo", note: "Seule la décharge occulte est disponible ; les autres sorts viendront dans un prochain chantier." },
+  },
+  wizard: {
+    "Incantation": { status: "todo", note: "Seul le trait de feu est disponible ; les autres sorts viendront dans un prochain chantier." },
+    "Adepte des rituels": { status: "todo" },
+    "Récupération arcanique": { status: "todo", note: "Dépend des emplacements de sorts." },
+  },
+};
+
+export const FEATURE_STATUS_LABEL: Record<FeatureStatusKind, string> = {
+  applied: "Appliqué en combat",
+  partial: "Partiellement appliqué",
+  todo: "Pas encore appliqué",
 };
