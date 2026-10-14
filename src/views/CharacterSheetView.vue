@@ -41,6 +41,20 @@
       </ion-list>
 
       <ion-list inset>
+        <ion-list-header><ion-label>Capacités de classe</ion-label></ion-list-header>
+        <ion-item v-if="style" lines="full">
+          <ion-label class="ion-text-wrap">Style de combat : {{ style.name }}<p>{{ style.text }}</p></ion-label>
+        </ion-item>
+        <ion-item v-for="f in c.classDef.features" :key="f" lines="full">
+          <ion-label class="ion-text-wrap">
+            {{ f }}
+            <p>{{ FEATURE_STATUS[c.classDef.id]?.[f]?.note ?? CLASS_FEATURE_TEXT[c.classDef.id]?.[f] }}</p>
+          </ion-label>
+          <ion-note slot="end">{{ statusShort(f) }}</ion-note>
+        </ion-item>
+      </ion-list>
+
+      <ion-list inset>
         <ion-list-header><ion-label>Attaques</ion-label></ion-list-header>
         <ion-item v-for="a in c.attacks" :key="a.name" lines="full">
           <ion-label class="ion-text-wrap">
@@ -82,6 +96,8 @@ import {
 } from "@ionic/vue";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
+import { FIGHTING_STYLES } from "../data/fighting-styles";
+import { CLASS_FEATURE_TEXT, FEATURE_STATUS } from "../data/help";
 import { ABILITIES } from "../engine/rules";
 import { ABILITY_NAMES, fmtNumber, signed } from "../ui/format";
 import { useCharacters } from "../stores/characters";
@@ -90,6 +106,11 @@ const store = useCharacters();
 const router = useIonRouter();
 const route = useRoute();
 const c = computed(() => store.get(String(route.params.id)));
+const style = computed(() => FIGHTING_STYLES.find((st) => st.id === c.value?.fightingStyle));
+const statusShort = (feature: string) => {
+  const st = FEATURE_STATUS[c.value!.classDef.id]?.[feature]?.status;
+  return st === "applied" ? "Actif" : st === "partial" ? "Partiel" : "À venir";
+};
 
 function del() {
   if (c.value && window.confirm(`Supprimer ${c.value.name} ?`)) {

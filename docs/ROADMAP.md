@@ -19,9 +19,10 @@
 ## Jalon 2 — Combat
 - [x] Initiative, tours, action Attaquer / Esquiver (combat 1 contre N, sans positions)
 - [x] Animation de vos jets de dés (initiative, attaque, dégâts, jets de mort), déclenchée par un bouton, désactivable ; les jets ennemis se résolvent sans dés
-- [ ] Actions bonus, réactions, déplacement, portée
+- [x] Action bonus et fin de tour ; capacités de classe de niveau 1 : Second souffle, Style de combat (Défense, Archerie), Rage, Imposition des mains, Magie innée, frappe bonus du moine
+- [ ] Réactions, déplacement, portée, repos court et long
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
-- [ ] Conditions, résistances, sorts de combat, soins, capacités de classe
+- [ ] Conditions, sorts de combat (Incantation), soins des alliés, autres capacités de classe (Attaque sournoise, Expertise, Inspiration bardique…), autres styles de combat
 - [x] Bestiaire de départ (7 monstres, SRD 5.1) et 7 rencontres
 - [ ] Bestiaire complet, capacités spéciales des monstres, compagnons, propriétés d'armes (lourde, légère, maîtrises), munitions
 

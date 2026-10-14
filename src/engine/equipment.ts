@@ -1,5 +1,6 @@
 import { ARMORS, CLASS_TRAINING, STARTING_KITS, WEAPONS, type ArmorDef, type Kit, type WeaponDef } from "../data/equipment";
 import type { AbilityScores } from "./abilities";
+import type { FightingStyleId } from "../data/fighting-styles";
 import type { AttackDef } from "./combat";
 import type { Ability } from "./rules";
 
@@ -37,6 +38,7 @@ export interface EquipmentInput {
   proficiencyBonus: number;
   /** Vitesse de l'espèce en mètres, avant malus d'armure. */
   baseSpeed: number;
+  fightingStyle?: FightingStyleId;
 }
 
 const weaponById = (id: string): WeaponDef => {
@@ -129,6 +131,7 @@ export function computeEquipment(input: EquipmentInput, kitId?: string): Equipme
     ac = 10 + mod.DEX;
   }
   if (shield) ac += armorById("shield").baseAc;
+  if (input.fightingStyle === "defense" && armor) ac += 1; // Style de combat : Défense
 
   // --- vitesse
   const speed = armor?.minStr && scores.STR < armor.minStr ? Math.max(0, input.baseSpeed - HEAVY_ARMOR_SPEED_PENALTY) : input.baseSpeed;
@@ -139,15 +142,16 @@ export function computeEquipment(input: EquipmentInput, kitId?: string): Equipme
   if (spell) {
     attacks.push({
       name: spell.name, toHit: mod[spell.ability] + prof, damage: { count: 1, sides: 10, bonus: 0 },
-      damageType: spell.damageType, ranged: true,
+      damageType: spell.damageType, ranged: true, ability: spell.ability, spell: true,
     });
   }
   if (classId === "monk") {
     attacks.push({
       name: "Frappe à mains nues", toHit: mod.DEX + prof, damage: { count: 1, sides: 6, bonus: mod.DEX },
-      damageType: "contondant", ranged: false,
+      damageType: "contondant", ranged: false, ability: "DEX", unarmed: true,
     });
   }
+  const archery = input.fightingStyle === "archery" ? 2 : 0; // Style de combat : Archerie (armes à distance)
   for (const item of weapons.values()) {
     const w = weaponById(item.id);
     const proficient = isWeaponProficient(classId, w);
@@ -155,14 +159,14 @@ export function computeEquipment(input: EquipmentInput, kitId?: string): Equipme
     // Arme polyvalente : une main si l'on porte un bouclier, deux mains sinon.
     const sides = w.properties.includes("versatile") && !shield && w.versatileSides ? w.versatileSides : w.damage.sides;
     const base: AttackDef = {
-      name: w.name, toHit: mod[ability] + (proficient ? prof : 0),
-      damage: { count: w.damage.count, sides, bonus: mod[ability] }, damageType: w.damageType, ranged: w.ranged,
+      name: w.name, toHit: mod[ability] + (proficient ? prof : 0) + (w.ranged ? archery : 0),
+      damage: { count: w.damage.count, sides, bonus: mod[ability] }, damageType: w.damageType, ranged: w.ranged, ability,
     };
     attacks.push(base);
     if (w.properties.includes("thrown") && !w.ranged) {
       const throwAbility = w.properties.includes("finesse") && mod.DEX > mod.STR ? "DEX" : "STR";
       attacks.push({
-        ...base, name: `${w.name} (lancer)`, ranged: true, toHit: mod[throwAbility] + (proficient ? prof : 0),
+        ...base, name: `${w.name} (lancer)`, ranged: true, ability: throwAbility, toHit: mod[throwAbility] + (proficient ? prof : 0),
         damage: { count: w.damage.count, sides: w.damage.sides, bonus: mod[throwAbility] },
       });
     }

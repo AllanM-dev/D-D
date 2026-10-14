@@ -3,12 +3,13 @@ import { BACKGROUNDS } from "../../data/backgrounds";
 import { CLASSES } from "../../data/classes";
 import { ARMORS, CLASS_TRAINING, WEAPONS } from "../../data/equipment";
 import {
-  ABILITY_HELP, APP_GUIDE, ARMOR_KIND_TEXT, ARMOR_TRAINING_TEXT, BACKGROUND_TEXT, BASIC_RULES, CLASS_FEATURE_TEXT, FEAT_TEXT,
+  ABILITY_HELP, APP_GUIDE, FEATURE_STATUS, ARMOR_KIND_TEXT, ARMOR_TRAINING_TEXT, BACKGROUND_TEXT, BASIC_RULES, CLASS_FEATURE_TEXT, FEAT_TEXT,
   SPECIES_TRAIT_TEXT, WEAPON_PROPERTY_TEXT, WEAPON_TRAINING_TEXT,
 } from "../../data/help";
 import { SPECIES } from "../../data/species";
 import { HELP_KINDS, helpEntries, type HelpKind } from "../../ui/helpLists";
 import { ABILITIES } from "../rules";
+import { featuresFor } from "../features";
 
 describe("contenu de la page Aide", () => {
   it("explique chaque capacité de chaque classe", () => {
@@ -58,5 +59,31 @@ describe("contenu de la page Aide", () => {
       expect(entries.length, k).toBe(counts[k]);
       for (const e of entries) expect(e.summary, `${k}/${e.id}`).toBeTruthy();
     }
+  });
+
+  it("indique le statut de chaque capacité de classe, sans entrée orpheline", () => {
+    for (const c of CLASSES) {
+      expect(Object.keys(FEATURE_STATUS[c.id] ?? {}).sort(), c.id).toEqual([...c.features].sort());
+    }
+    expect(Object.keys(FEATURE_STATUS).sort()).toEqual(CLASSES.map((c) => c.id).sort());
+  });
+  it("ne déclare « appliqué » que ce que le moteur gère, et inversement", () => {
+    const names: Record<string, string[]> = {
+      "second-wind": ["Second souffle"], rage: ["Rage"], "lay-on-hands": ["Imposition des mains"],
+      "innate-sorcery": ["Magie innée"], "martial-arts": ["Arts martiaux"],
+    };
+    // Tout ce que le moteur donne en combat est « appliqué » dans l'Aide…
+    for (const c of CLASSES)
+      for (const f of featuresFor(c.id))
+        for (const n of names[f.id]) expect(FEATURE_STATUS[c.id][n]?.status, `${c.id}/${n}`).toBe("applied");
+    // … et rien n'est « appliqué » sans être branché (hors Défense sans armure, calculée dans la CA).
+    const wired = new Set(CLASSES.flatMap((c) => featuresFor(c.id).flatMap((f) => names[f.id].map((n) => `${c.id}/${n}`))));
+    for (const [cid, feats] of Object.entries(FEATURE_STATUS))
+      for (const [n, v] of Object.entries(feats))
+        if (v.status === "applied" && n !== "Défense sans armure") expect(wired.has(`${cid}/${n}`), `${cid}/${n}`).toBe(true);
+  });
+  it("chaque capacité appliquée ou partielle a une explication de ce que fait le jeu", () => {
+    for (const feats of Object.values(FEATURE_STATUS))
+      for (const [n, v] of Object.entries(feats)) if (v.status !== "todo") expect(v.note, n).toBeTruthy();
   });
 });

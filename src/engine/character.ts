@@ -6,6 +6,7 @@ import {
   POINT_BUY_BUDGET, POINT_BUY_MAX, POINT_BUY_MIN, pointBuyTotal, usesPoolExactly, STANDARD_ARRAY,
   type AbilityScores, type ScoreMethod,
 } from "./abilities";
+import { isFightingStyle, type FightingStyleId } from "../data/fighting-styles";
 import type { AttackDef } from "./combat";
 import { computeEquipment, getKit, type CharacterEquipment } from "./equipment";
 import { ABILITIES, abilityModifier, proficiencyBonus, type Ability } from "./rules";
@@ -29,6 +30,8 @@ export interface CharacterDraft {
   classSkills: SkillId[];
   /** Lot d'équipement de départ (le premier de la classe par défaut). */
   kitId?: string;
+  /** Style de combat (guerrier). */
+  fightingStyle?: FightingStyleId;
 }
 
 export interface SkillEntry {
@@ -60,6 +63,7 @@ export interface Character {
   equipment: CharacterEquipment;
   /** Attaques disponibles en combat, la meilleure en premier. */
   attacks: AttackDef[];
+  fightingStyle?: FightingStyleId;
 }
 
 const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id);
@@ -100,6 +104,8 @@ export function validateDraft(d: CharacterDraft): string[] {
     if (!bg.abilityOptions.includes(plus2) || !bg.abilityOptions.includes(plus1) || plus2 === plus1)
       errors.push("Le bonus d'historique doit viser deux caractéristiques différentes proposées par l'historique.");
   }
+
+  if (cls?.id === "fighter" && !isFightingStyle(d.fightingStyle)) errors.push("Choisissez un style de combat.");
 
   if (cls && d.kitId) {
     try {
@@ -146,7 +152,8 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
   ) as Character["saves"];
 
   const eq = computeEquipment(
-    { classId: classDef.id, scores, modifiers, proficiencyBonus: prof, baseSpeed: species.speed },
+    { classId: classDef.id, scores, modifiers, proficiencyBonus: prof, baseSpeed: species.speed,
+      fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined },
     d.kitId,
   );
 
@@ -159,6 +166,7 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
     speed: eq.speed,
     equipment: eq.equipment,
     attacks: eq.attacks,
+    fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined,
     passivePerception: 10 + skills.find((s) => s.id === "perception")!.bonus,
     saves, skills, originFeat: background.originFeat,
   };

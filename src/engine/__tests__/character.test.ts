@@ -15,6 +15,7 @@ const fighter: CharacterDraft = {
   baseScores: { STR: 15, DEX: 13, CON: 14, INT: 8, WIS: 10, CHA: 12 },
   bonus: { mode: "2/1", plus2: "STR", plus1: "CON" },
   classSkills: ["perception", "survival"],
+  fightingStyle: "defense",
 };
 
 describe("abilities", () => {
@@ -54,7 +55,7 @@ describe("création de personnage", () => {
     const c = buildCharacter(fighter, "x");
     expect(c.scores).toEqual({ STR: 17, DEX: 13, CON: 15, INT: 8, WIS: 10, CHA: 12 });
     expect(c.maxHp).toBe(10 + 2); // d10 + mod CON (+2)
-    expect(c.armorClass).toBe(16); // cotte de mailles (lot A du guerrier)
+    expect(c.armorClass).toBe(17); // cotte de mailles (16) + style Défense (+1)
     expect(c.proficiencyBonus).toBe(2);
     expect(c.saves.STR).toEqual({ proficient: true, bonus: 5 });
     expect(c.saves.DEX).toEqual({ proficient: false, bonus: 1 });

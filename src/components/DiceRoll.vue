@@ -67,7 +67,7 @@ const calc = computed(() => {
   const base = kept.value ?? e.dice.join(" + ");
   const mod = e.modifier ? ` ${signed(e.modifier).replace("-", "− ").replace("+", "+ ")}` : "";
   const dc = e.dc !== undefined ? ` contre CA ${e.dc}` : "";
-  const unit = e.kind === "damage" ? " dégâts" : "";
+  const unit = e.kind === "damage" ? " dégâts" : e.kind === "heal" ? " PV" : "";
   return `${base}${mod} = ${e.total}${dc}${unit}`;
 });
 
@@ -79,6 +79,7 @@ const outcomeText = computed(() => {
   const e = props.event;
   if (!e.outcome) return "";
   if (e.kind === "damage") return e.outcome === "crit" ? "Dégâts critiques !" : "";
+  if (e.kind === "heal") return `Vous récupérez ${e.total} PV`;
   if (e.kind === "deathSave" && e.outcome === "crit") return "Vous vous relevez !";
   return OUTCOMES[e.outcome] ?? "";
 });

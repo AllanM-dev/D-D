@@ -123,6 +123,15 @@
         </ion-list>
       </template>
 
+      <!-- Style de combat (guerrier) -->
+      <template v-if="classDef?.id === 'fighter'">
+        <h3>Style de combat</h3>
+        <ion-segment v-model="draft.fightingStyle">
+          <ion-segment-button v-for="st in FIGHTING_STYLES" :key="st.id" :value="st.id"><ion-label>{{ st.name }}</ion-label></ion-segment-button>
+        </ion-segment>
+        <p class="hint">{{ FIGHTING_STYLES.find((st) => st.id === draft.fightingStyle)?.text }} Les autres styles viendront plus tard.</p>
+      </template>
+
       <!-- Équipement de départ -->
       <template v-if="classDef && kits.length">
         <h3>Équipement de départ</h3>
@@ -201,6 +210,7 @@ import {
 } from "../engine/abilities";
 import { keyAbilities } from "../engine/advice";
 import { computeEquipment, kitsFor } from "../engine/equipment";
+import { FIGHTING_STYLES } from "../data/fighting-styles";
 import { ARMORS, WEAPONS, type KitEntry } from "../data/equipment";
 import { applyBackgroundBonus, buildCharacter, validateDraft, type CharacterDraft } from "../engine/character";
 import { ABILITIES, abilityModifier, type Ability } from "../engine/rules";
@@ -251,6 +261,7 @@ watch(() => draft.backgroundId, () => {
 watch(() => draft.classId, (id) => {
   draft.classSkills = [];
   draft.kitId = id ? kitsFor(id)[0].id : undefined;
+  draft.fightingStyle = id === "fighter" ? "defense" : undefined;
 });
 
 function pruneSkills() {
@@ -331,7 +342,7 @@ const preview = computed(() => {
   if (!cls || !sp || ABILITIES.some((a) => final.value[a] <= 0)) return null;
   const scores = final.value;
   const modifiers = Object.fromEntries(ABILITIES.map((a) => [a, abilityModifier(scores[a])])) as Record<Ability, number>;
-  return computeEquipment({ classId: cls.id, scores, modifiers, proficiencyBonus: 2, baseSpeed: sp.speed }, draft.kitId);
+  return computeEquipment({ classId: cls.id, scores, modifiers, proficiencyBonus: 2, baseSpeed: sp.speed, fightingStyle: draft.fightingStyle }, draft.kitId);
 });
 
 function create() {
