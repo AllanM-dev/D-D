@@ -1,7 +1,7 @@
 import { CLASS_SPELLCASTING, SPELL_BY_ID, type SpellDef } from "../data/spells";
 import { rollD20, rollDie, type Rng } from "./dice";
 import {
-  afterPlayerAction, applyDamage, assertPlayerTurn, endConcentration, enemyTarget, healCombatant, isConscious, pushRoll,
+  ABILITY_FR, afterPlayerAction, applyCondition, applyDamage, rollSave, assertPlayerTurn, endConcentration, enemyTarget, healCombatant, isConscious, pushRoll,
   resolveAttack, rollDamageDetailed, type AttackDef, type Combatant, type CombatState, type Spellcasting,
 } from "./combat";
 import type { AbilityScores } from "./abilities";
@@ -36,9 +36,6 @@ export function castingFor(input: CastingInput): Spellcasting | undefined {
   };
 }
 
-const ABILITY_FR: Record<Ability, string> = {
-  STR: "Force", DEX: "Dextérité", CON: "Constitution", INT: "Intelligence", WIS: "Sagesse", CHA: "Charisme",
-};
 
 export interface SpellOption {
   id: string;
@@ -144,6 +141,10 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
         damageType: e.damageType, ranged: !e.melee, ability: sc.ability, spell: true,
       };
       const res = resolveAttack(state, cur, target, attack, rng);
+      if (e.condition && res.hit && !target.dead) {
+        // « Jusqu'à la fin de votre prochain tour » : lanceur, round suivant.
+        applyCondition(state, target, { id: e.condition, source: spell.name, until: { actorId: cur.id, round: state.round + 1 } });
+      }
       if (e.guiding && res.hit && !target.dead) {
         target.guided = true;
         target.guidedUntilRound = state.round + 1;
@@ -152,16 +153,8 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
       break;
     }
     case "save": {
-      const mod = target.saveMods?.[e.save] ?? 0;
-      const roll = rollD20(mod, "normal", rng);
       const dc = sc.saveDc + (cur.innateSorcery ? 1 : 0); // Magie innée : +1 au DD des sorts
-      const success = roll.total >= dc;
-      state.log.push(`${target.name} : sauvegarde de ${ABILITY_FR[e.save]} ${roll.natural}${mod >= 0 ? "+" : ""}${mod} = ${roll.total} contre DD ${dc} — ${success ? "réussie" : "ratée"}.`);
-      pushRoll(state, {
-        kind: "save", actorId: target.id, actorName: target.name, side: target.side,
-        title: `${target.name} : sauvegarde de ${ABILITY_FR[e.save]}`,
-        sides: 20, dice: roll.rolls, modifier: mod, total: roll.total, dc, outcome: success ? "success" : "failure",
-      });
+      const { success } = rollSave(state, target, e.save, dc, rng);
       if (success && !e.half) {
         state.log.push(`${target.name} résiste à ${spell.name}.`);
         break;
@@ -179,6 +172,24 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
       if (!success && e.mocks && !target.dead) {
         target.mocked = true;
         state.log.push(`${target.name} est tourné en ridicule : désavantage à sa prochaine attaque.`);
+      }
+      break;
+    }
+    case "control": {
+      const dc = sc.saveDc + (cur.innateSorcery ? 1 : 0);
+      const { success } = rollSave(state, target, e.save, dc, rng);
+      if (success) {
+        state.log.push(`${target.name} résiste à ${spell.name}.`);
+        break;
+      }
+      for (const id of e.conditions) {
+        applyCondition(state, target, {
+          id, source: spell.name,
+          ...(spell.concentration ? { concentrationOf: cur.id } : {}),
+          // Le nouveau jet ne porte que sur l'état qui neutralise : à terre disparaît ensuite quand la cible se relève.
+          ...(e.repeatSave && id === "incapacitated" ? { save: { ability: e.save, dc } } : {}),
+          ...(e.escape ? { escape: { ability: "STR" as const, dc } } : {}),
+        });
       }
       break;
     }

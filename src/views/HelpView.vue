@@ -33,6 +33,7 @@ const sections = [
   { path: "/help/classes", title: "Classes", text: "Les 12 classes : rôle, capacités de niveau 1, caractéristiques à privilégier." },
   { path: "/help/species", title: "Espèces", text: "Les 9 espèces : taille, vitesse et traits." },
   { path: "/help/spells", title: "Sorts", text: "Sorts mineurs et de niveau 1 : effet, portée, durée, et ce que le jeu applique." },
+  { path: "/help/conditions", title: "États", text: "Empoisonné, à terre, paralysé… : ce qu'ils font et lesquels le jeu applique." },
   { path: "/help/weapons", title: "Armes", text: "Dégâts, portée et propriétés des armes de départ." },
   { path: "/help/armors", title: "Armures", text: "Armures et boucliers : CA, Dextérité, Force minimale." },
   { path: "/help/backgrounds", title: "Historiques", text: "Les 4 historiques : bonus, compétences et don d'origine." },

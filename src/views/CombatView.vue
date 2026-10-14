@@ -58,6 +58,7 @@
                 <template v-if="isMarked(c.id)"> · marqué</template>
                 <template v-if="c.guided"> · éclairé</template>
                 <template v-if="c.mocked"> · tourné en ridicule</template>
+                <template v-for="cond in c.conditions" :key="cond.id"> · <strong class="cond">{{ conditionName(cond.id) }}</strong></template>
               </template>
             </p>
           </ion-label>
@@ -163,7 +164,7 @@ import { MONSTERS } from "../data/monsters";
 import { characterToCombatant } from "../engine/attacks";
 import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
-  currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, startCombat, useFeature,
+  conditionName, currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, startCombat, useFeature,
   type Combatant, type CombatState, type FeatureId, type RollEvent,
 } from "../engine/combat";
 import { useCharacters } from "../stores/characters";
@@ -337,6 +338,7 @@ const layOnHands = (max: number) => act((s) => useFeature(s, "lay-on-hands", Mat
 
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
+.cond { color: var(--ion-color-warning, #ffc409); }
 .hint { opacity: 0.8; font-size: 0.9rem; }
 .active { --background: var(--ion-color-step-150, #333); }
 h2 small { opacity: 0.7; font-weight: normal; font-size: 0.8rem; margin-left: 6px; }

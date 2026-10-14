@@ -1,5 +1,6 @@
 import type { AttackDef } from "../engine/combat";
 import type { Ability } from "../engine/rules";
+import type { ConditionId } from "./conditions";
 
 export interface MonsterDef {
   id: string;
@@ -10,6 +11,8 @@ export interface MonsterDef {
   /** Modificateurs de caractéristiques, utilisés pour les jets de sauvegarde contre les sorts. */
   saves: Record<Ability, number>;
   attacks: AttackDef[];
+  /** États auxquels le monstre est immunisé. */
+  immunities?: ConditionId[];
 }
 
 /**
@@ -21,14 +24,22 @@ export const MONSTERS: readonly MonsterDef[] = [
     attacks: [{ name: "Morsure", toHit: 4, damage: { count: 1, sides: 4, bonus: 2 }, damageType: "perforant", ranged: false }] },
   { id: "goblin", name: "Gobelin", maxHp: 7, ac: 15, initiativeBonus: 2, saves: { STR: -1, DEX: 2, CON: 0, INT: 0, WIS: -1, CHA: -1 },
     attacks: [{ name: "Cimeterre", toHit: 4, damage: { count: 1, sides: 6, bonus: 2 }, damageType: "tranchant", ranged: false }] },
-  { id: "skeleton", name: "Squelette", maxHp: 13, ac: 13, initiativeBonus: 2, saves: { STR: 0, DEX: 2, CON: 2, INT: -2, WIS: -1, CHA: -3 },
+  { id: "skeleton", name: "Squelette", maxHp: 13, ac: 13, initiativeBonus: 2, immunities: ["poisoned"], saves: { STR: 0, DEX: 2, CON: 2, INT: -2, WIS: -1, CHA: -3 },
     attacks: [{ name: "Épée courte", toHit: 4, damage: { count: 1, sides: 6, bonus: 2 }, damageType: "perforant", ranged: false }] },
-  { id: "zombie", name: "Zombie", maxHp: 22, ac: 8, initiativeBonus: -2, saves: { STR: 1, DEX: -2, CON: 3, INT: -4, WIS: -2, CHA: -3 },
+  { id: "zombie", name: "Zombie", maxHp: 22, ac: 8, initiativeBonus: -2, immunities: ["poisoned"], saves: { STR: 1, DEX: -2, CON: 3, INT: -4, WIS: -2, CHA: -3 },
     attacks: [{ name: "Coup", toHit: 3, damage: { count: 1, sides: 6, bonus: 1 }, damageType: "contondant", ranged: false }] },
   { id: "wolf", name: "Loup", maxHp: 11, ac: 13, initiativeBonus: 2, saves: { STR: 1, DEX: 2, CON: 1, INT: -4, WIS: 1, CHA: -2 },
-    attacks: [{ name: "Morsure", toHit: 4, damage: { count: 2, sides: 4, bonus: 2 }, damageType: "perforant", ranged: false }] },
+    attacks: [{ name: "Morsure", toHit: 4, damage: { count: 2, sides: 4, bonus: 2 }, damageType: "perforant", ranged: false,
+      rider: { condition: "prone", save: { ability: "STR", dc: 11 } } }] },
   { id: "bandit", name: "Bandit", maxHp: 11, ac: 12, initiativeBonus: 1, saves: { STR: 0, DEX: 1, CON: 1, INT: 0, WIS: 0, CHA: 0 },
     attacks: [{ name: "Cimeterre", toHit: 3, damage: { count: 1, sides: 6, bonus: 1 }, damageType: "tranchant", ranged: false }] },
   { id: "orc", name: "Orc", maxHp: 15, ac: 13, initiativeBonus: 1, saves: { STR: 3, DEX: 1, CON: 3, INT: -2, WIS: 0, CHA: 0 },
     attacks: [{ name: "Hache à deux mains", toHit: 5, damage: { count: 1, sides: 12, bonus: 3 }, damageType: "tranchant", ranged: false }] },
+  // Goule : les griffes paralysent (les elfes y échappent) ; immunisée au poison.
+  { id: "ghoul", name: "Goule", maxHp: 22, ac: 12, initiativeBonus: 2, immunities: ["poisoned"], saves: { STR: 1, DEX: 2, CON: 0, INT: -2, WIS: 0, CHA: -2 },
+    attacks: [
+      { name: "Griffes", toHit: 4, damage: { count: 2, sides: 4, bonus: 2 }, damageType: "tranchant", ranged: false,
+        rider: { condition: "paralyzed", rounds: 10, save: { ability: "CON", dc: 10 }, repeatSave: true, exceptTags: ["elf", "undead"] } },
+      { name: "Morsure", toHit: 2, damage: { count: 2, sides: 6, bonus: 2 }, damageType: "perforant", ranged: false },
+    ] },
 ];
