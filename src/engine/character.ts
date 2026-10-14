@@ -9,6 +9,7 @@ import {
 import { isFightingStyle, type FightingStyleId } from "../data/fighting-styles";
 import { CLASS_SPELLCASTING, defaultSpells, spellsFor } from "../data/spells";
 import type { AttackDef } from "./combat";
+import type { Vitals } from "./rest";
 import { computeEquipment, getKit, type CharacterEquipment } from "./equipment";
 import { ABILITIES, abilityModifier, proficiencyBonus, type Ability } from "./rules";
 
@@ -75,6 +76,8 @@ export interface Character {
   attacks: AttackDef[];
   fightingStyle?: FightingStyleId;
   spells?: SpellChoice;
+  /** PV et ressources actuels (voir `rest.ts`) ; absent = tout au maximum. */
+  vitals?: Vitals;
 }
 
 const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id);
