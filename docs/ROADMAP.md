@@ -14,7 +14,7 @@
 - [ ] Traits d'espèce et de classe de niveau 1 appliqués, sorts de départ, don d'origine appliqué
 
 - [x] Distances en mètres partout (vitesses, portées, malus d'armure), anciennes sauvegardes converties
-- [x] Illustrations (icônes game-icons.net, CC BY 3.0) : 12 classes, 9 espèces, 4 historiques, 7 monstres (création, fiche, accueil, Aide, combat) ; page Crédits
+- [x] Illustrations (icônes game-icons.net, CC BY 3.0) : 12 classes, 9 espèces, 4 historiques, 8 monstres (création, fiche, accueil, Aide, combat) ; page Crédits
 - [ ] Illustrations des armes, armures et objets ; fonds d'écran d'ambiance ; images plus artistiques (si une source libre devient accessible)
 - [x] Menu latéral et page Aide : règles de base, caractéristiques, fiches des 12 classes, 9 espèces et 4 historiques
 
@@ -25,10 +25,11 @@
 - [x] PV et ressources conservés entre les combats ; repos court (dés de vie, Second souffle, Rage, Magie de pacte, Récupération arcanique) et repos long, depuis la fiche
 - [ ] Réactions, déplacement, portée ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
-- [x] Sorts (lot 1) : 40 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
+- [x] Sorts (lot 1) : 43 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
 - [ ] Sorts : réactions (Bouclier…), grimoire du magicien, niveaux supérieurs, zones à plusieurs cibles, soins des alliés
-- [ ] Conditions, autres capacités de classe (Attaque sournoise, Expertise, Inspiration bardique…), autres styles de combat
-- [x] Bestiaire de départ (7 monstres, SRD 5.1) et 7 rencontres
+- [x] États (conditions) : empoisonné, effrayé, aveuglé, entravé, à terre, neutralisé, étourdi, paralysé ; infligés par le loup (à terre), la goule (paralysie) et les sorts Rayon empoisonné, Enchevêtrement, Fou rire de Tasha ; section Aide → États
+- [ ] États restants (charmé, assourdi, épuisement, agrippé, invisible, pétrifié), autres capacités de classe (Attaque sournoise, Expertise, Inspiration bardique…), autres styles de combat
+- [x] Bestiaire de départ (8 monstres, SRD 5.1) et 8 rencontres
 - [ ] Bestiaire complet, capacités spéciales des monstres, compagnons, propriétés d'armes (lourde, légère, maîtrises), munitions
 
 ## Jalon 3 — Aventure

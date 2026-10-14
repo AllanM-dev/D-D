@@ -2,6 +2,7 @@ import { rollD20, rollDie, type AdvantageMode, type Rng } from "./dice";
 import { SPELL_BY_ID } from "../data/spells";
 import { hasBonusSpell, spellOptionsFor, type SpellOption } from "./spellcasting";
 import type { Ability } from "./rules";
+import type { ActiveCondition, ConditionId, ConditionRider } from "../data/conditions";
 
 export type Side = "party" | "enemies";
 
@@ -22,6 +23,8 @@ export interface AttackDef {
   ability?: Ability;
   /** Attaque de sort (la Magie innée donne l'avantage). */
   spell?: boolean;
+  /** État infligé par un coup qui touche (jet de sauvegarde de la cible). */
+  rider?: ConditionRider;
   /** Frappe à mains nues (arts martiaux). */
   unarmed?: boolean;
 }
@@ -124,6 +127,12 @@ export interface Combatant {
   guidedUntilRound: number;
   /** Moquerie cruelle : désavantage à sa prochaine attaque. */
   mocked: boolean;
+  /** États en cours (empoisonné, à terre…). */
+  conditions: ActiveCondition[];
+  /** Marqueurs (espèce du héros…) : certains effets les épargnent. */
+  tags?: string[];
+  /** États auxquels ce combattant est immunisé. */
+  immunities?: ConditionId[];
   /** Modificateurs de caractéristiques pour les jets de sauvegarde (monstres). */
   saveMods?: Partial<Record<Ability, number>>;
 }
@@ -176,7 +185,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods">>;
+  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods" | "tags" | "immunities">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
@@ -193,7 +202,7 @@ export function makeCombatant(init: CombatantInit): Combatant {
     raging: false, ragingUntilRound: 0, innateSorcery: false, innateUntilRound: 0,
     turnState: { action: false, bonus: false, attacked: false, spells: [] },
     spellcasting: init.spellcasting ? JSON.parse(JSON.stringify(init.spellcasting)) : undefined,
-    acBonus: 0, guided: false, guidedUntilRound: 0, mocked: false,
+    acBonus: 0, guided: false, guidedUntilRound: 0, mocked: false, conditions: [],
   };
 }
 
@@ -273,6 +282,13 @@ export function endConcentration(state: CombatState, c: Combatant, reason: strin
   }
   c.mark = undefined;
   c.concentrating = undefined;
+  // Les états liés à ce sort (Enchevêtrement, Fou rire…) prennent fin.
+  for (const other of state.combatants) {
+    const gone = other.conditions.filter((x) => x.concentrationOf === c.id);
+    if (!gone.length) continue;
+    other.conditions = other.conditions.filter((x) => x.concentrationOf !== c.id);
+    for (const g of gone) state.log.push(`${other.name} n'est plus ${CONDITION_FR[g.id]}.`);
+  }
   state.log.push(`${c.name} ${reason} : ${spell?.name ?? "le sort"} prend fin.`);
 }
 
@@ -331,15 +347,93 @@ export interface AttackResult {
   damage: number;
 }
 
+export const ABILITY_FR: Record<Ability, string> = {
+  STR: "Force", DEX: "Dextérité", CON: "Constitution", INT: "Intelligence", WIS: "Sagesse", CHA: "Charisme",
+};
+
+export const hasCondition = (c: Combatant, id: ConditionId) => c.conditions.some((x) => x.id === id);
+/** Neutralisé, étourdi ou paralysé : ne peut ni agir ni se concentrer. */
+export const isIncapacitated = (c: Combatant) => c.conditions.some((x) => x.id === "incapacitated" || x.id === "stunned" || x.id === "paralyzed");
+const CONDITION_FR: Record<ConditionId, string> = {
+  poisoned: "empoisonné", prone: "à terre", frightened: "effrayé", blinded: "aveuglé", restrained: "entravé",
+  incapacitated: "neutralisé", stunned: "étourdi", paralyzed: "paralysé",
+};
+export const conditionName = (id: ConditionId) => CONDITION_FR[id];
+
+/** Inflige un état. Renvoie false si la cible y est immunisée. Un état qui neutralise met fin à la concentration. */
+export function applyCondition(state: CombatState, target: Combatant, cond: ActiveCondition): boolean {
+  if (target.dead) return false;
+  if (target.immunities?.includes(cond.id)) {
+    state.log.push(`${target.name} est immunisé : ${CONDITION_FR[cond.id]} sans effet.`);
+    return false;
+  }
+  target.conditions = target.conditions.filter((x) => x.id !== cond.id);
+  target.conditions.push(cond);
+  state.log.push(`${target.name} est ${CONDITION_FR[cond.id]} (${cond.source}).`);
+  if (cond.id === "incapacitated" || cond.id === "stunned" || cond.id === "paralyzed") endConcentration(state, target, "est neutralisé");
+  return true;
+}
+
+export function removeCondition(state: CombatState, target: Combatant, id: ConditionId, why: string) {
+  if (!hasCondition(target, id)) return;
+  target.conditions = target.conditions.filter((x) => x.id !== id);
+  state.log.push(`${target.name} n'est plus ${CONDITION_FR[id]} (${why}).`);
+}
+
+export interface SaveResult {
+  success: boolean;
+  total: number;
+}
+
+/** Jet de sauvegarde d'un combattant contre un DD, avec les effets des états (échec automatique, désavantage). */
+export function rollSave(state: CombatState, target: Combatant, ability: Ability, dc: number, rng: Rng, title?: string): SaveResult {
+  const name = title ?? `${target.name} : sauvegarde de ${ABILITY_FR[ability]}`;
+  if ((ability === "STR" || ability === "DEX") && (hasCondition(target, "stunned") || hasCondition(target, "paralyzed"))) {
+    state.log.push(`${target.name} : sauvegarde de ${ABILITY_FR[ability]} ratée automatiquement (${hasCondition(target, "stunned") ? "étourdi" : "paralysé"}).`);
+    return { success: false, total: 0 };
+  }
+  const disadvantage = ability === "DEX" && hasCondition(target, "restrained");
+  const mod = target.saveMods?.[ability] ?? 0;
+  const roll = rollD20(mod, disadvantage ? "disadvantage" : "normal", rng);
+  const success = roll.total >= dc;
+  state.log.push(
+    `${target.name} : sauvegarde de ${ABILITY_FR[ability]} ${roll.natural}${mod >= 0 ? "+" : ""}${mod} = ${roll.total} contre DD ${dc}${disadvantage ? " (désavantage : entravé)" : ""} — ${success ? "réussie" : "ratée"}.`,
+  );
+  pushRoll(state, {
+    kind: "save", actorId: target.id, actorName: target.name, side: target.side, title: name,
+    sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: mod, total: roll.total, dc, outcome: success ? "success" : "failure",
+    ...(disadvantage ? { note: "Désavantage : entravé" } : {}),
+  });
+  return { success, total: roll.total };
+}
+
+/** Avantages et désavantages venant des états des deux combattants. */
+function conditionModes(attacker: Combatant, target: Combatant, melee: boolean) {
+  const advantage: string[] = [];
+  const disadvantage: string[] = [];
+  for (const id of ["poisoned", "frightened", "blinded", "restrained", "prone"] as const)
+    if (hasCondition(attacker, id)) disadvantage.push(CONDITION_FR[id]);
+  for (const id of ["blinded", "restrained", "stunned", "paralyzed"] as const)
+    if (hasCondition(target, id)) advantage.push(`cible ${CONDITION_FR[id]}`);
+  if (hasCondition(target, "prone")) (melee ? advantage : disadvantage).push(melee ? "cible à terre" : "cible à terre, attaque à distance");
+  return { advantage, disadvantage };
+}
+
 export function resolveAttack(state: CombatState, attacker: Combatant, target: Combatant, attack: AttackDef, rng: Rng): AttackResult {
   const melee = !attack.ranged;
   const unconscious = isDown(target);
   let mode: AdvantageMode = "normal";
   // Avantage : cible inconsciente au corps à corps, attaque de sort sous Magie innée, ou cible marquée par Éclair guidé.
   const guidedAdvantage = target.guided && attacker.side === "party";
-  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell) || guidedAdvantage;
-  // Désavantage : cible qui esquive, ou attaquant visé par Moquerie cruelle.
-  const disadvantage = target.dodging || attacker.mocked;
+  const cm = conditionModes(attacker, target, melee);
+  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell) || guidedAdvantage || cm.advantage.length > 0;
+  // Désavantage : cible qui esquive, attaquant visé par Moquerie cruelle, ou états (empoisonné, effrayé…).
+  const disadvantage = target.dodging || attacker.mocked || cm.disadvantage.length > 0;
+  const reasons = [
+    advantage && !disadvantage ? `Avantage : ${[unconscious && melee ? "cible inconsciente" : "", attacker.innateSorcery && attack.spell ? "Magie innée" : "", guidedAdvantage ? "cible éclairée" : "", ...cm.advantage].filter(Boolean).join(", ")}` : "",
+    disadvantage && !advantage ? `Désavantage : ${[target.dodging ? "cible qui esquive" : "", attacker.mocked ? "moquerie" : "", ...cm.disadvantage].filter(Boolean).join(", ")}` : "",
+    advantage && disadvantage ? "Avantage et désavantage s'annulent" : "",
+  ].filter(Boolean);
   if (guidedAdvantage) target.guided = false;
   if (attacker.mocked) attacker.mocked = false;
   if (advantage && !disadvantage) mode = "advantage";
@@ -349,12 +443,14 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
   const hit = roll.critical || (!roll.fumble && roll.total >= target.ac);
   const label = `${attacker.name} attaque ${target.name} (${attack.name}) : ${roll.natural}${attack.toHit >= 0 ? "+" : ""}${attack.toHit} = ${roll.total} contre CA ${target.ac}`;
   // Un coup au corps à corps contre une cible inconsciente est toujours un critique.
-  const crit = hit && (roll.critical || (unconscious && melee));
+  const paralyzed = hasCondition(target, "paralyzed");
+  const crit = hit && (roll.critical || ((unconscious || paralyzed) && melee));
   const attackRoll: RollInit = {
     kind: "attack", actorId: attacker.id, actorName: attacker.name, side: attacker.side,
     title: `${attacker.name} attaque ${target.name} (${attack.name})`,
     sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: attack.toHit,
     total: roll.total, dc: target.ac, outcome: roll.fumble ? "fumble" : !hit ? "miss" : crit ? "crit" : "hit",
+    ...(reasons.length ? { note: reasons.join(" · ") } : {}),
   };
   if (!hit) {
     state.log.push(`${label} — raté.`);
@@ -398,6 +494,19 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
 
   // Un lanceur de sorts qui subit des dégâts doit garder sa concentration.
   concentrationCheck(state, target, damage, rng);
+  // État infligé par le coup (jet de sauvegarde de la cible).
+  const rider = attack.rider;
+  if (rider && !target.dead && target.hp > 0 && !target.tags?.some((t) => rider.exceptTags?.includes(t))) {
+    const save = rider.save;
+    const ok = save ? rollSave(state, target, save.ability, save.dc, rng).success : false;
+    if (!ok) {
+      applyCondition(state, target, {
+        id: rider.condition, source: attack.name,
+        ...(rider.rounds ? { expiresRound: state.round + rider.rounds } : {}),
+        ...(rider.repeatSave && save ? { save } : {}),
+      });
+    }
+  }
   return { hit: true, crit, damage: total };
 }
 
@@ -436,8 +545,15 @@ function enemyTurn(state: CombatState, enemy: Combatant, rng: Rng) {
     state.log.push(`${enemy.name} n'a personne à attaquer.`);
     return;
   }
+  // Entravé : l'ennemi tente de se libérer (test de Force contre le DD du sort) au lieu d'attaquer.
+  const bound = enemy.conditions.find((x) => x.escape);
+  if (bound?.escape) {
+    const res = rollSave(state, enemy, bound.escape.ability, bound.escape.dc, rng, `${enemy.name} tente de se libérer`);
+    if (res.success) removeCondition(state, enemy, bound.id, "il s'est libéré");
+    return;
+  }
   const target = pool[Math.floor(rng() * pool.length)];
-  resolveAttack(state, enemy, target, enemy.attacks[0], rng);
+  resolveAttack(state, enemy, target, enemy.attacks.length > 1 ? enemy.attacks[Math.floor(rng() * enemy.attacks.length)] : enemy.attacks[0], rng);
 }
 
 function advanceTurn(state: CombatState) {
@@ -465,13 +581,19 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
       cur.innateSorcery = false;
       state.log.push(`La magie innée de ${cur.name} s'estompe.`);
     }
+    startOfTurnConditions(state, cur);
     if (cur.dead) {
+      advanceTurn(state);
+    } else if (cur.side === "party" && cur.hp === 0) {
+      if (!cur.stable) deathSave(state, cur, rng);
+      advanceTurn(state);
+    } else if (isIncapacitated(cur)) {
+      state.log.push(`${cur.name} est neutralisé et passe son tour.`);
+      endOfTurnConditions(state, cur, rng);
       advanceTurn(state);
     } else if (cur.side === "enemies") {
       enemyTurn(state, cur, rng);
-      advanceTurn(state);
-    } else if (cur.hp === 0) {
-      if (!cur.stable) deathSave(state, cur, rng);
+      endOfTurnConditions(state, cur, rng);
       advanceTurn(state);
     } else {
       return; // à vous de jouer
@@ -480,7 +602,35 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
   throw new Error("Boucle de combat anormale.");
 }
 
+/** Début du tour : les états à durée en rounds expirent, un combattant à terre se relève (s'il n'est pas neutralisé). */
+function startOfTurnConditions(state: CombatState, cur: Combatant) {
+  for (const c of state.combatants) {
+    const over = c.conditions.filter((x) => x.expiresRound !== undefined && state.round > x.expiresRound);
+    for (const o of over) removeCondition(state, c, o.id, "la durée est écoulée");
+  }
+  if (!cur.dead && hasCondition(cur, "prone") && !isIncapacitated(cur)) removeCondition(state, cur, "prone", "il se relève");
+}
+
+/** Fin du tour : fin des états « jusqu'à la fin de votre tour », puis jets de sauvegarde répétés. */
+function endOfTurnConditions(state: CombatState, c: Combatant, rng: Rng) {
+  if (c.dead) return;
+  // « Jusqu'à la fin de votre prochain tour » : l'état est sur la cible, l'échéance est le tour du lanceur.
+  for (const other of state.combatants) {
+    for (const cond of [...other.conditions]) {
+      if (cond.until && cond.until.actorId === c.id && state.round >= cond.until.round) {
+        removeCondition(state, other, cond.id, "la durée est écoulée");
+      }
+    }
+  }
+  for (const cond of [...c.conditions]) {
+    if (!cond.save || !isConscious(c)) continue;
+    const res = rollSave(state, c, cond.save.ability, cond.save.dc, rng, `${c.name} : sauvegarde de ${ABILITY_FR[cond.save.ability]} contre ${CONDITION_FR[cond.id]}`);
+    if (res.success) removeCondition(state, c, cond.id, "jet de sauvegarde réussi");
+  }
+}
+
 function endTurn(state: CombatState, rng: Rng) {
+  endOfTurnConditions(state, currentCombatant(state), rng);
   advanceTurn(state);
   processTurns(state, rng);
 }

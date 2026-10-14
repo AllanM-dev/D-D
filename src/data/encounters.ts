@@ -17,6 +17,7 @@ export const ENCOUNTERS: readonly EncounterDef[] = [
   { id: "skeleton", name: "Un squelette dans la crypte", difficulty: "Moyen", monsters: [{ monsterId: "skeleton", count: 1 }] },
   { id: "goblins", name: "Embuscade de gobelins", difficulty: "Difficile", monsters: [{ monsterId: "goblin", count: 2 }] },
   { id: "bandits", name: "Bandits de grand chemin", difficulty: "Difficile", monsters: [{ monsterId: "bandit", count: 2 }] },
+  { id: "ghoul", name: "Une goule dans le cimetière", difficulty: "Difficile", monsters: [{ monsterId: "ghoul", count: 1 }] },
   { id: "orc", name: "Un orc solitaire", difficulty: "Difficile", monsters: [{ monsterId: "orc", count: 1 }] },
 ];
 
@@ -29,7 +30,7 @@ export function buildEnemies(encounter: EncounterDef): CombatantInit[] {
     for (let i = 1; i <= count; i++) {
       out.push({
         id: `${m.id}-${i}`, name: count > 1 ? `${m.name} ${i}` : m.name, side: "enemies",
-        maxHp: m.maxHp, ac: m.ac, initiativeBonus: m.initiativeBonus, attacks: m.attacks, art: artKey("monster", m.id), saveMods: m.saves,
+        maxHp: m.maxHp, ac: m.ac, initiativeBonus: m.initiativeBonus, attacks: m.attacks, art: artKey("monster", m.id), saveMods: m.saves, immunities: m.immunities,
       });
     }
   }

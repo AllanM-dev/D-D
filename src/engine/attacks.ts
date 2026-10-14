@@ -2,6 +2,7 @@ import { artKey } from "../data/illustrations";
 import type { Character } from "./character";
 import type { CombatantInit } from "./combat";
 import { featuresFor } from "./features";
+import { ABILITIES, type Ability } from "./rules";
 import { castingInput, vitalsOf } from "./rest";
 import { castingFor } from "./spellcasting";
 
@@ -18,6 +19,8 @@ export function characterToCombatant(c: Character): CombatantInit {
     initiativeBonus: c.initiative, attacks: c.attacks, level: c.level,
     features: featuresFor(c.classDef.id, c.level).map((f) => ({ ...f, uses: f.unlimited ? f.uses : Math.min(v.features[f.id] ?? f.max, f.max) })),
     art: artKey("class", c.classDef.id),
+    saveMods: Object.fromEntries(ABILITIES.map((a) => [a, c.saves[a].bonus])) as Record<Ability, number>,
+    tags: [c.species.id],
     spellcasting,
   };
 }

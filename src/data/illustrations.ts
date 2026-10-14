@@ -56,6 +56,7 @@ const monsters: Record<string, Art> = {
   skeleton: { hue: 220, icon: "skull-crossed-bones" },
   zombie: { hue: 85, icon: "shambling-zombie" },
   wolf: { hue: 215, icon: "wolf-head" },
+  ghoul: { hue: 150, icon: "grasping-claws" },
   bandit: { hue: 10, icon: "bandit" },
   orc: { hue: 100, icon: "orc-head" },
 };
