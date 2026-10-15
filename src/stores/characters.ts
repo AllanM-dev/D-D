@@ -6,6 +6,8 @@ import { migrateCharacter } from "../engine/equipment";
 import type { ExplorationState } from "../engine/exploration";
 import type { Vitals } from "../engine/rest";
 import type { Applied } from "../engine/story";
+import type { Loot } from "../data/items";
+import { changeItems, inventoryOf } from "../engine/inventory";
 
 const KEY = "dd-mobile.characters";
 
@@ -38,17 +40,31 @@ export const useCharacters = defineStore("characters", () => {
     const c = list.value.find((x) => x.id === id);
     if (c) { c.exploration = JSON.parse(JSON.stringify(e)); persist(); }
   };
-  /** Enregistre les drapeaux de l'histoire et l'or gagné ou dépensé. */
-  const setStory = (id: string, a: Pick<Applied, "flags" | "gold">) => {
+  /** Enregistre les drapeaux de l'histoire, l'or et les objets gagnés ou dépensés. */
+  const setStory = (id: string, a: Pick<Applied, "flags" | "gold"> & { items?: Record<string, number> }) => {
     const c = list.value.find((x) => x.id === id);
     if (!c) return;
     c.story = { flags: [...a.flags] };
     if (a.gold) c.equipment.gold = Math.max(0, c.equipment.gold + a.gold);
+    if (a.items && Object.keys(a.items).length) c.inventory = changeItems(inventoryOf(c), a.items);
     persist();
+  };
+  /** Ajoute un butin (or et objets) au personnage. */
+  const addLoot = (id: string, loot: Loot) => {
+    const c = list.value.find((x) => x.id === id);
+    if (!c) return;
+    if (loot.gold) c.equipment.gold += loot.gold;
+    if (loot.items) c.inventory = changeItems(inventoryOf(c), loot.items);
+    persist();
+  };
+  /** Remplace le sac à dos (et les PV) après avoir bu une potion ou combattu. */
+  const setInventory = (id: string, inventory: Record<string, number>) => {
+    const c = list.value.find((x) => x.id === id);
+    if (c) { c.inventory = { ...inventory }; persist(); }
   };
   const get = (id: string) => list.value.find((c) => c.id === id);
 
-  return { list, add, remove, get, setVitals, setExploration, setStory };
+  return { list, add, remove, get, setVitals, setExploration, setStory, addLoot, setInventory };
 });
 
 export function newId(): string {

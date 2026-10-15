@@ -4,10 +4,11 @@ import { SPECIES } from "../data/species";
 import { ARMORS, WEAPONS } from "../data/equipment";
 import { artKey } from "../data/illustrations";
 import { CONDITIONS } from "../data/conditions";
+import { ITEMS, ITEM_KIND_NAMES } from "../data/items";
 import { SPELLS, isPlayable } from "../data/spells";
 import { BACKGROUND_TEXT, WEAPON_PROPERTY_TEXT } from "../data/help";
 
-export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors" | "spells" | "conditions";
+export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors" | "spells" | "conditions" | "items";
 
 export const HELP_KINDS: Record<HelpKind, { title: string; singular: string }> = {
   classes: { title: "Classes", singular: "Classe" },
@@ -17,6 +18,7 @@ export const HELP_KINDS: Record<HelpKind, { title: string; singular: string }> =
   armors: { title: "Armures", singular: "Armure" },
   spells: { title: "Sorts", singular: "Sort" },
   conditions: { title: "États", singular: "État" },
+  items: { title: "Objets", singular: "Objet" },
 };
 
 export const isHelpKind = (k: string): k is HelpKind => k in HELP_KINDS;
@@ -37,6 +39,8 @@ export function helpEntries(kind: HelpKind): { id: string; name: string; summary
         id: sp.id, name: sp.name,
         summary: `${sp.level === 0 ? "Sort mineur" : "Niveau 1"} · ${sp.school}${isPlayable(sp) ? "" : " · pas encore jouable en combat"}`,
       }));
+  if (kind === "items")
+    return ITEMS.map((i) => ({ id: i.id, name: i.name, summary: `${ITEM_KIND_NAMES[i.kind]}${i.value ? ` · ${i.value} po` : ""} · ${i.text}` }));
   if (kind === "conditions")
     return CONDITIONS.map((c) => ({ id: c.id, name: c.name, summary: `${c.status === "applied" ? "Appliqué en combat" : "Pas encore appliqué"} · ${c.text}` }));
   if (kind === "armors")

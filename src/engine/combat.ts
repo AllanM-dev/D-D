@@ -30,7 +30,7 @@ export interface AttackDef {
 }
 
 /** Capacités de classe utilisables en combat (toutes en action bonus). */
-export type FeatureId = "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts";
+export type FeatureId = "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts" | "potion";
 
 export interface FeatureUse {
   id: FeatureId;
@@ -47,6 +47,7 @@ export const FEATURE_LABELS: Record<FeatureId, string> = {
   "lay-on-hands": "Imposition des mains",
   "innate-sorcery": "Magie innée",
   "martial-arts": "Frappe bonus (arts martiaux)",
+  potion: "Boire une potion de soin",
 };
 
 /** Capacité d'incantation d'un combattant (voir `spellcasting.ts`). */
@@ -809,6 +810,7 @@ export function availableBonus(state: CombatState, c: Combatant): FeatureOption[
     const label = FEATURE_LABELS[f.id];
     if (f.id === "second-wind" && missing > 0) out.push({ id: f.id, label, detail: `${f.uses}/${f.max} · 1d10 + niveau PV` });
     else if (f.id === "lay-on-hands" && missing > 0) out.push({ id: f.id, label, detail: `réserve ${f.uses}/${f.max} PV`, amountMax: Math.min(f.uses, missing) });
+    else if (f.id === "potion" && missing > 0) out.push({ id: f.id, label, detail: `${f.uses} dans le sac · 2d4 + 2 PV` });
     else if (f.id === "rage" && !c.raging) out.push({ id: f.id, label, detail: `${f.uses}/${f.max}` });
     else if (f.id === "innate-sorcery" && !c.innateSorcery) out.push({ id: f.id, label, detail: `${f.uses}/${f.max}` });
     else if (f.id === "martial-arts" && c.turnState.attacked && enemiesAlive && c.attacks.some((a) => a.unarmed))
@@ -913,6 +915,18 @@ export function useFeature(state: CombatState, id: FeatureId, rng: Rng = Math.ra
       pushRoll(state, {
         kind: "heal", actorId: cur.id, actorName: cur.name, side: cur.side, title: `Second souffle de ${cur.name}`,
         sides: 10, dice: [die], modifier: cur.level, total: healed, outcome: "success",
+      });
+      break;
+    }
+    case "potion": {
+      const dice = [rollDie(4, rng), rollDie(4, rng)];
+      f.uses -= 1;
+      f.max -= 1;
+      const healed = healCombatant(state, cur, dice[0] + dice[1] + 2);
+      state.log.push(`${cur.name} boit une potion de soin (2d4 + 2 = ${dice[0] + dice[1] + 2}).`);
+      pushRoll(state, {
+        kind: "heal", actorId: cur.id, actorName: cur.name, side: cur.side, title: `Potion de soin de ${cur.name}`,
+        sides: 4, dice, modifier: 2, total: healed, outcome: "success",
       });
       break;
     }

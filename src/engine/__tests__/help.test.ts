@@ -1,3 +1,4 @@
+import { ITEMS } from "../../data/items";
 import { CONDITIONS } from "../../data/conditions";
 import { describe, expect, it } from "vitest";
 import { BACKGROUNDS } from "../../data/backgrounds";
@@ -56,7 +57,7 @@ describe("contenu de la page Aide", () => {
     }
   });
   it("liste toutes les entrées de chaque section d'aide", () => {
-    const counts: Record<HelpKind, number> = { classes: CLASSES.length, species: SPECIES.length, backgrounds: BACKGROUNDS.length, weapons: WEAPONS.length, armors: ARMORS.length, spells: SPELLS.length, conditions: CONDITIONS.length };
+    const counts: Record<HelpKind, number> = { classes: CLASSES.length, species: SPECIES.length, backgrounds: BACKGROUNDS.length, weapons: WEAPONS.length, armors: ARMORS.length, spells: SPELLS.length, conditions: CONDITIONS.length, items: ITEMS.length };
     for (const k of Object.keys(HELP_KINDS) as HelpKind[]) {
       const entries = helpEntries(k);
       expect(entries.length, k).toBe(counts[k]);

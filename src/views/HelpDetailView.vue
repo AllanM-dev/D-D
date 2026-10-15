@@ -96,6 +96,16 @@
         </p>
       </template>
 
+      <!-- Objet -->
+      <template v-else-if="item">
+        <ion-list inset>
+          <ion-item><ion-label>Type</ion-label><ion-note slot="end">{{ ITEM_KIND_NAMES[item.kind] }}</ion-note></ion-item>
+          <ion-item v-if="item.value"><ion-label>Valeur</ion-label><ion-note slot="end">{{ item.value }} po</ion-note></ion-item>
+        </ion-list>
+        <p>{{ item.text }}</p>
+        <p class="status applied"><strong>Dans l'application.</strong> {{ item.note }}</p>
+      </template>
+
       <!-- État -->
       <template v-else-if="cond">
         <p>{{ cond.text }}</p>
@@ -200,6 +210,7 @@ import {
   WEAPON_PROPERTY_TEXT, WEAPON_TRAINING_TEXT,
 } from "../data/help";
 import { CONDITION_BY_ID } from "../data/conditions";
+import { ITEM_BY_ID, ITEM_KIND_NAMES } from "../data/items";
 import { CLASS_SPELLCASTING, SPELL_BY_ID, isPlayable } from "../data/spells";
 import { kitsFor } from "../engine/equipment";
 import { SKILLS, type SkillId } from "../data/skills";
@@ -216,6 +227,7 @@ const cls = computed(() => (kind.value === "classes" ? CLASSES.find((c) => c.id 
 const sp = computed(() => (kind.value === "species" ? SPECIES.find((s) => s.id === id.value) : undefined));
 const bg = computed(() => (kind.value === "backgrounds" ? BACKGROUNDS.find((b) => b.id === id.value) : undefined));
 const sp2 = computed(() => (kind.value === "spells" ? SPELL_BY_ID[id.value] : undefined));
+const item = computed(() => (kind.value === "items" ? ITEM_BY_ID[id.value] : undefined));
 const cond = computed(() => (kind.value === "conditions" ? CONDITION_BY_ID[id.value] : undefined));
 const spellCfg = computed(() => (cls.value ? CLASS_SPELLCASTING[cls.value.id] : undefined));
 const TIME_LABEL: Record<string, string> = { action: "Action", bonus: "Action bonus", reaction: "Réaction" };
@@ -223,7 +235,7 @@ const className = (id: string) => CLASSES.find((c) => c.id === id)?.name ?? id;
 const wp = computed(() => (kind.value === "weapons" ? WEAPONS.find((w) => w.id === id.value) : undefined));
 const ar = computed(() => (kind.value === "armors" ? ARMORS.find((a) => a.id === id.value) : undefined));
 const heroArt = computed(() => helpArt(kind.value, id.value));
-const title = computed(() => cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? sp2.value?.name ?? cond.value?.name ?? "Aide");
+const title = computed(() => cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? sp2.value?.name ?? cond.value?.name ?? item.value?.name ?? "Aide");
 const training = computed(() => CLASS_TRAINING[cls.value?.id ?? ""]);
 const kits = computed(() => (cls.value ? kitsFor(cls.value.id) : []));
 const kitLines = (k: Kit) =>

@@ -31,6 +31,7 @@ const items = [
   { path: "/help/backgrounds", label: "Historiques", sub: true },
   { path: "/help/spells", label: "Sorts", sub: true },
   { path: "/help/conditions", label: "États", sub: true },
+  { path: "/help/items", label: "Objets", sub: true },
   { path: "/help/weapons", label: "Armes", sub: true },
   { path: "/help/armors", label: "Armures", sub: true },
   { path: "/help/abilities", label: "Caractéristiques", sub: true },

@@ -84,6 +84,8 @@ export interface Character {
   exploration?: ExplorationState;
   /** Drapeaux de l'histoire (voir `story.ts`). */
   story?: StoryProgress;
+  /** Objets du sac à dos : identifiant → quantité (voir `inventory.ts`). */
+  inventory?: Record<string, number>;
 }
 
 const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id);

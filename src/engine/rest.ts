@@ -46,7 +46,7 @@ export function vitalsAfterCombat(c: Character, state: CombatState): Vitals {
   const before = vitalsOf(c);
   const me = getCombatant(state, c.id);
   const features = { ...before.features };
-  for (const f of me.features) if (!f.unlimited) features[f.id] = f.uses;
+  for (const f of me.features) if (!f.unlimited && f.id !== "potion") features[f.id] = f.uses;
   const free = { ...before.free };
   for (const f of me.spellcasting?.free ?? []) free[f.spellId] = f.uses;
   return { ...before, hp: Math.max(1, me.hp), features, slotsUsed: me.spellcasting?.slots.used ?? before.slotsUsed, free };
