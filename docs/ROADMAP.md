@@ -37,7 +37,8 @@
 - [x] Carte d'exploration (lot 1) : cases de 1,5 m, déplacement au toucher, brouillard et ligne de vue, ennemis visibles qui lancent le combat, position enregistrée ; carte « Brumeval et ses environs »
 - [ ] Carte : personnages non joueurs, objets, portes verrouillées, pièges, plusieurs cartes reliées
 - [x] Format de scénario (scènes, choix conditionnés par des drapeaux, tests de compétence, combats, or) ; lieux et personnages « ! » sur la carte, portes verrouillées ; première quête « Les morts de Brumeval » (maire, aubergiste, porte de la crypte)
-- [ ] Une aventure courte jouable de bout en bout
+- [x] Une aventure courte jouable de bout en bout : « Les morts de Brumeval » (village, crypte à deux cartes reliées, deux fins possibles, récompense en or) ; cartes reliées par des passages, zones explorées gardées par carte
+- [ ] Aventure : expérience et montée de niveau, inventaire et butin, autres aventures
 - [ ] Inventaire
 
 ## Plus tard

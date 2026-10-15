@@ -16,6 +16,8 @@ export interface Effects {
   set?: string[];
   unset?: string[];
   gold?: number;
+  /** Ennemis de la carte qui disparaissent (identifiants de la carte) : ils laissent le drapeau `defeated:<id>`. */
+  defeat?: string[];
 }
 
 export interface Choice extends Effects {
@@ -34,7 +36,7 @@ export interface Choice extends Effects {
     onFailure?: Effects;
   };
   /** Combat : le joueur se bat, puis la suite dépend du résultat. */
-  fight?: { encounterId: string; win: string; lose?: string };
+  fight?: { encounterId: string; /** Ennemi de la carte affronté : il disparaît s'il est vaincu. */ enemy?: string; win: string; lose?: string };
   /** Quitte l'histoire et revient à la carte. */
   end?: boolean;
   /** Le choix ne peut être pris qu'une fois. */
@@ -129,6 +131,7 @@ const maire: Scene[] = [
       "Vous racontez ce que vous avez affronté. Odile écoute en silence, puis dépose dans votre main une bourse.",
     ],
     textIf: [
+      { requires: { flags: ["goule-apaisee"] }, text: ["Vous lui dites que le gardien est mort en paix, qu'il s'agissait du père de Thibaud. Odile ferme les yeux. « Gédéon… Il nous aura protégés jusqu'au bout. Vous avez fait plus que nous vous demandions. »"] },
       { requires: { flags: ["recompense-haute"] }, text: ["« Cinquante pièces d'or, comme promis. C'est peu pour ce que vous avez fait. Brumeval n'oubliera pas. »"] },
       { requires: { notFlags: ["recompense-haute"] }, text: ["« Vingt pièces d'or. C'est peu pour ce que vous avez fait. Brumeval n'oubliera pas. »"] },
     ],
@@ -146,9 +149,12 @@ const aubergiste: Scene[] = [
     ],
     textIf: [
       { requires: { flags: ["cle-crypte"] }, text: ["Il vous lance un regard en coin. « Vous avez la clé. Ne me la rendez pas, je préfère ne plus la voir. »"] },
+      { requires: { flags: ["goule-apaisee"] }, text: ["Thibaud a les yeux rouges. « On m'a dit ce que vous avez fait pour mon père. Je n'ai pas de mots. La maison vous offre le gîte, quand vous voulez. »"] },
+      { requires: { flags: ["defeated:ghoul-1"], notFlags: ["goule-apaisee"] }, text: ["Thibaud évite votre regard. « Vous avez fait ce qu'il fallait. Je le sais. Je ne l'accepte pas encore, c'est tout. »"] },
     ],
     choices: [
       { text: "La maire m'envoie : je voudrais la clé de la crypte.", requires: { flags: ["quete-acceptee"], notFlags: ["cle-crypte"] }, goto: "aubergiste-cle" },
+      { text: "Léo dit que votre père a disparu dans la crypte. C'est vrai ?", requires: { flags: ["pere-disparu"], notFlags: ["histoire-pere"] }, check: { skill: "insight", dc: 12, success: "aubergiste-pere", failure: "aubergiste-pere-ko" } },
       { text: "Observer la salle d'un œil attentif.", requires: { notFlags: ["indice-cave"] }, check: { skill: "perception", dc: 11, success: "aubergiste-indice", failure: "aubergiste-rien", onSuccess: { set: ["indice-cave"] } } },
       { text: "Écouter les rumeurs du village.", goto: "aubergiste-rumeurs" },
       { text: "Je vous laisse.", end: true },
@@ -233,11 +239,157 @@ const crypte: Scene[] = [
   },
 ];
 
+
+const village: Scene[] = [
+  {
+    id: "leo",
+    title: "Léo, fils du meunier",
+    text: [
+      "Un garçon d'une douzaine d'années, assis sur un tas de sacs, vous observe sans oser parler. Ses doigts tordent sans cesse le bord de sa chemise.",
+    ],
+    textIf: [{ requires: { flags: ["pere-disparu"] }, text: ["« Je vous ai tout dit, m'sieur. Faites juste attention là-bas. »"] }],
+    choices: [
+      { text: "Raconter ce que tu as vu, mon garçon.", requires: { notFlags: ["pere-disparu"] }, goto: "leo-recit" },
+      { text: "Le rassurer.", requires: { flags: ["pere-disparu"] }, goto: "leo-rassure" },
+      { text: "Je repasserai.", end: true },
+    ],
+  },
+  {
+    id: "leo-recit",
+    title: "Léo, fils du meunier",
+    text: [
+      "« J'ai vu une silhouette sortir de la crypte, cette nuit-là. Elle marchait courbée, comme un vieillard. Elle est entrée dans l'auberge par la cave… et elle y a laissé des empreintes. »",
+      "Il baisse la voix. « On dit que le père de Thibaud est entré dans la crypte il y a des années, pour ne jamais en ressortir. Je crois que c'est lui. »",
+    ],
+    choices: [{ text: "Merci, Léo.", goto: "leo-rassure", set: ["pere-disparu"] }],
+  },
+  {
+    id: "leo-rassure",
+    title: "Léo, fils du meunier",
+    text: ["Léo hoche la tête, un peu moins pâle. « Vous direz à Thibaud que je n'ai rien dit de méchant ? »"],
+    choices: [{ text: "Je lui dirai.", end: true }],
+  },
+  {
+    id: "aubergiste-pere",
+    title: "Thibaud, l'aubergiste",
+    text: [
+      "Thibaud repose lentement son gobelet. Sa voix se brise. « Mon père, Gédéon, gardait cette crypte. Un soir, il est descendu pour réparer un sceau et n'est jamais remonté. J'ai gardé la clé comme on garde un deuil. »",
+      "Il sort la clé de sous le comptoir et la tend vers vous. « Si c'est lui… ne le laissez pas souffrir. »",
+    ],
+    choices: [{ text: "Prendre la clé, avec respect.", goto: "aubergiste", set: ["cle-crypte", "histoire-pere"] }],
+  },
+  {
+    id: "aubergiste-pere-ko",
+    title: "Thibaud, l'aubergiste",
+    text: ["Thibaud se ferme comme une huître. « Je ne sais pas de quoi vous parlez. Les enfants racontent n'importe quoi. »"],
+    choices: [{ text: "Revenir au comptoir.", goto: "aubergiste" }],
+  },
+];
+
+const crypteInterieur: Scene[] = [
+  {
+    id: "journal",
+    title: "Le journal du gardien",
+    text: [
+      "Sur une table basse, sous une épaisse couche de poussière, repose un cahier à la couverture rongée. L'écriture, tremblante, couvre des pages entières.",
+    ],
+    textIf: [{ requires: { flags: ["journal-lu"] }, text: ["Vous avez déjà lu ces pages : Gédéon, le gardien, s'est enfermé ici pour ne pas contaminer le village."] }],
+    choices: [
+      { text: "Lire le journal.", requires: { notFlags: ["journal-lu"] }, goto: "journal-lecture" },
+      { text: "Refermer le cahier.", end: true },
+    ],
+  },
+  {
+    id: "journal-lecture",
+    title: "Le journal du gardien",
+    text: [
+      "« … le sceau s'est fissuré la nuit de l'orage. Quelque chose est monté de la terre et m'a mordu. Je sens le froid gagner mes bras. Je ne veux pas être un danger pour Brumeval. »",
+      "« J'ai verrouillé la porte de la salle du fond et scellé l'entrée. Si je deviens ce que je redoute, qu'on récite sur ma tombe la prière du repos : « Que la terre te soit légère, que la nuit te soit douce, repose-toi, gardien. » »",
+    ],
+    choices: [{ text: "Refermer le journal.", end: true, set: ["journal-lu"] }],
+  },
+  {
+    id: "coffre",
+    title: "Un coffre ancien",
+    text: ["Un coffre de bois cerclé de cuivre, sans serrure, dort sous un linceul de toiles d'araignée. À l'intérieur, une petite bourse de cuir : les économies d'un gardien oublié."],
+    choices: [
+      { text: "Prendre la bourse (30 pièces d'or).", end: true, gold: 30, set: ["coffre-pris"] },
+      { text: "Laisser le coffre en paix.", end: true },
+    ],
+  },
+  {
+    id: "sceau",
+    title: "La porte scellée",
+    text: [
+      "Une porte de pierre, gravée de runes pâles, ferme la salle du fond. Au centre, un sceau de cire noire est fendu, mais retient encore la porte. Quelque chose bouge derrière, lentement.",
+    ],
+    choices: [
+      { text: "Réciter la prière du journal.", requires: { flags: ["journal-lu"] }, goto: "sceau-ouvert", set: ["sceau-brise"] },
+      { text: "Déchiffrer les runes.", check: { skill: "religion", dc: 12, success: "sceau-ouvert", failure: "sceau-echec", onSuccess: { set: ["sceau-brise"] } } },
+      { text: "Chercher le mécanisme caché.", check: { skill: "investigation", dc: 13, success: "sceau-ouvert", failure: "sceau-echec", onSuccess: { set: ["sceau-brise"] } } },
+      { text: "Pousser la porte de toutes vos forces.", check: { skill: "athletics", dc: 15, success: "sceau-ouvert", failure: "sceau-echec", onSuccess: { set: ["sceau-brise"] } } },
+      { text: "S'éloigner.", end: true },
+    ],
+  },
+  {
+    id: "sceau-ouvert",
+    title: "La porte scellée",
+    text: ["Les runes s'éteignent une à une. La porte glisse dans la roche avec un grondement sourd. Une odeur de terre froide et de cire brûlée vous atteint : la salle du gardien s'ouvre devant vous."],
+    choices: [{ text: "Avancer.", end: true }],
+  },
+  {
+    id: "sceau-echec",
+    title: "La porte scellée",
+    text: ["Rien ne cède. Vous avez l'impression que la porte vous observe. Peut-être vaut-il mieux chercher un indice ailleurs dans la crypte, ou tenter une autre approche."],
+    choices: [{ text: "Réfléchir.", goto: "sceau" }],
+  },
+  {
+    id: "autel",
+    title: "L'autel du gardien",
+    text: [
+      "Au fond de la salle, une silhouette voûtée est assise contre un sarcophage de pierre, la tête baissée. Des lambeaux de vêtements pendent à son corps maigre. Vous reconnaissez la veste du gardien décrite par les villageois.",
+      "Elle ne vous a pas encore remarqué. Devant vous, un petit autel, couvert de cire fondue, semble attendre une prière.",
+    ],
+    choices: [
+      { text: "Réciter la prière du repos.", requires: { flags: ["journal-lu"] }, check: { skill: "religion", dc: 13, success: "autel-paix", failure: "autel-colere", onSuccess: { set: ["goule-apaisee"], defeat: ["ghoul-1"] } } },
+      { text: "Réveiller la créature et se battre.", fight: { encounterId: "ghoul", enemy: "ghoul-1", win: "autel-victoire", lose: "autel-defaite" } },
+      { text: "Reculer silencieusement.", end: true },
+    ],
+  },
+  {
+    id: "autel-paix",
+    title: "L'autel du gardien",
+    text: [
+      "Vous récitez la prière à voix basse. La silhouette frémit, lève un visage ravagé, puis l'ombre qui la tourmente s'effrite. Le gardien pousse un long soupir… et ne bouge plus. Un sourire fatigué flotte sur ses lèvres.",
+      "« Merci », murmure-t-il d'une voix qui n'est plus qu'un souffle. Puis il n'est plus qu'un vieil homme en paix.",
+    ],
+    choices: [{ text: "Poser une main sur l'épaule du gardien et quitter la salle.", end: true }],
+  },
+  {
+    id: "autel-colere",
+    title: "L'autel du gardien",
+    text: ["Votre voix tremble, les mots se mélangent. La silhouette lève la tête d'un coup : ses yeux sont deux braises. Elle se redresse en grondant et se jette sur vous !"],
+    choices: [{ text: "Se battre !", fight: { encounterId: "ghoul", enemy: "ghoul-1", win: "autel-victoire", lose: "autel-defaite" } }],
+  },
+  {
+    id: "autel-victoire",
+    title: "L'autel du gardien",
+    text: ["La créature s'effondre dans un râle. Le silence retombe dans la crypte. Il ne reste qu'un vieil homme dont les traits se détendent enfin."],
+    choices: [{ text: "Sortir de la salle.", end: true }],
+  },
+  {
+    id: "autel-defaite",
+    title: "L'autel du gardien",
+    text: ["Les ténèbres vous engloutissent… puis vous revenez à vous sur la place de Brumeval, avec une odeur de terre dans la gorge et un mal de crâne persistant. Quelqu'un vous a ramené."],
+    choices: [{ text: "Se relever, courbaturé.", end: true }],
+  },
+];
+
 export const STORIES: readonly StoryDef[] = [
   {
     id: "brumeval",
     title: "Les morts de Brumeval",
-    scenes: Object.fromEntries([...maire, ...aubergiste, ...crypte].map((s) => [s.id, s])),
+    scenes: Object.fromEntries([...maire, ...aubergiste, ...crypte, ...village, ...crypteInterieur].map((s) => [s.id, s])),
   },
 ];
 

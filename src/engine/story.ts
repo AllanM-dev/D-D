@@ -40,19 +40,23 @@ export interface Applied {
   flags: string[];
   /** Or gagné (ou dépensé si négatif). */
   gold: number;
+  /** Ennemis de la carte à faire disparaître. */
+  defeated: string[];
 }
 
 /** Applique des effets à une liste de drapeaux. */
 export function applyEffects(flags: readonly string[], ...effects: (Effects | undefined)[]): Applied {
   let out = [...flags];
   let gold = 0;
+  const defeated: string[] = [];
   for (const e of effects) {
     if (!e) continue;
+    for (const id of e.defeat ?? []) { defeated.push(id); if (!out.includes(`defeated:${id}`)) out.push(`defeated:${id}`); }
     for (const f of e.set ?? []) if (!out.includes(f)) out.push(f);
     out = out.filter((f) => !(e.unset ?? []).includes(f));
     gold += e.gold ?? 0;
   }
-  return { flags: out, gold };
+  return { flags: out, gold, defeated };
 }
 
 /** Pose les drapeaux d'arrivée d'une scène. */
@@ -81,9 +85,11 @@ export function rollCheck(skill: SkillId, dc: number, bonus: number, rng: Rng = 
 export interface ChoiceOutcome {
   flags: string[];
   gold: number;
+  /** Ennemis de la carte à faire disparaître. */
+  defeated: string[];
   /** Scène suivante (absente si le choix quitte l'histoire ou lance un combat). */
   next?: string;
-  fight?: { encounterId: string; win: string; lose?: string };
+  fight?: { encounterId: string; enemy?: string; win: string; lose?: string };
   end?: boolean;
   check?: CheckResult;
 }
@@ -97,7 +103,7 @@ export function resolveChoice(
 ): ChoiceOutcome {
   const choice = scene.choices[index];
   if (!choice || !availableChoices(scene, flags).some((c) => c.index === index)) throw new Error("Choix impossible.");
-  const base: Effects = { set: [...(choice.set ?? []), ...(choice.once ? [onceFlag(scene.id, index)] : [])], unset: choice.unset, gold: choice.gold };
+  const base: Effects = { set: [...(choice.set ?? []), ...(choice.once ? [onceFlag(scene.id, index)] : [])], unset: choice.unset, gold: choice.gold, defeat: choice.defeat };
   if (choice.check) {
     const c = choice.check;
     const check = rollCheck(c.skill, c.dc, skillBonus(c.skill), rng);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAP_BY_ID } from "../../data/maps";
+import { MAPS, MAP_BY_ID } from "../../data/maps";
 import { STORIES, STORY_BY_ID, type Scene } from "../../data/stories";
 import { liveSpots, lockedCells, planPath, startExploration, stepTo, validateMap } from "../exploration";
 import {
@@ -91,7 +91,7 @@ describe("résolution des choix", () => {
 describe("histoires", () => {
   it("chaque histoire est valide : scènes existantes, une issue par choix, compétences et rencontres connues", () => {
     for (const s of STORIES) {
-      const spots = MAP_BY_ID.brumeval.spots!.filter((x) => x.story === s.id).map((x) => x.scene);
+      const spots = MAPS.flatMap((m) => m.spots ?? []).filter((x) => x.story === s.id).map((x) => x.scene);
       expect(validateStory(s, spots[0]), s.id).toEqual([]);
       // aucune scène orpheline : tout est atteignable depuis les lieux de la carte
       expect(unreachableScenes(s, spots), s.id).toEqual([]);
@@ -102,10 +102,13 @@ describe("histoires", () => {
     expect(validateStory(broken, "a").length).toBeGreaterThanOrEqual(3);
   });
   it("tous les lieux de la carte pointent vers une scène existante", () => {
-    for (const sp of MAP_BY_ID.brumeval.spots!) expect(STORY_BY_ID[sp.story]?.scenes[sp.scene], sp.id).toBeTruthy();
+    for (const m of MAPS) for (const sp of m.spots ?? []) expect(STORY_BY_ID[sp.story]?.scenes[sp.scene], sp.id).toBeTruthy();
+    // les combats d'histoire visent des ennemis qui existent sur une carte
+    const enemies = new Set(MAPS.flatMap((m) => m.enemies.map((e) => e.id)));
+    for (const sc of Object.values(story.scenes)) for (const c of sc.choices) if (c.fight?.enemy) expect(enemies.has(c.fight.enemy), c.fight.enemy).toBe(true);
   });
 
-  it("la quête de Brumeval se joue de bout en bout (or, clé, porte, victoire contre la goule)", () => {
+  it("la quête de Brumeval en combat (or, clé, porte, victoire contre la goule)", () => {
     const scenes = story.scenes;
     const pick = (scene: string, text: string, flags: string[], b = 5, r: Rng = roll(15)) => {
       const i = availableChoices(scenes[scene], flags).find((c) => c.choice.text.startsWith(text))?.index ?? -1;
@@ -142,6 +145,69 @@ describe("histoires", () => {
     const flags = [...o.flags, "recompense-haute", "quete-acceptee", "defeated:ghoul-1"];
     const j = scenes.maire.choices.findIndex((c) => c.text.startsWith("Je reviens") && c.gold === 50);
     expect(resolveChoice(scenes.maire, j, flags, bonus(0)).gold).toBe(50);
+  });
+});
+
+describe("aventure complète", () => {
+  const scenes = story.scenes;
+  const pick = (scene: string, text: string, flags: string[], b = 5, r: Rng = roll(15)) => {
+    const i = availableChoices(scenes[scene], flags).find((c) => c.choice.text.startsWith(text))?.index ?? -1;
+    expect(i, `${scene} / ${text}`).toBeGreaterThanOrEqual(0);
+    return resolveChoice(scenes[scene], i, flags, bonus(b), r);
+  };
+  it("voie pacifique : témoin, père, journal, sceau, prière, apaisement, fin chez la maire", () => {
+    let flags: string[] = [];
+    let gold = 0;
+    const apply = (o: { flags: string[]; gold: number }) => { flags = o.flags; gold += o.gold; };
+    apply(pick("leo", "Raconter", flags));
+    apply(pick("leo-recit", "Merci", flags));
+    expect(flags).toContain("pere-disparu");
+    apply(pick("maire", "J'accepte", flags));
+    // le père : Perspicacité réussie → clé sans marchander
+    const pere = pick("aubergiste", "Léo dit", flags);
+    expect(pere.next).toBe("aubergiste-pere");
+    apply(pick("aubergiste-pere", "Prendre la clé", flags));
+    expect(flags).toEqual(expect.arrayContaining(["cle-crypte", "histoire-pere"]));
+    apply(pick("crypte", "Ouvrir avec la clé", flags));
+    apply(pick("journal", "Lire", flags));
+    apply(pick("journal-lecture", "Refermer", flags));
+    expect(flags).toContain("journal-lu");
+    apply(pick("coffre", "Prendre la bourse", flags));
+    expect(gold).toBe(30);
+    expect(flags).toContain("coffre-pris");
+    const sceau = pick("sceau", "Réciter", flags); // sans test : la prière du journal suffit
+    expect(sceau.check).toBeUndefined();
+    apply(sceau);
+    expect(flags).toContain("sceau-brise");
+    const prière = pick("autel", "Réciter", flags, 5, roll(10)); // 10 + 5 = 15 ≥ 13
+    expect(prière.next).toBe("autel-paix");
+    expect(prière.defeated).toEqual(["ghoul-1"]);
+    apply(prière);
+    expect(flags).toEqual(expect.arrayContaining(["goule-apaisee", "defeated:ghoul-1"]));
+    // l'autel n'est plus utile, la maire conclut avec le texte du gardien
+    expect(sceneText(scenes["maire-fin"], flags).join(" ")).toContain("Gédéon");
+    apply(pick("maire", "Je reviens", flags));
+    expect(flags).toContain("quete-terminee");
+    expect(gold).toBe(50);
+  });
+  it("sans le journal, la prière du repos n'est pas proposée ; l'échec du jet réveille la goule", () => {
+    expect(availableChoices(scenes.autel, []).some((c) => c.choice.text.startsWith("Réciter"))).toBe(false);
+    const o = pick("autel", "Réciter", ["journal-lu"], 0, roll(2));
+    expect(o.next).toBe("autel-colere");
+    expect(o.defeated).toEqual([]);
+    expect(pick("autel-colere", "Se battre", []).fight).toMatchObject({ encounterId: "ghoul", enemy: "ghoul-1" });
+  });
+  it("le sceau peut aussi être brisé par un test (Religion), et un échec ne bloque pas", () => {
+    const ok = pick("sceau", "Déchiffrer", [], 0, roll(14));
+    expect(ok.flags).toContain("sceau-brise");
+    const ko = pick("sceau", "Déchiffrer", [], 0, roll(3));
+    expect(ko.flags).not.toContain("sceau-brise");
+    expect(ko.next).toBe("sceau-echec");
+    expect(scenes["sceau-echec"].choices[0].goto).toBe("sceau");
+  });
+  it("le coffre ne se prend qu'une fois : le lieu disparaît de la carte", () => {
+    const coffre = MAP_BY_ID.crypte.spots!.find((x) => x.id === "coffre")!;
+    expect(coffre.hiddenWhen).toBe("coffre-pris");
   });
 });
 

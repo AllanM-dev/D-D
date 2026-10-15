@@ -1,4 +1,4 @@
-import { MAP_BY_ID, OPAQUE, PASSABLE, TILE_CHARS, type MapDef, type MapEnemy, type MapSpot, type TileKind } from "../data/maps";
+import { MAPS, MAP_BY_ID, OPAQUE, PASSABLE, TILE_CHARS, type MapDef, type MapEnemy, type MapExit, type MapSpot, type TileKind } from "../data/maps";
 
 /** Une case de la carte fait 1,5 m. */
 export const CELL_METERS = 1.5;
@@ -15,8 +15,10 @@ export interface ExplorationState {
   mapId: string;
   x: number;
   y: number;
-  /** Cases déjà vues, « x,y ». */
+  /** Cases déjà vues sur la carte actuelle, « x,y ». */
   explored: string[];
+  /** Cases déjà vues sur les autres cartes visitées. */
+  others?: Record<string, string[]>;
   /** Ennemis vaincus (identifiants de la carte). */
   defeated: string[];
 }
@@ -65,6 +67,12 @@ export function validateMap(map: MapDef): string[] {
   }
   for (const sp of map.spots ?? []) if (!walkable(g, sp)) errors.push(`${map.id} : lieu ${sp.id} sur une case infranchissable`);
   for (const l of map.locks ?? []) if (!walkable(g, l)) errors.push(`${map.id} : verrou en ${l.x},${l.y} sur une case infranchissable`);
+  for (const ex of map.exits ?? []) {
+    if (!walkable(g, ex)) errors.push(`${map.id} : passage en ${ex.x},${ex.y} sur une case infranchissable`);
+    const dest = MAP_BY_ID[ex.to.map];
+    if (!dest) errors.push(`${map.id} : passage vers une carte inconnue (${ex.to.map})`);
+    else if (!walkable(parseMap(dest), ex.to)) errors.push(`${map.id} : arrivée en ${ex.to.x},${ex.to.y} de ${ex.to.map} infranchissable`);
+  }
   const reach = reachableFrom(g, map.start);
   for (const e of map.enemies) if (walkable(g, e) && !reach.has(key(e))) errors.push(`${map.id} : ${e.id} inatteignable`);
   return errors;
@@ -197,6 +205,8 @@ export interface StepResult {
   spotted: MapEnemy[];
   /** Ennemi au contact après ce pas : la rencontre commence. */
   ambush?: MapEnemy;
+  /** Le pas mène à un passage vers une autre carte. */
+  travel?: MapExit;
 }
 
 /** Un pas vers une case voisine libre. Lève une erreur si le pas est impossible. */
@@ -208,7 +218,8 @@ export function stepTo(st: ExplorationState, to: Cell, flags: readonly string[] 
   st.y = to.y;
   const spotted = reveal(map, st);
   const ambush = livingEnemies(map, st).find((e) => cellDistance(e, st) <= 1);
-  return { spotted, ambush };
+  const travel = ambush ? undefined : (map.exits ?? []).find((e) => same(e, st));
+  return { spotted, ambush, travel };
 }
 
 export interface Plan {
@@ -249,10 +260,23 @@ export function defeatEnemy(st: ExplorationState, enemyId: string): ExplorationS
   return st.defeated.includes(enemyId) ? st : { ...st, defeated: [...st.defeated, enemyId] };
 }
 
-/** Après une défaite, le héros se réveille au point de départ. */
+/** Passe par un passage : le héros arrive sur l'autre carte, qui garde ses zones déjà explorées. */
+export function travelTo(st: ExplorationState, exit: MapExit): ExplorationState {
+  const dest = MAP_BY_ID[exit.to.map];
+  if (!dest) throw new Error(`Carte inconnue : ${exit.to.map}`);
+  const others = { ...(st.others ?? {}), [st.mapId]: [...st.explored] };
+  const known = others[dest.id] ?? [];
+  delete others[dest.id];
+  const next: ExplorationState = { ...st, mapId: dest.id, x: exit.to.x, y: exit.to.y, explored: [...known], others };
+  reveal(dest, next);
+  return next;
+}
+
+/** Après une défaite, le héros se réveille au village (départ de la première carte). */
 export function retreatToStart(st: ExplorationState): ExplorationState {
-  const map = mapOf(st);
-  const next: ExplorationState = { ...st, x: map.start.x, y: map.start.y, explored: [...st.explored] };
-  reveal(map, next);
+  const home = MAPS[0];
+  const back = st.mapId === home.id ? st : travelTo(st, { x: st.x, y: st.y, label: "", to: { map: home.id, x: home.start.x, y: home.start.y } });
+  const next: ExplorationState = { ...back, x: home.start.x, y: home.start.y, explored: [...back.explored] };
+  reveal(home, next);
   return next;
 }
