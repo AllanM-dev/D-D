@@ -1,4 +1,4 @@
-import { MAP_BY_ID, OPAQUE, PASSABLE, TILE_CHARS, type MapDef, type MapEnemy, type TileKind } from "../data/maps";
+import { MAP_BY_ID, OPAQUE, PASSABLE, TILE_CHARS, type MapDef, type MapEnemy, type MapSpot, type TileKind } from "../data/maps";
 
 /** Une case de la carte fait 1,5 m. */
 export const CELL_METERS = 1.5;
@@ -63,6 +63,8 @@ export function validateMap(map: MapDef): string[] {
     seen.add(e.id);
     if (same(e, map.start)) errors.push(`${map.id} : ${e.id} sur le départ`);
   }
+  for (const sp of map.spots ?? []) if (!walkable(g, sp)) errors.push(`${map.id} : lieu ${sp.id} sur une case infranchissable`);
+  for (const l of map.locks ?? []) if (!walkable(g, l)) errors.push(`${map.id} : verrou en ${l.x},${l.y} sur une case infranchissable`);
   const reach = reachableFrom(g, map.start);
   for (const e of map.enemies) if (walkable(g, e) && !reach.has(key(e))) errors.push(`${map.id} : ${e.id} inatteignable`);
   return errors;
@@ -165,8 +167,14 @@ export const mapOf = (st: ExplorationState): MapDef => {
 
 /** Ennemis encore en vie sur la carte. */
 export const livingEnemies = (map: MapDef, st: ExplorationState): MapEnemy[] => map.enemies.filter((e) => !st.defeated.includes(e.id));
-/** Cases occupées par un ennemi vivant. */
-const enemyCells = (map: MapDef, st: ExplorationState) => new Set(livingEnemies(map, st).map(key));
+/** Lieux et personnages encore présents (selon les drapeaux de l'histoire). */
+export const liveSpots = (map: MapDef, flags: readonly string[] = []): MapSpot[] =>
+  (map.spots ?? []).filter((s) => !s.hiddenWhen || !flags.includes(s.hiddenWhen));
+/** Portes verrouillées qui le sont encore. */
+export const lockedCells = (map: MapDef, flags: readonly string[] = []) => (map.locks ?? []).filter((l) => !flags.includes(l.flag));
+/** Cases où l'on ne peut pas entrer : ennemis vivants, personnages, portes verrouillées. */
+const blockedCells = (map: MapDef, st: ExplorationState, flags: readonly string[]) =>
+  new Set([...livingEnemies(map, st), ...liveSpots(map, flags), ...lockedCells(map, flags)].map(key));
 
 /** Met à jour les cases explorées d'après la position. Renvoie les ennemis qui viennent d'apparaître. */
 function reveal(map: MapDef, st: ExplorationState): MapEnemy[] {
@@ -192,10 +200,10 @@ export interface StepResult {
 }
 
 /** Un pas vers une case voisine libre. Lève une erreur si le pas est impossible. */
-export function stepTo(st: ExplorationState, to: Cell): StepResult {
+export function stepTo(st: ExplorationState, to: Cell, flags: readonly string[] = []): StepResult {
   const map = mapOf(st);
   const g = parseMap(map);
-  if (cellDistance(st, to) !== 1 || !neighbors(g, st, enemyCells(map, st)).some((n) => same(n, to))) throw new Error("Pas impossible.");
+  if (cellDistance(st, to) !== 1 || !neighbors(g, st, blockedCells(map, st, flags)).some((n) => same(n, to))) throw new Error("Pas impossible.");
   st.x = to.x;
   st.y = to.y;
   const spotted = reveal(map, st);
@@ -203,26 +211,37 @@ export function stepTo(st: ExplorationState, to: Cell): StepResult {
   return { spotted, ambush };
 }
 
-/** Chemin vers une case libre, ou vers la case voisine d'un ennemi si la destination en porte un. */
-export function planPath(st: ExplorationState, target: Cell): { path: Cell[]; enemy?: MapEnemy } | null {
+export interface Plan {
+  path: Cell[];
+  /** La destination est un ennemi : le chemin s'arrête à son contact. */
+  enemy?: MapEnemy;
+  /** La destination est un lieu ou un personnage : le chemin s'arrête à côté. */
+  spot?: MapSpot;
+}
+
+/** Chemin vers une case libre, ou vers la case voisine d'un ennemi ou d'un lieu si la destination en porte un. */
+export function planPath(st: ExplorationState, target: Cell, flags: readonly string[] = []): Plan | null {
   const map = mapOf(st);
   const g = parseMap(map);
   const enemy = livingEnemies(map, st).find((e) => same(e, target));
-  const blocked = enemyCells(map, st);
-  if (!enemy) {
+  const spot = enemy ? undefined : liveSpots(map, flags).find((s) => same(s, target));
+  const blocked = blockedCells(map, st, flags);
+  if (!enemy && !spot) {
     const path = findPath(g, st, target, blocked);
     return path ? { path } : null;
   }
-  if (cellDistance(st, enemy) <= 1) return { path: [], enemy };
-  // Meilleure case voisine de l'ennemi.
+  const dest = (enemy ?? spot)!;
+  if (cellDistance(st, dest) <= 1) return { path: [], enemy, spot };
+  // Meilleure case voisine de la destination.
   let best: Cell[] | null = null;
   for (const d of DIRS) {
-    const n = { x: enemy.x + d.x, y: enemy.y + d.y };
+    const n = { x: dest.x + d.x, y: dest.y + d.y };
     if (!walkable(g, n) || blocked.has(key(n))) continue;
+    // Une diagonale ne peut pas couper un coin : on laisse `findPath` en juger.
     const p = findPath(g, st, n, blocked);
     if (p && (!best || p.length < best.length)) best = p;
   }
-  return best ? { path: best, enemy } : null;
+  return best ? { path: best, enemy, spot } : null;
 }
 
 /** Marque un ennemi comme vaincu. */
