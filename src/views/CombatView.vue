@@ -69,6 +69,16 @@
       <DiceRoll v-if="currentRoll" :key="currentRoll.id" :event="currentRoll" :start-mode="startMode" :next-label="nextLabel" @done="nextRoll" />
       <ion-button v-if="busy" expand="block" fill="clear" size="small" @click="skipAll">Passer l'animation</ion-button>
 
+      <!-- Réaction -->
+      <div v-else-if="state.status === 'ongoing' && state.pending" class="actions reaction">
+        <h3>Réaction ?</h3>
+        <p>{{ state.pending.summary }}</p>
+        <ion-button v-for="o in state.pending.options" :key="o.id" expand="block" color="tertiary" @click="react(o.id)">
+          Lancer {{ o.name }} ({{ o.detail }})
+        </ion-button>
+        <ion-button expand="block" fill="outline" @click="react(null)">Ne pas réagir</ion-button>
+      </div>
+
       <!-- Actions -->
       <div v-else-if="state.status === 'ongoing' && options" class="actions">
         <h3>À vous de jouer, {{ currentName }}</h3>
@@ -164,7 +174,7 @@ import { MONSTERS } from "../data/monsters";
 import { characterToCombatant } from "../engine/attacks";
 import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
-  conditionName, currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, startCombat, useFeature,
+  conditionName, currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, resolveReaction, startCombat, useFeature,
   type Combatant, type CombatState, type FeatureId, type RollEvent,
 } from "../engine/combat";
 import { useCharacters } from "../stores/characters";
@@ -311,6 +321,7 @@ watch(() => state.value?.status, (st) => {
   if (st && st !== "ongoing" && character.value) store.setVitals(character.value.id, vitalsAfterCombat(character.value, state.value!));
 });
 const attackTarget = (id: string) => act((s) => playerAttack(s, id, Math.random, attackIndex.value));
+const react = (id: string | null) => act((s) => resolveReaction(s, id));
 const dodge = () => act((s) => playerDodge(s));
 const endTurn = () => act((s) => playerEndTurn(s));
 

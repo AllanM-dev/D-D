@@ -87,6 +87,8 @@ export interface TurnState {
   spells: { level: number; time: "action" | "bonus" | "reaction" }[];
   /** A utilisé l'action Attaquer ce tour (condition de la frappe bonus des arts martiaux). */
   attacked: boolean;
+  /** Réaction utilisée depuis le début de son dernier tour. */
+  reaction?: boolean;
 }
 
 export interface Combatant {
@@ -127,6 +129,8 @@ export interface Combatant {
   guidedUntilRound: number;
   /** Moquerie cruelle : désavantage à sa prochaine attaque. */
   mocked: boolean;
+  /** Bonus de CA du sort Bouclier, jusqu'au début de son prochain tour. */
+  shielded: number;
   /** États en cours (empoisonné, à terre…). */
   conditions: ActiveCondition[];
   /** Marqueurs (espèce du héros…) : certains effets les épargnent. */
@@ -182,6 +186,8 @@ export interface CombatState {
   /** Tous les jets, dans l'ordre : sert à animer les dés. */
   rolls: RollEvent[];
   status: CombatStatus;
+  /** Réaction que le joueur doit décider avant que le combat continue. */
+  pending?: PendingReaction;
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
@@ -191,6 +197,7 @@ const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
 export const EFFECT_ROUNDS = 10;
 export const RAGE_DAMAGE = 2;
+export const SHIELD_BONUS = 5;
 const RAGE_RESISTED = ["contondant", "perforant", "tranchant"];
 
 export function makeCombatant(init: CombatantInit): Combatant {
@@ -202,7 +209,7 @@ export function makeCombatant(init: CombatantInit): Combatant {
     raging: false, ragingUntilRound: 0, innateSorcery: false, innateUntilRound: 0,
     turnState: { action: false, bonus: false, attacked: false, spells: [] },
     spellcasting: init.spellcasting ? JSON.parse(JSON.stringify(init.spellcasting)) : undefined,
-    acBonus: 0, guided: false, guidedUntilRound: 0, mocked: false, conditions: [],
+    acBonus: 0, guided: false, guidedUntilRound: 0, mocked: false, conditions: [], shielded: 0,
   };
 }
 
@@ -345,6 +352,46 @@ export interface AttackResult {
   hit: boolean;
   crit: boolean;
   damage: number;
+  /** Une réaction est proposée au joueur avant de connaître l'issue (voir `state.pending`). */
+  paused?: boolean;
+}
+
+/** Jet d'attaque déjà lancé, en attente de la réaction du joueur. */
+interface AttackContext {
+  attackerId: string;
+  targetId: string;
+  attack: AttackDef;
+  roll: { natural: number; rolls: number[]; total: number; critical: boolean; fumble: boolean };
+  reasons: string[];
+  melee: boolean;
+}
+
+export interface ReactionOption {
+  /** Identifiant du sort (`shield`, `hellish-rebuke`). */
+  id: string;
+  name: string;
+  detail: string;
+}
+
+/** Réaction à décider : avant les dégâts (l'attaque touche) ou après (le héros a été blessé). */
+export interface PendingReaction {
+  stage: "hit" | "damage";
+  reactorId: string;
+  attackerId: string;
+  summary: string;
+  options: ReactionOption[];
+  context: AttackContext;
+}
+
+/** Réactions (sorts) que ce combattant peut utiliser maintenant : Bouclier quand l'attaque touche, Représailles infernales après des dégâts. */
+export function reactionOptions(c: Combatant, stage: "hit" | "damage"): ReactionOption[] {
+  const sc = c.spellcasting;
+  if (!sc || c.side !== "party" || !isConscious(c) || isIncapacitated(c) || c.turnState.reaction) return [];
+  if (sc.slots.max - sc.slots.used <= 0) return [];
+  const id = stage === "hit" ? "shield" : "hellish-rebuke";
+  if (!sc.prepared.includes(id)) return [];
+  const spell = SPELL_BY_ID[id];
+  return [{ id, name: spell.name, detail: `1 emplacement, ${sc.slots.max - sc.slots.used}/${sc.slots.max} restants` }];
 }
 
 export const ABILITY_FR: Record<Ability, string> = {
@@ -440,6 +487,31 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
   else if (disadvantage && !advantage) mode = "disadvantage";
 
   const roll = rollD20(attack.toHit, mode, rng);
+  const ctx: AttackContext = {
+    attackerId: attacker.id, targetId: target.id, attack, reasons, melee,
+    roll: { natural: roll.natural, rolls: roll.rolls, total: roll.total, critical: roll.critical, fumble: roll.fumble },
+  };
+  // Un ennemi qui touche un héros capable de réagir (Bouclier) attend la décision du joueur avant les dégâts.
+  const hits = roll.critical || (!roll.fumble && roll.total >= target.ac);
+  if (hits && attacker.side === "enemies" && target.side === "party") {
+    const options = reactionOptions(target, "hit");
+    if (options.length) {
+      state.pending = {
+        stage: "hit", reactorId: target.id, attackerId: attacker.id, options, context: ctx,
+        summary: `${attacker.name} vous touche (${attack.name} : ${roll.total} contre CA ${target.ac}).`,
+      };
+      return { hit: true, crit: false, damage: 0, paused: true };
+    }
+  }
+  return completeAttack(state, ctx, rng);
+}
+
+/** Suite d'une attaque dont le d20 est lancé : touche ou rate (selon la CA actuelle), dégâts, marque, concentration, état. */
+function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): AttackResult {
+  const attacker = getCombatant(state, ctx.attackerId);
+  const target = getCombatant(state, ctx.targetId);
+  const { attack, roll, reasons, melee } = ctx;
+  const unconscious = isDown(target);
   const hit = roll.critical || (!roll.fumble && roll.total >= target.ac);
   const label = `${attacker.name} attaque ${target.name} (${attack.name}) : ${roll.natural}${attack.toHit >= 0 ? "+" : ""}${attack.toHit} = ${roll.total} contre CA ${target.ac}`;
   // Un coup au corps à corps contre une cible inconsciente est toujours un critique.
@@ -507,7 +579,60 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
       });
     }
   }
+  // Représailles infernales : le héros blessé peut réagir.
+  if (attacker.side === "enemies" && target.side === "party" && total > 0) {
+    const options = reactionOptions(target, "damage");
+    if (options.length) {
+      state.pending = {
+        stage: "damage", reactorId: target.id, attackerId: attacker.id, options, context: ctx,
+        summary: `${attacker.name} vous a blessé (${total} PV).`,
+      };
+      return { hit: true, crit, damage: total, paused: true };
+    }
+  }
   return { hit: true, crit, damage: total };
+}
+
+/** Décision du joueur pour la réaction en attente (`null` : ne pas réagir), puis le combat continue. */
+export function resolveReaction(state: CombatState, choice: string | null, rng: Rng = Math.random) {
+  const p = state.pending;
+  if (!p) throw new Error("Aucune réaction en attente.");
+  state.pending = undefined;
+  const reactor = getCombatant(state, p.reactorId);
+  const attacker = getCombatant(state, p.attackerId);
+  if (choice !== null) {
+    const option = p.options.find((o) => o.id === choice);
+    const sc = reactor.spellcasting;
+    if (!option || !sc) throw new Error("Réaction impossible.");
+    sc.slots.used += 1;
+    reactor.turnState.reaction = true;
+    state.log.push(`${reactor.name} lance ${option.name} (réaction).`);
+    if (choice === "shield") {
+      reactor.ac += SHIELD_BONUS;
+      reactor.shielded += SHIELD_BONUS;
+      state.log.push(`${reactor.name} : CA ${reactor.ac} jusqu'au début de son prochain tour.`);
+    } else if (choice === "hellish-rebuke") {
+      const spell = SPELL_BY_ID["hellish-rebuke"].effect;
+      if (spell.kind === "reaction-rebuke" && !attacker.dead) {
+        const { success } = rollSave(state, attacker, spell.save, sc.saveDc, rng);
+        const dmg = rollDamageDetailed({ count: spell.dice[0], sides: spell.dice[1], bonus: 0 }, false, rng);
+        const amount = success ? Math.floor(dmg.total / 2) : dmg.total;
+        state.log.push(`Représailles infernales : ${amount} dégâts (${spell.damageType})${success ? ", moitié car le jet est réussi" : ""}.`);
+        applyDamage(state, attacker, amount, false);
+        pushRoll(state, {
+          kind: "damage", actorId: reactor.id, actorName: reactor.name, side: reactor.side,
+          title: `Représailles infernales : dégâts (${spell.damageType})`, sides: spell.dice[1], dice: dmg.dice, modifier: 0, total: amount, outcome: "hit",
+          ...(success ? { rolled: dmg.total, note: "moitié : jet de sauvegarde réussi" } : {}),
+        });
+      }
+    }
+  }
+  if (p.stage === "hit") completeAttack(state, p.context, rng);
+  if (state.pending) return; // seconde réaction proposée (Représailles infernales)
+  // Le tour de l'attaquant reprend où il s'était arrêté.
+  endOfTurnConditions(state, attacker, rng);
+  advanceTurn(state);
+  processTurns(state, rng);
 }
 
 function deathSave(state: CombatState, c: Combatant, rng: Rng) {
@@ -572,6 +697,11 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
     const cur = currentCombatant(state);
     cur.dodging = false;
     cur.turnState = { action: false, bonus: false, attacked: false, spells: [] };
+    if (cur.shielded) {
+      cur.ac -= cur.shielded;
+      cur.shielded = 0;
+      state.log.push(`Le Bouclier de ${cur.name} se dissipe.`);
+    }
     for (const c of state.combatants) if (c.guided && state.round > c.guidedUntilRound) c.guided = false;
     if (cur.raging && state.round > cur.ragingUntilRound) {
       cur.raging = false;
@@ -593,6 +723,7 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
       advanceTurn(state);
     } else if (cur.side === "enemies") {
       enemyTurn(state, cur, rng);
+      if (state.pending) return; // le joueur décide d'une réaction
       endOfTurnConditions(state, cur, rng);
       advanceTurn(state);
     } else {
