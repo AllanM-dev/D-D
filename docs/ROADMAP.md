@@ -24,7 +24,8 @@
 - [x] Action bonus et fin de tour ; capacités de classe de niveau 1 : Second souffle, Style de combat (Défense, Archerie), Rage, Imposition des mains, Magie innée, frappe bonus du moine
 - [x] PV et ressources conservés entre les combats ; repos court (dés de vie, Second souffle, Rage, Magie de pacte, Récupération arcanique) et repos long, depuis la fiche
 - [x] Réactions (lot 1) : Bouclier et Représailles infernales, proposés au joueur pendant le tour des ennemis
-- [ ] Attaques d'opportunité, déplacement, portée ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
+- [x] Combat sur le terrain (lot 1) : positions sur la carte ou dans une clairière, déplacement en mètres, portées et ligne de vue, désavantages à longue portée et au contact, attaques d'opportunité des ennemis, Foncer, Se désengager, ennemis qui avancent à leur vitesse
+- [ ] Combat sur le terrain (suite) : sorts de zone à plusieurs cibles, attaques d'opportunité du héros, terrain difficile, couverts, tactiques de monstres ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
 - [x] Sorts (lot 1) : 43 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
 - [ ] Sorts : grimoire du magicien, niveaux supérieurs, zones à plusieurs cibles, soins des alliés

@@ -60,6 +60,7 @@ import {
 import { vitalsOf } from "../engine/rest";
 import { useCharacters } from "../stores/characters";
 import { formatMeters } from "../ui/format";
+import "../ui/tiles.css";
 
 const TILE = 32;
 const STEP_MS = 140;
@@ -205,18 +206,6 @@ async function go(target: Cell) {
 ion-content { --padding-start: 16px; --padding-end: 16px; }
 .status { margin: 0 0 8px; }
 .scroller { max-height: 58vh; overflow: auto; border-radius: 8px; border: 1px solid var(--ion-color-step-200, #444); background: #000; touch-action: pan-x pan-y; }
-.grid { display: grid; width: max-content; }
-.tile { position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; cursor: pointer; }
-.tile.grass { background: #4f7f3a; }
-.tile.path { background: #b59a63; }
-.tile.floor { background: #8a8a92; background-image: linear-gradient(#0002 1px, transparent 1px), linear-gradient(90deg, #0002 1px, transparent 1px); background-size: 16px 16px; }
-.tile.wall { background: #55555c; background-image: repeating-linear-gradient(0deg, #0004 0 2px, transparent 2px 10px), repeating-linear-gradient(90deg, #0003 0 2px, transparent 2px 16px); }
-.tile.door { background: #7a4a22; border: 3px solid #4a2c12; }
-.tile.tree { background: radial-gradient(circle at 50% 45%, #2f6a2a 0 55%, #1d4a1c 56% 100%); }
-.tile.water { background: repeating-linear-gradient(135deg, #2f6fb5 0 6px, #3a80c7 6px 12px); cursor: default; }
-.tile.stairs { background: repeating-linear-gradient(0deg, #6d6d78 0 5px, #8d8d98 5px 10px); }
-.tile.bridge { background: repeating-linear-gradient(90deg, #8b6a3a 0 6px, #6f5230 6px 8px); }
-.tile.wall, .tile.tree { cursor: default; }
 .tile.seen::after, .tile.unknown::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
 .tile.seen::after { background: #000a; }
 .tile.unknown::after { background: #000; }

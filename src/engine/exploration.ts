@@ -260,6 +260,13 @@ export function defeatEnemy(st: ExplorationState, enemyId: string): ExplorationS
   return st.defeated.includes(enemyId) ? st : { ...st, defeated: [...st.defeated, enemyId] };
 }
 
+/** Pose le héros sur une case (fin d'un combat sur la carte) et dévoile ce qu'il y voit. */
+export function placeAt(st: ExplorationState, cell: Cell): ExplorationState {
+  const next: ExplorationState = { ...st, x: cell.x, y: cell.y, explored: [...st.explored] };
+  reveal(mapOf(st), next);
+  return next;
+}
+
 /** Passe par un passage : le héros arrive sur l'autre carte, qui garde ses zones déjà explorées. */
 export function travelTo(st: ExplorationState, exit: MapExit): ExplorationState {
   const dest = MAP_BY_ID[exit.to.map];

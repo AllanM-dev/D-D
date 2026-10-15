@@ -2,6 +2,9 @@ import { rollD20, rollDie, type AdvantageMode, type Rng } from "./dice";
 import { SPELL_BY_ID } from "../data/spells";
 import { hasBonusSpell, spellOptionsFor, type SpellOption } from "./spellcasting";
 import type { Ability } from "./rules";
+import { WEAPONS } from "../data/equipment";
+import { CLEARING, freeCellsNear, hasLineOfSight, metersBetween, pathBetween, speedCells, type Arena } from "./battlefield";
+import { CELL_METERS, cellDistance, type Cell } from "./exploration";
 import type { ActiveCondition, ConditionId, ConditionRider } from "../data/conditions";
 
 export type Side = "party" | "enemies";
@@ -25,6 +28,8 @@ export interface AttackDef {
   spell?: boolean;
   /** État infligé par un coup qui touche (jet de sauvegarde de la cible). */
   rider?: ConditionRider;
+  /** Portée normale / maximale en mètres (armes à distance, armes de jet, sorts) ; sinon corps à corps (1,5 m). */
+  range?: [number, number];
   /** Frappe à mains nues (arts martiaux). */
   unarmed?: boolean;
 }
@@ -90,6 +95,12 @@ export interface TurnState {
   attacked: boolean;
   /** Réaction utilisée depuis le début de son dernier tour. */
   reaction?: boolean;
+  /** Cases parcourues ce tour. */
+  moved?: number;
+  /** A utilisé l'action Foncer : déplacement doublé. */
+  dashed?: boolean;
+  /** A utilisé l'action Se désengager : pas d'attaque d'opportunité ce tour. */
+  disengaged?: boolean;
 }
 
 export interface Combatant {
@@ -130,6 +141,10 @@ export interface Combatant {
   guidedUntilRound: number;
   /** Moquerie cruelle : désavantage à sa prochaine attaque. */
   mocked: boolean;
+  /** Position sur le terrain (absente : combat sans carte). */
+  pos?: Cell;
+  /** Vitesse en mètres. */
+  speed?: number;
   /** Bonus de CA du sort Bouclier, jusqu'au début de son prochain tour. */
   shielded: number;
   /** États en cours (empoisonné, à terre…). */
@@ -144,7 +159,7 @@ export interface Combatant {
 
 export type CombatStatus = "ongoing" | "victory" | "defeat";
 
-export type RollKind = "initiative" | "attack" | "damage" | "deathSave" | "heal" | "save" | "check";
+export type RollKind = "initiative" | "attack" | "damage" | "deathSave" | "heal" | "save" | "check" | "move";
 export type RollOutcome = "hit" | "miss" | "crit" | "fumble" | "success" | "failure";
 
 /** Un jet de dés, avec de quoi l'animer : dés lancés, dé retenu, résultat. */
@@ -189,10 +204,12 @@ export interface CombatState {
   status: CombatStatus;
   /** Réaction que le joueur doit décider avant que le combat continue. */
   pending?: PendingReaction;
+  /** Terrain du combat (absent : pas de positions, ni portées ni déplacement). */
+  arena?: Arena;
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods" | "tags" | "immunities">>;
+  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
@@ -245,9 +262,10 @@ export function pushRoll(state: CombatState, init: RollInit, logLen = state.log.
 }
 
 /** Initiative : d20 + bonus. Égalité : meilleur bonus, puis le groupe du joueur. */
-export function startCombat(party: CombatantInit[], enemies: CombatantInit[], rng: Rng = Math.random): CombatState {
+export function startCombat(party: CombatantInit[], enemies: CombatantInit[], rng: Rng = Math.random, arena?: Arena): CombatState {
   const combatants = [...party, ...enemies].map(makeCombatant);
-  const state: CombatState = { combatants, order: [], turn: 0, round: 1, log: [], rolls: [], status: "ongoing" };
+  if (arena && combatants.some((c) => !c.pos)) throw new Error("Chaque combattant a besoin d'une position sur le terrain.");
+  const state: CombatState = { combatants, order: [], turn: 0, round: 1, log: [], rolls: [], status: "ongoing", arena };
   for (const c of combatants) {
     const roll = rollD20(c.initiativeBonus, "normal", rng);
     c.initiative = roll.total;
@@ -467,7 +485,9 @@ function conditionModes(attacker: Combatant, target: Combatant, melee: boolean) 
   return { advantage, disadvantage };
 }
 
-export function resolveAttack(state: CombatState, attacker: Combatant, target: Combatant, attack: AttackDef, rng: Rng): AttackResult {
+export function resolveAttack(
+  state: CombatState, attacker: Combatant, target: Combatant, attack: AttackDef, rng: Rng, opts: { opportunity?: boolean } = {},
+): AttackResult {
   const melee = !attack.ranged;
   const unconscious = isDown(target);
   let mode: AdvantageMode = "normal";
@@ -476,10 +496,11 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
   const cm = conditionModes(attacker, target, melee);
   const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell) || guidedAdvantage || cm.advantage.length > 0;
   // Désavantage : cible qui esquive, attaquant visé par Moquerie cruelle, ou états (empoisonné, effrayé…).
-  const disadvantage = target.dodging || attacker.mocked || cm.disadvantage.length > 0;
+  const rangeDis = attackCheck(state, attacker, target, attack).disadvantage;
+  const disadvantage = target.dodging || attacker.mocked || cm.disadvantage.length > 0 || rangeDis.length > 0;
   const reasons = [
     advantage && !disadvantage ? `Avantage : ${[unconscious && melee ? "cible inconsciente" : "", attacker.innateSorcery && attack.spell ? "Magie innée" : "", guidedAdvantage ? "cible éclairée" : "", ...cm.advantage].filter(Boolean).join(", ")}` : "",
-    disadvantage && !advantage ? `Désavantage : ${[target.dodging ? "cible qui esquive" : "", attacker.mocked ? "moquerie" : "", ...cm.disadvantage].filter(Boolean).join(", ")}` : "",
+    disadvantage && !advantage ? `Désavantage : ${[target.dodging ? "cible qui esquive" : "", attacker.mocked ? "moquerie" : "", ...cm.disadvantage, ...rangeDis].filter(Boolean).join(", ")}` : "",
     advantage && disadvantage ? "Avantage et désavantage s'annulent" : "",
   ].filter(Boolean);
   if (guidedAdvantage) target.guided = false;
@@ -494,7 +515,7 @@ export function resolveAttack(state: CombatState, attacker: Combatant, target: C
   };
   // Un ennemi qui touche un héros capable de réagir (Bouclier) attend la décision du joueur avant les dégâts.
   const hits = roll.critical || (!roll.fumble && roll.total >= target.ac);
-  if (hits && attacker.side === "enemies" && target.side === "party") {
+  if (hits && attacker.side === "enemies" && target.side === "party" && !opts.opportunity) {
     const options = reactionOptions(target, "hit");
     if (options.length) {
       state.pending = {
@@ -663,6 +684,182 @@ function deathSave(state: CombatState, c: Combatant, rng: Rng) {
   pushRoll(state, { ...event, outcome: roll.fumble ? "fumble" : failures ? "failure" : "success" });
 }
 
+// ---------------------------------------------------------------- positions, portées, déplacement
+
+const AROUND: Cell[] = [
+  { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+  { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 },
+];
+const cellKey = (c: Cell) => `${c.x},${c.y}`;
+/** Portée par défaut d'une arme à distance sans portée connue (anciennes sauvegardes). */
+const DEFAULT_RANGE: [number, number] = [18, 54];
+export const SPEED_DEFAULT = 9;
+
+/** Portée d'une attaque en mètres : `undefined` pour le corps à corps. */
+export function attackRange(attack: AttackDef): [number, number] | undefined {
+  if (attack.range) return attack.range;
+  if (!attack.ranged) return undefined;
+  const base = attack.name.replace(/ \(lancer\)$/, "");
+  return WEAPONS.find((w) => w.name === base)?.range ?? DEFAULT_RANGE;
+}
+
+/** Cases occupées par des combattants en vie (celui dont l'identifiant est `except` ne compte pas). */
+export function occupiedCells(state: CombatState, except?: string): Set<string> {
+  return new Set(state.combatants.filter((c) => !c.dead && c.pos && c.id !== except).map((c) => cellKey(c.pos!)));
+}
+
+export interface TargetCheck {
+  ok: boolean;
+  /** Pourquoi la cible est inaccessible. */
+  reason?: string;
+  /** Désavantages venant de la distance ou du contact (tir à longue portée, ennemi au contact). */
+  disadvantage: string[];
+  /** Distance en mètres. */
+  meters: number;
+}
+
+const fm = (n: number) => String(n).replace(".", ",");
+
+/** Peut-on viser `target` avec cette attaque ? (portée, ligne de vue, désavantages). Toujours oui sans terrain. */
+export function attackCheck(state: CombatState, attacker: Combatant, target: Combatant, attack: AttackDef): TargetCheck {
+  if (!state.arena || !attacker.pos || !target.pos) return { ok: true, disadvantage: [], meters: 0 };
+  const meters = metersBetween(attacker.pos, target.pos);
+  const range = attackRange(attack);
+  const disadvantage: string[] = [];
+  if (!range) {
+    if (cellDistance(attacker.pos, target.pos) > 1) return { ok: false, reason: `Hors de portée (${fm(meters)} m ; corps à corps : 1,5 m)`, disadvantage, meters };
+    return { ok: true, disadvantage, meters };
+  }
+  if (meters > range[1]) return { ok: false, reason: `Hors de portée (${fm(meters)} m ; maximum ${fm(range[1])} m)`, disadvantage, meters };
+  if (!hasLineOfSight(state.arena, attacker.pos, target.pos)) return { ok: false, reason: "Pas de ligne de vue", disadvantage, meters };
+  if (meters > range[0]) disadvantage.push("longue portée");
+  // Une attaque à distance faite au contact d'un ennemi qui peut agir a un désavantage (pas pour un sort de contact).
+  if (attack.ranged && state.combatants.some((c) => c.side !== attacker.side && !c.dead && c.pos && !isIncapacitated(c) && cellDistance(c.pos, attacker.pos!) <= 1))
+    disadvantage.push("ennemi au contact");
+  return { ok: true, disadvantage, meters };
+}
+
+/** Une cible peut-elle être visée par un sort de portée `rangeM` ? (distance et ligne de vue) */
+export function spellTargetCheck(state: CombatState, caster: Combatant, target: Combatant, rangeM: number | undefined): TargetCheck {
+  if (!state.arena || !caster.pos || !target.pos || rangeM === undefined) return { ok: true, disadvantage: [], meters: 0 };
+  const meters = metersBetween(caster.pos, target.pos);
+  if (meters > rangeM) return { ok: false, reason: `Hors de portée (${fm(meters)} m ; sort : ${fm(rangeM)} m)`, disadvantage: [], meters };
+  if (!hasLineOfSight(state.arena, caster.pos, target.pos)) return { ok: false, reason: "Pas de ligne de vue", disadvantage: [], meters };
+  return { ok: true, disadvantage: [], meters };
+}
+
+/** Cases de déplacement qu'il reste à ce combattant ce tour. */
+export function movementLeft(c: Combatant): number {
+  if (hasCondition(c, "restrained")) return 0;
+  const base = speedCells(c.speed ?? SPEED_DEFAULT) * (c.turnState.dashed ? 2 : 1);
+  return Math.max(0, base - (c.turnState.moved ?? 0));
+}
+
+export interface MovePlan {
+  ok: boolean;
+  reason?: string;
+  path: Cell[];
+  /** Coût en mètres. */
+  meters: number;
+}
+
+/** Trajet (cases libres uniquement) du combattant vers une case, et ce qu'il coûte. */
+export function planMove(state: CombatState, c: Combatant, to: Cell): MovePlan {
+  if (!state.arena || !c.pos) return { ok: false, reason: "Pas de terrain.", path: [], meters: 0 };
+  if (cellDistance(c.pos, to) === 0) return { ok: false, reason: "Vous y êtes déjà.", path: [], meters: 0 };
+  if (occupiedCells(state, c.id).has(cellKey(to))) return { ok: false, reason: "Case occupée.", path: [], meters: 0 };
+  const path = pathBetween(state.arena, c.pos, to, occupiedCells(state, c.id));
+  if (!path) return { ok: false, reason: "Chemin impossible.", path: [], meters: 0 };
+  const meters = path.length * CELL_METERS;
+  const left = movementLeft(c);
+  if (path.length > left) return { ok: false, reason: `Trop loin : ${fm(meters)} m, il vous reste ${fm(left * CELL_METERS)} m.`, path, meters };
+  return { ok: true, path, meters };
+}
+
+/** Déplacement du joueur : case par case, avec les attaques d'opportunité des ennemis qu'il quitte. */
+export function playerMove(state: CombatState, to: Cell, rng: Rng = Math.random) {
+  const cur = assertPlayerTurn(state);
+  const plan = planMove(state, cur, to);
+  if (!plan.ok) throw new Error(plan.reason ?? "Déplacement impossible.");
+  for (const cell of plan.path) {
+    const from = cur.pos!;
+    if (!cur.turnState.disengaged) {
+      for (const e of state.combatants) {
+        if (e.side === cur.side || e.dead || !e.pos || !e.attacks.length || isIncapacitated(e) || e.turnState.reaction) continue;
+        if (cellDistance(e.pos, from) <= 1 && cellDistance(e.pos, cell) > 1) {
+          e.turnState.reaction = true;
+          state.log.push(`${cur.name} s'éloigne de ${e.name} : attaque d'opportunité !`);
+          resolveAttack(state, e, cur, e.attacks[0], rng, { opportunity: true });
+          if (!isConscious(cur)) {
+            // Tombé pendant son propre tour : le tour se termine (jets de mort, ennemis suivants).
+            updateStatus(state);
+            if (state.status === "ongoing") endTurn(state, rng);
+            return;
+          }
+        }
+      }
+    }
+    cur.pos = cell;
+    cur.turnState.moved = (cur.turnState.moved ?? 0) + 1;
+  }
+  state.log.push(`${cur.name} se déplace de ${fm(plan.meters)} m.`);
+  updateStatus(state);
+}
+
+/** Action Foncer : le déplacement de ce tour est doublé. */
+export function playerDash(state: CombatState, rng: Rng = Math.random) {
+  const cur = assertPlayerTurn(state);
+  if (cur.turnState.action) throw new Error("Action déjà utilisée ce tour.");
+  cur.turnState.action = true;
+  cur.turnState.dashed = true;
+  state.log.push(`${cur.name} fonce : déplacement doublé (${fm(movementLeft(cur) * CELL_METERS)} m possibles).`);
+  afterPlayerAction(state, rng);
+}
+
+/** Action Se désengager : pas d'attaque d'opportunité pour ce tour. */
+export function playerDisengage(state: CombatState, rng: Rng = Math.random) {
+  const cur = assertPlayerTurn(state);
+  if (cur.turnState.action) throw new Error("Action déjà utilisée ce tour.");
+  cur.turnState.action = true;
+  cur.turnState.disengaged = true;
+  state.log.push(`${cur.name} se désengage : aucune attaque d'opportunité ce tour.`);
+  afterPlayerAction(state, rng);
+}
+
+/** Un ennemi s'approche de sa cible aussi loin que sa vitesse le permet. */
+function enemyApproach(state: CombatState, enemy: Combatant, target: Combatant) {
+  if (!state.arena || !enemy.pos || !target.pos) return;
+  const budget = movementLeft(enemy);
+  if (!budget || cellDistance(enemy.pos, target.pos) <= 1) return;
+  const occupied = occupiedCells(state, enemy.id);
+  let best: Cell[] | null = null;
+  for (const d of AROUND) {
+    const goal = { x: target.pos.x + d.x, y: target.pos.y + d.y };
+    if (occupied.has(cellKey(goal))) continue;
+    const path = pathBetween(state.arena, enemy.pos, goal, occupied);
+    if (path && (!best || path.length < best.length)) best = path;
+  }
+  if (!best) return;
+  const steps = best.slice(0, budget);
+  if (!steps.length) return;
+  enemy.pos = steps[steps.length - 1];
+  enemy.turnState.moved = (enemy.turnState.moved ?? 0) + steps.length;
+  state.log.push(`${enemy.name} s'approche de ${target.name} (${fm(steps.length * CELL_METERS)} m).`);
+  pushRoll(state, {
+    kind: "move", actorId: enemy.id, actorName: enemy.name, side: enemy.side, title: `${enemy.name} s'approche`,
+    sides: 0, dice: [], modifier: 0, total: steps.length * CELL_METERS,
+  });
+}
+
+/** Cible de l'ennemi : le héros conscient le plus proche (au hasard à égalité). */
+function nearestTarget(state: CombatState, enemy: Combatant, pool: Combatant[], rng: Rng): Combatant {
+  if (!state.arena || !enemy.pos) return pool[Math.floor(rng() * pool.length)];
+  const dist = (c: Combatant) => (c.pos ? cellDistance(enemy.pos!, c.pos) : 99);
+  const best = Math.min(...pool.map(dist));
+  const near = pool.filter((c) => dist(c) === best);
+  return near.length > 1 ? near[Math.floor(rng() * near.length)] : near[0];
+}
+
 function enemyTurn(state: CombatState, enemy: Combatant, rng: Rng) {
   const party = state.combatants.filter((c) => c.side === "party" && !c.dead);
   const conscious = party.filter(isConscious);
@@ -678,8 +875,17 @@ function enemyTurn(state: CombatState, enemy: Combatant, rng: Rng) {
     if (res.success) removeCondition(state, enemy, bound.id, "il s'est libéré");
     return;
   }
-  const target = pool[Math.floor(rng() * pool.length)];
-  resolveAttack(state, enemy, target, enemy.attacks.length > 1 ? enemy.attacks[Math.floor(rng() * enemy.attacks.length)] : enemy.attacks[0], rng);
+  const target = nearestTarget(state, enemy, pool, rng);
+  const attack = enemy.attacks.length > 1 ? enemy.attacks[Math.floor(rng() * enemy.attacks.length)] : enemy.attacks[0];
+  if (state.arena) {
+    // Sur le terrain : l'ennemi avance d'abord, puis attaque s'il est à portée.
+    enemyApproach(state, enemy, target);
+    if (!attackCheck(state, enemy, target, attack).ok) {
+      state.log.push(`${enemy.name} ne peut pas atteindre ${target.name}.`);
+      return;
+    }
+  }
+  resolveAttack(state, enemy, target, attack, rng);
 }
 
 function advanceTurn(state: CombatState) {
@@ -697,7 +903,7 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
     if (state.status !== "ongoing") return;
     const cur = currentCombatant(state);
     cur.dodging = false;
-    cur.turnState = { action: false, bonus: false, attacked: false, spells: [] };
+    cur.turnState = { action: false, bonus: false, attacked: false, spells: [], moved: 0 };
     if (cur.shielded) {
       cur.ac -= cur.shielded;
       cur.shielded = 0;
@@ -797,6 +1003,8 @@ export interface PlayerOptions {
   spells: SpellOption[];
   /** On peut terminer le tour (au moins une action utilisée). */
   canEnd: boolean;
+  /** Cases de déplacement restantes (absent : pas de terrain). */
+  movementCells?: number;
 }
 
 /** Actions bonus utilisables par ce combattant maintenant. Rien si l'action bonus est déjà utilisée. */
@@ -828,7 +1036,8 @@ export function playerOptions(state: CombatState): PlayerOptions {
     canAct: !cur.turnState.action,
     bonus: availableBonus(state, cur),
     spells: spellOptionsFor(state, cur),
-    canEnd: cur.turnState.action || cur.turnState.bonus,
+    canEnd: cur.turnState.action || cur.turnState.bonus || (cur.turnState.moved ?? 0) > 0,
+    ...(state.arena ? { movementCells: movementLeft(cur) } : {}),
   };
 }
 
@@ -840,6 +1049,8 @@ export function afterPlayerAction(state: CombatState, rng: Rng) {
   updateStatus(state);
   if (state.status !== "ongoing") return;
   const cur = currentCombatant(state);
+  // Sur le terrain, le tour ne se termine pas tout seul tant qu'il reste du déplacement : on peut reculer après avoir attaqué.
+  if (state.arena && movementLeft(cur) > 0) return;
   if (cur.turnState.action && availableBonus(state, cur).length === 0 && !hasBonusSpell(state, cur)) endTurn(state, rng);
 }
 
@@ -856,6 +1067,8 @@ export function playerAttack(state: CombatState, targetId: string, rng: Rng = Ma
   const target = enemyTarget(state, targetId);
   const attack = cur.attacks[attackIndex];
   if (!attack) throw new Error("Attaque inconnue.");
+  const check = attackCheck(state, cur, target, attack);
+  if (!check.ok) throw new Error(check.reason);
   cur.turnState.action = true;
   cur.turnState.attacked = true;
   resolveAttack(state, cur, target, attack, rng);

@@ -161,6 +161,15 @@ export const SPELLS: readonly SpellDef[] = [
 export const SPELL_BY_ID: Record<string, SpellDef> = Object.fromEntries(SPELLS.map((s) => [s.id, s]));
 
 /** Un sort que le moteur sait jouer en combat. */
+/** Portée numérique en mètres : « 36 m » → 36, « Contact » → 1,5, « Cône de 4,5 m » → 4,5 ; undefined pour « Soi-même ». */
+export function rangeMeters(spell: Pick<SpellDef, "range">): number | undefined {
+  const r = spell.range;
+  if (r === "Contact") return 1.5;
+  if (r.startsWith("Soi-même")) return undefined;
+  const m = r.match(/(\d+(?:,\d+)?)\s*m/);
+  return m ? Number(m[1].replace(",", ".")) : undefined;
+}
+
 export const isPlayable = (s: SpellDef) => s.effect.kind !== "none";
 
 export interface ClassSpellcasting {

@@ -1,7 +1,7 @@
-import { CLASS_SPELLCASTING, SPELL_BY_ID, type SpellDef } from "../data/spells";
+import { CLASS_SPELLCASTING, SPELL_BY_ID, rangeMeters, type SpellDef } from "../data/spells";
 import { rollD20, rollDie, type Rng } from "./dice";
 import {
-  ABILITY_FR, afterPlayerAction, applyCondition, applyDamage, rollSave, assertPlayerTurn, endConcentration, enemyTarget, healCombatant, isConscious, pushRoll,
+  ABILITY_FR, afterPlayerAction, applyCondition, applyDamage, rollSave, spellTargetCheck, assertPlayerTurn, endConcentration, enemyTarget, healCombatant, isConscious, pushRoll,
   resolveAttack, rollDamageDetailed, type AttackDef, type Combatant, type CombatState, type Spellcasting,
 } from "./combat";
 import type { AbilityScores } from "./abilities";
@@ -117,6 +117,10 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
   if (!sc || !spell || !option) throw new Error("Sort inconnu ou non préparé.");
   if (!option.available) throw new Error(option.reason ?? "Ce sort est impossible maintenant.");
   const target = option.target === "enemy" ? enemyTarget(state, choice.targetId ?? "") : cur;
+  if (option.target === "enemy") {
+    const check = spellTargetCheck(state, cur, target, rangeMeters(spell));
+    if (!check.ok) throw new Error(check.reason);
+  }
 
   // Coût : lancer gratuit d'abord, sinon un emplacement.
   if (spell.level >= 1) {
@@ -139,6 +143,7 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
       const attack: AttackDef = {
         name: spell.name, toHit: sc.attackBonus, damage: { count: e.dice[0], sides: e.dice[1], bonus: 0 },
         damageType: e.damageType, ranged: !e.melee, ability: sc.ability, spell: true,
+        ...(rangeMeters(spell) !== undefined ? { range: [rangeMeters(spell)!, rangeMeters(spell)!] as [number, number] } : {}),
       };
       const res = resolveAttack(state, cur, target, attack, rng);
       if (e.condition && res.hit && !target.dead) {
