@@ -23,10 +23,11 @@
 - [x] Animation de vos jets de dés (initiative, attaque, dégâts, jets de mort), déclenchée par un bouton, désactivable ; les jets ennemis se résolvent sans dés
 - [x] Action bonus et fin de tour ; capacités de classe de niveau 1 : Second souffle, Style de combat (Défense, Archerie), Rage, Imposition des mains, Magie innée, frappe bonus du moine
 - [x] PV et ressources conservés entre les combats ; repos court (dés de vie, Second souffle, Rage, Magie de pacte, Récupération arcanique) et repos long, depuis la fiche
-- [ ] Réactions, déplacement, portée ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
+- [x] Réactions (lot 1) : Bouclier et Représailles infernales, proposés au joueur pendant le tour des ennemis
+- [ ] Attaques d'opportunité, déplacement, portée ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
 - [x] Sorts (lot 1) : 43 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
-- [ ] Sorts : réactions (Bouclier…), grimoire du magicien, niveaux supérieurs, zones à plusieurs cibles, soins des alliés
+- [ ] Sorts : grimoire du magicien, niveaux supérieurs, zones à plusieurs cibles, soins des alliés
 - [x] États (conditions) : empoisonné, effrayé, aveuglé, entravé, à terre, neutralisé, étourdi, paralysé ; infligés par le loup (à terre), la goule (paralysie) et les sorts Rayon empoisonné, Enchevêtrement, Fou rire de Tasha ; section Aide → États
 - [ ] États restants (charmé, assourdi, épuisement, agrippé, invisible, pétrifié), autres capacités de classe (Attaque sournoise, Expertise, Inspiration bardique…), autres styles de combat
 - [x] Bestiaire de départ (8 monstres, SRD 5.1) et 8 rencontres

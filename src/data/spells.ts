@@ -8,6 +8,10 @@ export type SpellEffect =
   | { kind: "missiles"; darts: number; sides: number; bonus: number; damageType: string }
   /** Pas de dégâts : un jet de sauvegarde ; en cas d'échec, la cible subit ces états. */
   | { kind: "control"; save: Ability; conditions: ConditionId[]; /** Nouveau jet à la fin de chacun de ses tours. */ repeatSave?: boolean; /** La cible peut tenter de se libérer (Force) au lieu d'attaquer. */ escape?: boolean }
+  /** Réaction : +5 à la CA quand une attaque touche. */
+  | { kind: "reaction-shield" }
+  /** Réaction : l'attaquant qui vient de vous blesser subit des dégâts (jet de sauvegarde, moitié si réussi). */
+  | { kind: "reaction-rebuke"; save: Ability; dice: [number, number]; damageType: string }
   | { kind: "heal"; dice: [number, number] }
   | { kind: "mage-armor" }
   | { kind: "ac-bonus"; bonus: number }
@@ -129,13 +133,13 @@ export const SPELLS: readonly SpellDef[] = [
 
   // ----- Sorts de niveau 1 sans effet en combat pour le moment
   { id: "shield", name: "Bouclier", level: 1, school: "Abjuration", time: "reaction", range: "Soi-même", duration: "1 round", concentration: false, classes: [sorcerer, wizard],
-    description: "Réaction quand vous êtes touché : +5 à votre CA jusqu'au début de votre prochain tour, et vous évitez Projectile magique.", effect: { kind: "none" }, note: "Les réactions ne sont pas encore gérées." },
+    description: "Réaction quand vous êtes touché : +5 à votre CA jusqu'au début de votre prochain tour, et vous évitez Projectile magique.", effect: { kind: "reaction-shield" }, note: "Se lance en réaction quand une attaque ennemie vous touche : l'application vous demande si vous voulez le lancer (1 emplacement). L'immunité à Projectile magique est sans objet, aucun ennemi n'en lance." },
   { id: "bless", name: "Bénédiction", level: 1, school: "Enchantement", time: "action", range: "9 m", duration: "Concentration, 1 minute", concentration: true, classes: [cleric, paladin],
     description: "Jusqu'à trois créatures ajoutent 1d4 à leurs jets d'attaque et de sauvegarde.", effect: { kind: "none" }, note: "Pas encore appliqué : il faudrait ajouter un d4 à chaque jet." },
   { id: "goodberry", name: "Baies nourricières", level: 1, school: "Transmutation", time: "action", range: "Contact", duration: "24 heures", concentration: false, classes: [druid, ranger],
     description: "Dix baies magiques : en manger une rend 1 PV et nourrit pour la journée.", effect: { kind: "none" }, note: "Pas encore appliqué : pas d'inventaire de consommables." },
   { id: "hellish-rebuke", name: "Représailles infernales", level: 1, school: "Évocation", time: "reaction", range: "18 m", duration: "Instantanée", concentration: false, classes: [warlock],
-    description: "Réaction quand une créature vous blesse : elle fait un jet de sauvegarde de Dextérité, 2d10 dégâts de feu, la moitié si elle réussit.", effect: { kind: "none" }, note: "Les réactions ne sont pas encore gérées." },
+    description: "Réaction quand une créature vous blesse : elle fait un jet de sauvegarde de Dextérité, 2d10 dégâts de feu, la moitié si elle réussit.", effect: { kind: "reaction-rebuke", save: "DEX", dice: [2, 10], damageType: "feu" }, note: "Se lance en réaction après avoir été blessé par un ennemi : l'application vous demande si vous voulez le lancer (1 emplacement)." },
   { id: "armor-of-agathys", name: "Armure d'Agathys", level: 1, school: "Abjuration", time: "action", range: "Soi-même", duration: "1 heure", concentration: false, classes: [warlock],
     description: "Vous gagnez 5 PV temporaires ; un attaquant au corps à corps qui vous touche subit 5 dégâts de froid tant qu'il vous en reste.", effect: { kind: "none" }, note: "Pas encore appliqué : les PV temporaires ne sont pas gérés." },
   { id: "detect-magic", name: "Détection de la magie", level: 1, school: "Divination", time: "action", range: "Soi-même (9 m)", duration: "Concentration, 10 minutes", concentration: true, classes: [bard, cleric, druid, paladin, ranger, sorcerer, wizard],

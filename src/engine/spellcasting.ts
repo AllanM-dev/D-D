@@ -234,6 +234,8 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
       state.log.push(`${target.name} est marqué : +${e.dice[0]}d${e.dice[1]} dégâts (${e.damageType}) à chaque coup.`);
       break;
     }
+    case "reaction-shield":
+    case "reaction-rebuke":
     case "none":
       break;
   }
