@@ -145,6 +145,7 @@
       </div>
       <div v-else-if="finished" class="result" :class="state.status">
         <h2>{{ state.status === "victory" ? "Victoire !" : "Défaite…" }}</h2>
+        <p v-if="lootText && state.status === 'victory'" class="loot">Butin : {{ lootText }}</p>
         <template v-if="fromStory">
           <p v-if="state.status === 'defeat'" class="hint">Vous perdez connaissance… (1 PV).</p>
           <ion-button expand="block" :router-link="continueStory">Continuer l'histoire</ion-button>
@@ -186,6 +187,7 @@ import { MONSTERS } from "../data/monsters";
 import { characterToCombatant } from "../engine/attacks";
 import { defeatEnemy, retreatToStart } from "../engine/exploration";
 import { applyEffects } from "../engine/story";
+import { changeItems, describeLoot, enemyLoot, inventoryOf, potionsLeft } from "../engine/inventory";
 import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
   conditionName, currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, resolveReaction, startCombat, useFeature,
@@ -340,12 +342,23 @@ watch(() => state.value?.status, (st) => {
     if (st === "victory" && enemyParam.value) store.setExploration(character.value.id, defeatEnemy(ex, enemyParam.value));
     else if (st === "defeat") store.setExploration(character.value.id, retreatToStart(ex));
   }
+  // Potions bues pendant le combat : le sac à dos est mis à jour.
+  const left = potionsLeft(state.value!, character.value.id);
+  if (left !== undefined) store.setInventory(character.value.id, changeItems(inventoryOf(character.value), { "healing-potion": left - (character.value.inventory?.["healing-potion"] ?? 0) }));
+  // Butin de l'ennemi vaincu.
+  lootText.value = "";
+  if ((fromMap.value || fromStory.value) && st === "victory" && enemyParam.value) {
+    const loot = enemyLoot(enemyParam.value);
+    lootText.value = describeLoot(loot);
+    store.addLoot(character.value.id, loot);
+  }
   // L'ennemi vaincu laisse un drapeau dans l'histoire (`defeated:<id>`).
   if ((fromMap.value || fromStory.value) && st === "victory" && enemyParam.value) {
     store.setStory(character.value.id, { flags: applyEffects(character.value.story?.flags ?? [], { defeat: [enemyParam.value] }).flags, gold: 0 });
   }
 });
 // Rencontre lancée depuis la carte : le combat démarre tout de suite.
+const lootText = ref("");
 const fromMap = computed(() => route.query.from === "map");
 const fromStory = computed(() => route.query.from === "story");
 const continueStory = computed(() => {
@@ -399,6 +412,7 @@ const layOnHands = (max: number) => act((s) => useFeature(s, "lay-on-hands", Mat
 
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
+.loot { font-weight: 600; }
 .cond { color: var(--ion-color-warning, #ffc409); }
 .hint { opacity: 0.8; font-size: 0.9rem; }
 .active { --background: var(--ion-color-step-150, #333); }

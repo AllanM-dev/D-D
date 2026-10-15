@@ -3,6 +3,7 @@ import type { Character } from "./character";
 import type { CombatantInit } from "./combat";
 import { featuresFor } from "./features";
 import { ABILITIES, type Ability } from "./rules";
+import { itemCount } from "./inventory";
 import { castingInput, vitalsOf } from "./rest";
 import { castingFor } from "./spellcasting";
 
@@ -17,7 +18,11 @@ export function characterToCombatant(c: Character): CombatantInit {
   return {
     id: c.id, name: c.name, side: "party", maxHp: c.maxHp, hp: v.hp, ac: c.armorClass,
     initiativeBonus: c.initiative, attacks: c.attacks, level: c.level,
-    features: featuresFor(c.classDef.id, c.level).map((f) => ({ ...f, uses: f.unlimited ? f.uses : Math.min(v.features[f.id] ?? f.max, f.max) })),
+    features: [
+      ...featuresFor(c.classDef.id, c.level).map((f) => ({ ...f, uses: f.unlimited ? f.uses : Math.min(v.features[f.id] ?? f.max, f.max) })),
+      // Les potions du sac à dos : une utilisation par potion.
+      ...(itemCount(c, "healing-potion") > 0 ? [{ id: "potion" as const, uses: itemCount(c, "healing-potion"), max: itemCount(c, "healing-potion") }] : []),
+    ],
     art: artKey("class", c.classDef.id),
     saveMods: Object.fromEntries(ABILITIES.map((a) => [a, c.saves[a].bonus])) as Record<Ability, number>,
     tags: [c.species.id],

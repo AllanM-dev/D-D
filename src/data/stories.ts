@@ -9,6 +9,10 @@ import type { SkillId } from "./skills";
 export interface Requires {
   flags?: string[];
   notFlags?: string[];
+  /** Or minimum que le personnage doit posséder. */
+  minGold?: number;
+  /** Objets que le personnage doit posséder (au moins un de chaque). */
+  items?: string[];
 }
 
 /** Ce qu'un choix change : drapeaux posés ou retirés, or gagné (ou dépensé). */
@@ -16,6 +20,8 @@ export interface Effects {
   set?: string[];
   unset?: string[];
   gold?: number;
+  /** Objets gagnés (quantité positive) ou perdus (négative) : identifiant → quantité. */
+  items?: Record<string, number>;
   /** Ennemis de la carte qui disparaissent (identifiants de la carte) : ils laissent le drapeau `defeated:<id>`. */
   defeat?: string[];
 }
@@ -157,6 +163,7 @@ const aubergiste: Scene[] = [
       { text: "Léo dit que votre père a disparu dans la crypte. C'est vrai ?", requires: { flags: ["pere-disparu"], notFlags: ["histoire-pere"] }, check: { skill: "insight", dc: 12, success: "aubergiste-pere", failure: "aubergiste-pere-ko" } },
       { text: "Observer la salle d'un œil attentif.", requires: { notFlags: ["indice-cave"] }, check: { skill: "perception", dc: 11, success: "aubergiste-indice", failure: "aubergiste-rien", onSuccess: { set: ["indice-cave"] } } },
       { text: "Écouter les rumeurs du village.", goto: "aubergiste-rumeurs" },
+      { text: "Voir ce que Thibaud vend et achète.", goto: "boutique" },
       { text: "Je vous laisse.", end: true },
     ],
   },
@@ -174,7 +181,7 @@ const aubergiste: Scene[] = [
     id: "aubergiste-cle-ok",
     title: "Thibaud, l'aubergiste",
     text: ["Il soupire, fouille sous le comptoir et pose sur le bois une grosse clé rouillée. « Prenez-la. Et si vous voyez mon père là-dedans, dites-lui que je n'y suis pour rien. »"],
-    choices: [{ text: "Prendre la clé.", goto: "aubergiste", set: ["cle-crypte"] }],
+    choices: [{ text: "Prendre la clé.", goto: "aubergiste", set: ["cle-crypte"], items: { "cle-crypte": 1 } }],
   },
   {
     id: "aubergiste-cle-ko",
@@ -276,7 +283,19 @@ const village: Scene[] = [
       "Thibaud repose lentement son gobelet. Sa voix se brise. « Mon père, Gédéon, gardait cette crypte. Un soir, il est descendu pour réparer un sceau et n'est jamais remonté. J'ai gardé la clé comme on garde un deuil. »",
       "Il sort la clé de sous le comptoir et la tend vers vous. « Si c'est lui… ne le laissez pas souffrir. »",
     ],
-    choices: [{ text: "Prendre la clé, avec respect.", goto: "aubergiste", set: ["cle-crypte", "histoire-pere"] }],
+    choices: [{ text: "Prendre la clé, avec respect.", goto: "aubergiste", set: ["cle-crypte", "histoire-pere"], items: { "cle-crypte": 1 } }],
+  },
+  {
+    id: "boutique",
+    title: "Thibaud, l'aubergiste",
+    text: [
+      "Thibaud pose sur le comptoir quelques fioles et une balance. « Je vends des potions de soin, cinquante pièces pièce. Et j'achète les pierres précieuses, à dix pièces la petite gemme. Je ne marchande pas. »",
+    ],
+    choices: [
+      { text: "Acheter une potion de soin (50 po).", requires: { minGold: 50 }, goto: "boutique", gold: -50, items: { "healing-potion": 1 } },
+      { text: "Vendre une petite gemme (10 po).", requires: { items: ["gem"] }, goto: "boutique", gold: 10, items: { gem: -1 } },
+      { text: "Revenir au comptoir.", goto: "aubergiste" },
+    ],
   },
   {
     id: "aubergiste-pere-ko",
@@ -306,14 +325,14 @@ const crypteInterieur: Scene[] = [
       "« … le sceau s'est fissuré la nuit de l'orage. Quelque chose est monté de la terre et m'a mordu. Je sens le froid gagner mes bras. Je ne veux pas être un danger pour Brumeval. »",
       "« J'ai verrouillé la porte de la salle du fond et scellé l'entrée. Si je deviens ce que je redoute, qu'on récite sur ma tombe la prière du repos : « Que la terre te soit légère, que la nuit te soit douce, repose-toi, gardien. » »",
     ],
-    choices: [{ text: "Refermer le journal.", end: true, set: ["journal-lu"] }],
+    choices: [{ text: "Refermer le journal et le garder.", end: true, set: ["journal-lu"], items: { "journal-gedeon": 1 } }],
   },
   {
     id: "coffre",
     title: "Un coffre ancien",
-    text: ["Un coffre de bois cerclé de cuivre, sans serrure, dort sous un linceul de toiles d'araignée. À l'intérieur, une petite bourse de cuir : les économies d'un gardien oublié."],
+    text: ["Un coffre de bois cerclé de cuivre, sans serrure, dort sous un linceul de toiles d'araignée. À l'intérieur, une petite bourse de cuir — les économies d'un gardien oublié — et une fiole de liquide rouge soigneusement bouchée."],
     choices: [
-      { text: "Prendre la bourse (30 pièces d'or).", end: true, gold: 30, set: ["coffre-pris"] },
+      { text: "Prendre la bourse (30 pièces d'or) et la fiole qui l'accompagne.", end: true, gold: 30, set: ["coffre-pris"], items: { "healing-potion": 1 } },
       { text: "Laisser le coffre en paix.", end: true },
     ],
   },

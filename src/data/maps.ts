@@ -1,3 +1,5 @@
+import type { Loot } from "./items";
+
 /** Cartes d'exploration : une case = 1,5 m. */
 
 export type TileKind = "grass" | "tree" | "wall" | "water" | "floor" | "door" | "path" | "bridge" | "stairs";
@@ -22,6 +24,8 @@ export interface MapEnemy {
   encounterId: string;
   x: number;
   y: number;
+  /** Butin laissé quand il est vaincu. */
+  loot?: Loot;
 }
 
 /** Lieu ou personnage : le toucher ouvre une scène de l'histoire. */
@@ -90,8 +94,8 @@ export const MAPS: readonly MapDef[] = [
     start: { x: 9, y: 6 },
     enemies: [
       { id: "wolf-1", encounterId: "wolf", x: 4, y: 2 },
-      { id: "goblin-1", encounterId: "goblin", x: 15, y: 8 },
-      { id: "skeleton-1", encounterId: "skeleton", x: 17, y: 9 },
+      { id: "goblin-1", encounterId: "goblin", x: 15, y: 8, loot: { gold: 6 } },
+      { id: "skeleton-1", encounterId: "skeleton", x: 17, y: 9, loot: { gold: 4, items: { gem: 1 } } },
     ],
     spots: [
       { id: "maire", x: 6, y: 8, label: "Odile, la maire", story: "brumeval", scene: "maire" },
@@ -125,8 +129,8 @@ export const MAPS: readonly MapDef[] = [
     start: { x: 3, y: 1 },
     enemies: [
       { id: "rat-1", encounterId: "rat", x: 5, y: 4 },
-      { id: "zombie-1", encounterId: "zombie", x: 17, y: 3 },
-      { id: "ghoul-1", encounterId: "ghoul", x: 19, y: 11 },
+      { id: "zombie-1", encounterId: "zombie", x: 17, y: 3, loot: { gold: 8 } },
+      { id: "ghoul-1", encounterId: "ghoul", x: 19, y: 11, loot: { gold: 15, items: { "healing-potion": 1 } } },
     ],
     spots: [
       { id: "journal", x: 4, y: 10, label: "Journal du gardien", story: "brumeval", scene: "journal" },

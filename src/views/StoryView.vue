@@ -12,6 +12,7 @@
 
     <ion-content v-if="!character || !story || !scene" class="ion-padding"><p>Scène introuvable.</p></ion-content>
     <ion-content v-else class="ion-padding">
+      <p class="purse">{{ character.equipment.gold }} po<template v-if="potions"> · {{ potions }} potion{{ potions > 1 ? "s" : "" }} de soin</template></p>
       <h2>{{ scene.title }}</h2>
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-for="(p, i) in paragraphs" :key="i" class="para">{{ p }}</p>
@@ -52,8 +53,10 @@ const story = computed(() => STORY_BY_ID[String(route.query.story ?? "")]);
 const sceneId = ref(String(route.query.scene ?? ""));
 const scene = computed(() => story.value?.scenes[sceneId.value]);
 const flags = computed(() => character.value?.story?.flags ?? []);
-const paragraphs = computed(() => (scene.value ? sceneText(scene.value, flags.value) : []));
-const choices = computed(() => (scene.value ? availableChoices(scene.value, flags.value) : []));
+const wallet = computed(() => ({ gold: character.value?.equipment.gold ?? 0, items: character.value?.inventory ?? {} }));
+const paragraphs = computed(() => (scene.value ? sceneText(scene.value, flags.value, wallet.value) : []));
+const choices = computed(() => (scene.value ? availableChoices(scene.value, flags.value, wallet.value) : []));
+const potions = computed(() => character.value?.inventory?.["healing-potion"] ?? 0);
 
 // Même préférence que pour le combat : animation de mes jets de dés.
 const PREF_KEY = "dd-mobile.animateDice";
@@ -91,7 +94,7 @@ let nonce = 0;
 
 function choose(index: number) {
   notice.value = "";
-  const outcome = resolveChoice(scene.value!, index, flags.value, skillBonus);
+  const outcome = resolveChoice(scene.value!, index, flags.value, skillBonus, Math.random, wallet.value);
   if (outcome.check && animate.value) {
     const c = outcome.check;
     roll.value = {
@@ -111,7 +114,7 @@ const afterRoll = () => { const r = roll.value; roll.value = null; if (r) procee
 /** Enregistre les effets du choix puis passe à la suite : scène, combat ou retour à la carte. */
 function proceed(o: ChoiceOutcome) {
   if (o.check) notice.value = `${skillName(o.check.skill)} : ${o.check.total} contre DD ${o.check.dc} — ${o.check.success ? "réussi" : "raté"}.`;
-  store.setStory(characterId.value, { flags: o.flags, gold: o.gold });
+  store.setStory(characterId.value, { flags: o.flags, gold: o.gold, items: o.items });
   const id = characterId.value;
   const ex = character.value?.exploration;
   if (ex && o.defeated.length) store.setExploration(id, o.defeated.reduce(defeatEnemy, ex));
@@ -128,6 +131,7 @@ function proceed(o: ChoiceOutcome) {
 
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
+.purse { float: right; margin: 4px 0 0; font-size: 0.85rem; opacity: 0.8; }
 .para { line-height: 1.5; }
 .choices { margin-top: 16px; }
 .choices ion-button { --white-space: normal; text-transform: none; }

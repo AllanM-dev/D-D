@@ -62,6 +62,20 @@
       </ion-list>
 
       <ion-list inset>
+        <ion-list-header><ion-label>Sac à dos</ion-label></ion-list-header>
+        <ion-item lines="full"><ion-label>Pièces d'or</ion-label><ion-note slot="end">{{ c.equipment.gold }} po</ion-note></ion-item>
+        <ion-item v-for="b in bag" :key="b.def.id" lines="full">
+          <ion-label class="ion-text-wrap">
+            {{ b.def.name }}<template v-if="b.n > 1"> × {{ b.n }}</template>
+            <p>{{ ITEM_KIND_NAMES[b.def.kind] }}<template v-if="b.def.value"> · {{ b.def.value }} po</template> · {{ b.def.text }}</p>
+          </ion-label>
+          <ion-button v-if="b.def.id === 'healing-potion'" slot="end" size="small" :disabled="!canDrink(c)" @click="drink">Boire</ion-button>
+        </ion-item>
+        <ion-item v-if="!bag.length" lines="none"><ion-label class="ion-text-wrap"><p>Aucun objet pour l'instant.</p></ion-label></ion-item>
+        <ion-item v-if="bagReport" lines="none"><ion-label class="ion-text-wrap report">{{ bagReport }}</ion-label></ion-item>
+      </ion-list>
+
+      <ion-list inset>
         <ion-list-header><ion-label>Caractéristiques et sauvegardes</ion-label></ion-list-header>
         <ion-item v-for="a in ABILITIES" :key="a">
           <ion-label>
@@ -157,6 +171,8 @@ import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
 import { SPELL_BY_ID, isPlayable } from "../data/spells";
 import { castingFor } from "../engine/spellcasting";
+import { ITEM_BY_ID, ITEM_KIND_NAMES } from "../data/items";
+import { canDrink, drinkPotion } from "../engine/inventory";
 import { hitDiceMax, longRest, shortRest, vitalsOf, type RestResult } from "../engine/rest";
 import { FEATURE_LABELS } from "../engine/combat";
 import { featuresFor } from "../engine/features";
@@ -190,6 +206,16 @@ const resources = computed(() => {
   }
   return out;
 });
+const bag = computed(() =>
+  Object.entries(c.value?.inventory ?? {}).map(([id, n]) => ({ def: ITEM_BY_ID[id], n })).filter((b) => b.def),
+);
+const bagReport = ref("");
+function drink() {
+  const r = drinkPotion(c.value!);
+  store.setVitals(c.value!.id, r.vitals);
+  store.setInventory(c.value!.id, r.inventory);
+  bagReport.value = `Potion de soin : ${r.dice.join(" + ")} + 2 = ${r.dice[0] + r.dice[1] + 2}, ${r.healed} PV regagnés (${r.vitals.hp}/${c.value!.maxHp}).`;
+}
 const spend = ref(0);
 watch(() => vitals.value.hitDice, (n) => { if (spend.value > n) spend.value = n; });
 const restReport = ref("");

@@ -1,5 +1,6 @@
 import { STORY_BY_ID, type Choice, type Effects, type Requires, type Scene, type StoryDef } from "../data/stories";
 import { ENCOUNTERS } from "../data/encounters";
+import { ITEM_BY_ID } from "../data/items";
 import { SKILLS, type SkillId } from "../data/skills";
 import { rollD20, type Rng } from "./dice";
 
@@ -10,9 +11,20 @@ export interface StoryProgress {
 
 export const emptyProgress = (): StoryProgress => ({ flags: [] });
 
-export function meets(req: Requires | undefined, flags: readonly string[]): boolean {
+/** Ce que le personnage possède, pour les conditions d'or et d'objets. */
+export interface Wallet {
+  gold: number;
+  items: Record<string, number>;
+}
+
+export function meets(req: Requires | undefined, flags: readonly string[], wallet: Wallet = { gold: 0, items: {} }): boolean {
   if (!req) return true;
-  return (req.flags ?? []).every((f) => flags.includes(f)) && !(req.notFlags ?? []).some((f) => flags.includes(f));
+  return (
+    (req.flags ?? []).every((f) => flags.includes(f)) &&
+    !(req.notFlags ?? []).some((f) => flags.includes(f)) &&
+    wallet.gold >= (req.minGold ?? 0) &&
+    (req.items ?? []).every((id) => (wallet.items[id] ?? 0) > 0)
+  );
 }
 
 /** Drapeau interne qui retient un choix à usage unique. */
@@ -25,15 +37,15 @@ export interface ChoiceView {
 }
 
 /** Choix proposés : conditions remplies, usage unique non encore pris. */
-export function availableChoices(scene: Scene, flags: readonly string[]): ChoiceView[] {
+export function availableChoices(scene: Scene, flags: readonly string[], wallet?: Wallet): ChoiceView[] {
   return scene.choices
     .map((choice, index) => ({ choice, index }))
-    .filter(({ choice, index }) => meets(choice.requires, flags) && !(choice.once && flags.includes(onceFlag(scene.id, index))));
+    .filter(({ choice, index }) => meets(choice.requires, flags, wallet) && !(choice.once && flags.includes(onceFlag(scene.id, index))));
 }
 
 /** Paragraphes de la scène, dont ceux que les drapeaux font apparaître. */
-export function sceneText(scene: Scene, flags: readonly string[]): string[] {
-  return [...scene.text, ...(scene.textIf ?? []).filter((t) => meets(t.requires, flags)).flatMap((t) => t.text)];
+export function sceneText(scene: Scene, flags: readonly string[], wallet?: Wallet): string[] {
+  return [...scene.text, ...(scene.textIf ?? []).filter((t) => meets(t.requires, flags, wallet)).flatMap((t) => t.text)];
 }
 
 export interface Applied {
@@ -42,6 +54,8 @@ export interface Applied {
   gold: number;
   /** Ennemis de la carte à faire disparaître. */
   defeated: string[];
+  /** Objets gagnés ou perdus. */
+  items: Record<string, number>;
 }
 
 /** Applique des effets à une liste de drapeaux. */
@@ -49,14 +63,16 @@ export function applyEffects(flags: readonly string[], ...effects: (Effects | un
   let out = [...flags];
   let gold = 0;
   const defeated: string[] = [];
+  const items: Record<string, number> = {};
   for (const e of effects) {
     if (!e) continue;
+    for (const [id, n] of Object.entries(e.items ?? {})) items[id] = (items[id] ?? 0) + n;
     for (const id of e.defeat ?? []) { defeated.push(id); if (!out.includes(`defeated:${id}`)) out.push(`defeated:${id}`); }
     for (const f of e.set ?? []) if (!out.includes(f)) out.push(f);
     out = out.filter((f) => !(e.unset ?? []).includes(f));
     gold += e.gold ?? 0;
   }
-  return { flags: out, gold, defeated };
+  return { flags: out, gold, defeated, items };
 }
 
 /** Pose les drapeaux d'arrivée d'une scène. */
@@ -87,6 +103,8 @@ export interface ChoiceOutcome {
   gold: number;
   /** Ennemis de la carte à faire disparaître. */
   defeated: string[];
+  /** Objets gagnés ou perdus. */
+  items: Record<string, number>;
   /** Scène suivante (absente si le choix quitte l'histoire ou lance un combat). */
   next?: string;
   fight?: { encounterId: string; enemy?: string; win: string; lose?: string };
@@ -99,11 +117,11 @@ export interface ChoiceOutcome {
  * (`check`) est renvoyé avec la scène qui en découle.
  */
 export function resolveChoice(
-  scene: Scene, index: number, flags: readonly string[], skillBonus: (id: SkillId) => number, rng: Rng = Math.random,
+  scene: Scene, index: number, flags: readonly string[], skillBonus: (id: SkillId) => number, rng: Rng = Math.random, wallet?: Wallet,
 ): ChoiceOutcome {
   const choice = scene.choices[index];
-  if (!choice || !availableChoices(scene, flags).some((c) => c.index === index)) throw new Error("Choix impossible.");
-  const base: Effects = { set: [...(choice.set ?? []), ...(choice.once ? [onceFlag(scene.id, index)] : [])], unset: choice.unset, gold: choice.gold, defeat: choice.defeat };
+  if (!choice || !availableChoices(scene, flags, wallet).some((c) => c.index === index)) throw new Error("Choix impossible.");
+  const base: Effects = { set: [...(choice.set ?? []), ...(choice.once ? [onceFlag(scene.id, index)] : [])], unset: choice.unset, gold: choice.gold, defeat: choice.defeat, items: choice.items };
   if (choice.check) {
     const c = choice.check;
     const check = rollCheck(c.skill, c.dc, skillBonus(c.skill), rng);
@@ -131,6 +149,12 @@ export function validateStory(story: StoryDef, startScene: string): string[] {
       if (kinds !== 1) errors.push(`${story.id}/${id}#${i} : un choix doit avoir exactement une issue (goto, check, fight ou end)`);
       for (const t of targets(c)) if (!scenes[t]) errors.push(`${story.id}/${id}#${i} : scène ${t} inconnue`);
       if (c.check && !SKILLS.some((s) => s.id === c.check!.skill)) errors.push(`${story.id}/${id}#${i} : compétence inconnue`);
+      const spend = -((c.gold ?? 0) + (c.check?.onSuccess?.gold ?? 0) + (c.check?.onFailure?.gold ?? 0));
+      if (spend > 0 && (c.requires?.minGold ?? 0) < spend) errors.push(`${story.id}/${id}#${i} : un choix qui dépense de l'or doit exiger assez d'or (minGold)`);
+      for (const [item, n] of Object.entries(c.items ?? {})) {
+        if (!ITEM_BY_ID[item]) errors.push(`${story.id}/${id}#${i} : objet inconnu ${item}`);
+        else if (n < 0 && !c.requires?.items?.includes(item)) errors.push(`${story.id}/${id}#${i} : un choix qui retire ${item} doit l'exiger`);
+      }
       if (c.fight && !ENCOUNTERS.some((e) => e.id === c.fight!.encounterId)) errors.push(`${story.id}/${id}#${i} : rencontre inconnue`);
     });
   }
