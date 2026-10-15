@@ -26,7 +26,8 @@
         <div><strong>{{ c.passivePerception }}</strong><small>Perc. passive</small></div>
       </div>
 
-      <ion-button expand="block" :router-link="`/combat/${c.id}`">Lancer un combat</ion-button>
+      <ion-button expand="block" :router-link="`/map/${c.id}`">Explorer la carte</ion-button>
+      <ion-button expand="block" fill="outline" :router-link="`/combat/${c.id}`">Lancer un combat</ion-button>
 
       <ion-list inset>
         <ion-list-header><ion-label>Ressources et repos</ion-label></ion-list-header>

@@ -3,6 +3,7 @@ import { ref } from "vue";
 import type { Character } from "../engine/character";
 import { migrateSpells } from "../engine/character";
 import { migrateCharacter } from "../engine/equipment";
+import type { ExplorationState } from "../engine/exploration";
 import type { Vitals } from "../engine/rest";
 
 const KEY = "dd-mobile.characters";
@@ -32,9 +33,13 @@ export const useCharacters = defineStore("characters", () => {
     const c = list.value.find((x) => x.id === id);
     if (c) { c.vitals = v; persist(); }
   };
+  const setExploration = (id: string, e: ExplorationState) => {
+    const c = list.value.find((x) => x.id === id);
+    if (c) { c.exploration = JSON.parse(JSON.stringify(e)); persist(); }
+  };
   const get = (id: string) => list.value.find((c) => c.id === id);
 
-  return { list, add, remove, get, setVitals };
+  return { list, add, remove, get, setVitals, setExploration };
 });
 
 export function newId(): string {

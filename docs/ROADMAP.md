@@ -34,6 +34,8 @@
 - [ ] Bestiaire complet, capacités spéciales des monstres, compagnons, propriétés d'armes (lourde, légère, maîtrises), munitions
 
 ## Jalon 3 — Aventure
+- [x] Carte d'exploration (lot 1) : cases de 1,5 m, déplacement au toucher, brouillard et ligne de vue, ennemis visibles qui lancent le combat, position enregistrée ; carte « Brumeval et ses environs »
+- [ ] Carte : personnages non joueurs, objets, portes verrouillées, pièges, plusieurs cartes reliées
 - [ ] Format de scénario (scènes, choix, tests de compétence)
 - [ ] Une aventure courte jouable de bout en bout
 - [ ] Inventaire
