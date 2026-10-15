@@ -22,7 +22,7 @@
               v-for="(kind, x) in row"
               :key="`${x},${y}`"
               class="tile"
-              :class="[kind, fog(x, y), { hero: ex.x === x && ex.y === y, locked: isLocked(x, y) }]"
+              :class="[kind, fog(x, y), { hero: ex.x === x && ex.y === y, locked: isLocked(x, y), route: onRoute(x, y), dest: isDest(x, y) }]"
               :style="{ width: TILE + 'px', height: TILE + 'px' }"
               @click="tap(x, y)"
             >
@@ -37,7 +37,7 @@
       </div>
 
       <p class="message" aria-live="polite">{{ message }}</p>
-      <p class="hint">Touchez une case pour y aller (1 case = 1,5 m), un ennemi pour le combattre ou un « ! » pour parler ou agir. Les zones sombres ne sont pas encore explorées.</p>
+      <p class="hint">Touchez une case pour voir le trajet, touchez-la une seconde fois pour y aller (1 case = 1,5 m). Même chose pour un ennemi à combattre ou un « ! » pour parler ou agir. Touchez ailleurs pour changer de destination. Les zones sombres ne sont pas encore explorées.</p>
       <ion-button expand="block" fill="outline" :router-link="`/character/${character.id}`">Fiche et repos</ion-button>
     </ion-content>
   </ion-page>
@@ -127,11 +127,35 @@ function openSpot(spot: { story: string; scene: string; label: string }) {
   router.push(`/story/${characterId.value}?story=${spot.story}&scene=${spot.scene}&t=${Date.now()}`);
 }
 
-async function tap(x: number, y: number) {
+/** Destination choisie au premier toucher, en attente de confirmation (second toucher au même endroit). */
+const pending = ref<{ target: Cell; path: Cell[] } | null>(null);
+const routeCells = computed(() => new Set((pending.value?.path ?? []).map(key)));
+const onRoute = (x: number, y: number) => routeCells.value.has(`${x},${y}`);
+const isDest = (x: number, y: number) => pending.value?.target.x === x && pending.value?.target.y === y;
+onIonViewWillEnter(() => { pending.value = null; });
+
+/** Premier toucher : on montre le trajet ; le second, au même endroit, déplace le personnage. */
+function tap(x: number, y: number) {
   if (!ex.value || !character.value) return;
-  if (walking) { cancel = true; return; }
+  if (walking) { cancel = true; pending.value = null; return; }
   const target: Cell = { x, y };
-  if (!explored.value.has(key(target))) { message.value = "Vous ne savez pas encore ce qu'il y a là-bas."; return; }
+  if (pending.value && pending.value.target.x === x && pending.value.target.y === y) {
+    pending.value = null;
+    return go(target);
+  }
+  if (!explored.value.has(key(target))) { pending.value = null; message.value = "Vous ne savez pas encore ce qu'il y a là-bas."; return; }
+  const plan = planPath(ex.value, target, flags.value);
+  if (!plan) { pending.value = null; message.value = "Vous ne pouvez pas aller là."; return; }
+  if (!plan.enemy && !plan.spot && plan.path.length === 0) { pending.value = null; return; }
+  pending.value = { target, path: plan.path };
+  const dist = formatMeters(cellMeters(plan.path.length));
+  if (plan.enemy) message.value = `Combattre : ${monsterOf(map.value.enemies.find((e) => e.id === plan.enemy!.id)!.encounterId).name} (${dist}). Touchez à nouveau pour confirmer.`;
+  else if (plan.spot) message.value = `${plan.spot.label} (${dist}). Touchez à nouveau pour confirmer.`;
+  else message.value = `Aller ici : ${dist}. Touchez à nouveau pour confirmer.`;
+}
+
+async function go(target: Cell) {
+  if (!ex.value || !character.value) return;
   const plan = planPath(ex.value, target, flags.value);
   if (!plan) { message.value = "Vous ne pouvez pas aller là."; return; }
   const enemy = plan.enemy ? map.value.enemies.find((e) => e.id === plan.enemy!.id)! : undefined;
@@ -196,6 +220,8 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .tile.seen::after, .tile.unknown::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
 .tile.seen::after { background: #000a; }
 .tile.unknown::after { background: #000; }
+.tile.route::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #ffd54a; opacity: 0.9; z-index: 2; pointer-events: none; }
+.tile.dest { outline: 2px dashed #fff; outline-offset: -3px; z-index: 1; }
 .tile.hero { outline: 2px solid #ffd54a; outline-offset: -2px; z-index: 1; }
 .spot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-weight: 800; box-shadow: 0 0 0 2px #3a2a00, 0 0 6px #ffd54a; }
 .tile.locked { box-shadow: inset 0 0 0 3px #c0392b; }
