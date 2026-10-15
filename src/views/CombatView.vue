@@ -2,7 +2,7 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-buttons slot="start"><ion-back-button :default-href="fromMap ? `/map/${characterId}` : `/character/${characterId}`" /></ion-buttons>
+        <ion-buttons slot="start"><ion-back-button :default-href="fromMap || fromStory ? `/map/${characterId}` : `/character/${characterId}`" /></ion-buttons>
         <ion-title>{{ state ? `Combat · round ${shown?.round ?? state.round}` : "Combat" }}</ion-title>
         <ion-buttons slot="end">
           <ion-toggle v-model="animateDice" aria-label="Animation de mes jets de dés">Mes dés</ion-toggle>
@@ -145,7 +145,12 @@
       </div>
       <div v-else-if="finished" class="result" :class="state.status">
         <h2>{{ state.status === "victory" ? "Victoire !" : "Défaite…" }}</h2>
-        <template v-if="fromMap">
+        <template v-if="fromStory">
+          <p v-if="state.status === 'defeat'" class="hint">Vous perdez connaissance… (1 PV).</p>
+          <ion-button expand="block" :router-link="continueStory">Continuer l'histoire</ion-button>
+          <ion-button expand="block" fill="outline" :router-link="`/character/${characterId}`">Fiche et repos</ion-button>
+        </template>
+        <template v-else-if="fromMap">
           <p v-if="state.status === 'defeat'" class="hint">Vous vous réveillez au village, à bout de forces (1 PV).</p>
           <ion-button expand="block" :router-link="`/map/${characterId}`">Retour à la carte</ion-button>
           <ion-button expand="block" fill="outline" :router-link="`/character/${characterId}`">Fiche et repos</ion-button>
@@ -180,6 +185,7 @@ import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters"
 import { MONSTERS } from "../data/monsters";
 import { characterToCombatant } from "../engine/attacks";
 import { defeatEnemy, retreatToStart } from "../engine/exploration";
+import { applyEffects } from "../engine/story";
 import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
   conditionName, currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, resolveReaction, startCombat, useFeature,
@@ -331,9 +337,20 @@ watch(() => state.value?.status, (st) => {
   // Venu de la carte : l'ennemi vaincu disparaît ; en cas de défaite, le héros se réveille au départ.
   const ex = character.value.exploration;
   if (fromMap.value && ex) store.setExploration(character.value.id, st === "victory" ? defeatEnemy(ex, enemyParam.value) : retreatToStart(ex));
+  // L'ennemi vaincu laisse un drapeau dans l'histoire (`defeated:<id>`) ; une défaite dans une scène ramène au départ.
+  if (fromMap.value && st === "victory" && enemyParam.value) {
+    store.setStory(character.value.id, { flags: applyEffects(character.value.story?.flags ?? [], { set: [`defeated:${enemyParam.value}`] }).flags, gold: 0 });
+  }
+  if (fromStory.value && st === "defeat" && ex) store.setExploration(character.value.id, retreatToStart(ex));
 });
 // Rencontre lancée depuis la carte : le combat démarre tout de suite.
 const fromMap = computed(() => route.query.from === "map");
+const fromStory = computed(() => route.query.from === "story");
+const continueStory = computed(() => {
+  const q = route.query;
+  const scene = state.value?.status === "victory" ? q.win : q.lose;
+  return `/story/${characterId.value}?story=${q.story}&scene=${scene}&t=${Date.now()}`;
+});
 const enemyParam = computed(() => String(route.query.enemy ?? ""));
 let launched = "";
 watch(
@@ -343,7 +360,7 @@ watch(
     const e = ENCOUNTERS.find((x) => x.id === q.encounter);
     // `t` change à chaque lancement : la vue peut être réutilisée par le routeur.
     const id = `${q.encounter}:${q.enemy}:${q.t}`;
-    if (c && e && fromMap.value && id !== launched) {
+    if (c && e && (fromMap.value || fromStory.value) && id !== launched) {
       launched = id;
       state.value = null;
       start(e);

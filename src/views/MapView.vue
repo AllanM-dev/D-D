@@ -22,11 +22,12 @@
               v-for="(kind, x) in row"
               :key="`${x},${y}`"
               class="tile"
-              :class="[kind, fog(x, y), { hero: ex.x === x && ex.y === y }]"
+              :class="[kind, fog(x, y), { hero: ex.x === x && ex.y === y, locked: isLocked(x, y) }]"
               :style="{ width: TILE + 'px', height: TILE + 'px' }"
               @click="tap(x, y)"
             >
               <Illustration v-if="ex.x === x && ex.y === y" :art="artKey('class', character.classDef.id)" :size="TILE - 4" :label="character.name" />
+              <span v-else-if="spotAt(x, y)" class="spot" role="img" :aria-label="spotAt(x, y)!.label" :title="spotAt(x, y)!.label">!</span>
               <span v-else-if="enemyAt(x, y)" class="enemy" :title="enemyAt(x, y)!.name">
                 <Illustration :art="enemyAt(x, y)!.art" :size="TILE - 4" :label="enemyAt(x, y)!.name" />
               </span>
@@ -36,7 +37,7 @@
       </div>
 
       <p class="message" aria-live="polite">{{ message }}</p>
-      <p class="hint">Touchez une case pour y aller (1 case = 1,5 m) ou un ennemi pour le combattre. Les zones sombres ne sont pas encore explorées.</p>
+      <p class="hint">Touchez une case pour y aller (1 case = 1,5 m), un ennemi pour le combattre ou un « ! » pour parler ou agir. Les zones sombres ne sont pas encore explorées.</p>
       <ion-button expand="block" fill="outline" :router-link="`/character/${character.id}`">Fiche et repos</ion-button>
     </ion-content>
   </ion-page>
@@ -54,7 +55,7 @@ import { artKey } from "../data/illustrations";
 import { MAP_BY_ID } from "../data/maps";
 import { MONSTERS } from "../data/monsters";
 import {
-  cellMeters, key, livingEnemies, parseMap, planPath, startExploration, stepTo, visibleCells, type Cell, type ExplorationState,
+  cellMeters, key, liveSpots, livingEnemies, lockedCells, parseMap, planPath, startExploration, stepTo, visibleCells, type Cell, type ExplorationState,
 } from "../engine/exploration";
 import { vitalsOf } from "../engine/rest";
 import { useCharacters } from "../stores/characters";
@@ -105,6 +106,10 @@ const visibleEnemyMap = computed(() => {
   return out;
 });
 const enemyAt = (x: number, y: number) => visibleEnemyMap.value.get(`${x},${y}`);
+const flags = computed(() => character.value?.story?.flags ?? []);
+const spotAt = (x: number, y: number) =>
+  liveSpots(map.value, flags.value).find((s) => s.x === x && s.y === y && visible.value.has(`${x},${y}`));
+const isLocked = (x: number, y: number) => lockedCells(map.value, flags.value).some((l) => l.x === x && l.y === y);
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 function centerOnHero() {
@@ -117,15 +122,21 @@ function startFight(enemyId: string, encounterId: string) {
   router.push(`/combat/${characterId.value}?encounter=${encounterId}&enemy=${enemyId}&from=map&t=${Date.now()}`);
 }
 
+function openSpot(spot: { story: string; scene: string; label: string }) {
+  message.value = spot.label;
+  router.push(`/story/${characterId.value}?story=${spot.story}&scene=${spot.scene}&t=${Date.now()}`);
+}
+
 async function tap(x: number, y: number) {
   if (!ex.value || !character.value) return;
   if (walking) { cancel = true; return; }
   const target: Cell = { x, y };
   if (!explored.value.has(key(target))) { message.value = "Vous ne savez pas encore ce qu'il y a là-bas."; return; }
-  const plan = planPath(ex.value, target);
+  const plan = planPath(ex.value, target, flags.value);
   if (!plan) { message.value = "Vous ne pouvez pas aller là."; return; }
   const enemy = plan.enemy ? map.value.enemies.find((e) => e.id === plan.enemy!.id)! : undefined;
   if (enemy && plan.path.length === 0) return startFight(enemy.id, enemy.encounterId);
+  if (plan.spot && plan.path.length === 0) return openSpot(plan.spot);
   if (plan.path.length === 0) return;
 
   walking = true;
@@ -135,7 +146,7 @@ async function tap(x: number, y: number) {
   const next: ExplorationState = JSON.parse(JSON.stringify(ex.value));
   for (const cell of plan.path) {
     if (cancel) break;
-    const res = stepTo(next, cell);
+    const res = stepTo(next, cell, flags.value);
     steps += 1;
     walked.value += 1;
     store.setExploration(characterId.value, next);
@@ -152,7 +163,10 @@ async function tap(x: number, y: number) {
   }
   walking = false;
   if (!message.value) message.value = steps ? `Vous avez marché ${formatMeters(cellMeters(steps))}.` : "";
-  if (enemy && !cancel && steps === plan.path.length) startFight(enemy.id, enemy.encounterId);
+  if (!cancel && steps === plan.path.length) {
+    if (enemy) startFight(enemy.id, enemy.encounterId);
+    else if (plan.spot) openSpot(plan.spot);
+  }
 }
 </script>
 
@@ -175,6 +189,8 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .tile.seen::after { background: #000a; }
 .tile.unknown::after { background: #000; }
 .tile.hero { outline: 2px solid #ffd54a; outline-offset: -2px; z-index: 1; }
+.spot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-weight: 800; box-shadow: 0 0 0 2px #3a2a00, 0 0 6px #ffd54a; }
+.tile.locked { box-shadow: inset 0 0 0 3px #c0392b; }
 .enemy { display: flex; filter: drop-shadow(0 0 3px #f44); }
 .message { min-height: 1.4em; margin: 10px 0 0; }
 .hint { opacity: 0.75; font-size: 0.85rem; }

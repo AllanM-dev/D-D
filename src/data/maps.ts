@@ -24,6 +24,25 @@ export interface MapEnemy {
   y: number;
 }
 
+/** Lieu ou personnage : le toucher ouvre une scène de l'histoire. */
+export interface MapSpot {
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+  story: string;
+  scene: string;
+  /** Disparaît quand ce drapeau est posé. */
+  hiddenWhen?: string;
+}
+
+/** Case infranchissable tant que le drapeau n'est pas posé (porte verrouillée). */
+export interface MapLock {
+  x: number;
+  y: number;
+  flag: string;
+}
+
 export interface MapDef {
   id: string;
   name: string;
@@ -32,6 +51,8 @@ export interface MapDef {
   rows: readonly string[];
   start: { x: number; y: number };
   enemies: readonly MapEnemy[];
+  spots?: readonly MapSpot[];
+  locks?: readonly MapLock[];
 }
 
 export const MAPS: readonly MapDef[] = [
@@ -64,6 +85,12 @@ export const MAPS: readonly MapDef[] = [
       { id: "skeleton-1", encounterId: "skeleton", x: 17, y: 9 },
       { id: "ghoul-1", encounterId: "ghoul", x: 17, y: 13 },
     ],
+    spots: [
+      { id: "maire", x: 6, y: 8, label: "Odile, la maire", story: "brumeval", scene: "maire" },
+      { id: "aubergiste", x: 11, y: 7, label: "Thibaud, l'aubergiste", story: "brumeval", scene: "aubergiste" },
+      { id: "crypte", x: 17, y: 11, label: "Porte de la crypte", story: "brumeval", scene: "crypte", hiddenWhen: "crypte-ouverte" },
+    ],
+    locks: [{ x: 17, y: 11, flag: "crypte-ouverte" }],
   },
 ];
 

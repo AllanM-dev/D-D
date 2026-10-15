@@ -67,7 +67,7 @@ const calc = computed(() => {
   const e = props.event;
   const base = kept.value ?? e.dice.join(" + ");
   const mod = e.modifier ? ` ${signed(e.modifier).replace("-", "− ").replace("+", "+ ")}` : "";
-  const dc = e.dc !== undefined ? ` contre ${e.kind === "save" ? "DD" : "CA"} ${e.dc}` : "";
+  const dc = e.dc !== undefined ? ` contre ${e.kind === "save" || e.kind === "check" ? "DD" : "CA"} ${e.dc}` : "";
   const unit = e.kind === "damage" ? " dégâts" : e.kind === "heal" ? " PV" : "";
   // Dégâts réduits (moitié, résistance) : on montre le total lancé puis le total appliqué.
   if (e.rolled !== undefined && e.rolled !== e.total) return `${base}${mod} = ${e.rolled} → ${e.total}${unit}`;
@@ -84,6 +84,7 @@ const outcomeText = computed(() => {
   if (e.kind === "damage") return e.outcome === "crit" ? "Dégâts critiques !" : "";
   if (e.kind === "heal") return `Vous récupérez ${e.total} PV`;
   if (e.kind === "save") return e.outcome === "success" ? "Jet réussi" : "Jet raté";
+  if (e.kind === "check") return e.outcome === "success" ? "Test réussi" : "Test raté";
   if (e.kind === "deathSave" && e.outcome === "crit") return "Vous vous relevez !";
   return OUTCOMES[e.outcome] ?? "";
 });

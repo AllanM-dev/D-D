@@ -141,7 +141,8 @@ describe("pas, ennemis et rencontres", () => {
   it("la carte du village : on atteint chaque ennemi", () => {
     const m = MAP_BY_ID.brumeval;
     const st = startExploration(m);
-    for (const e of m.enemies) expect(planPath(st, e), e.id).not.toBeNull();
+    for (const e of m.enemies) expect(planPath(st, e, ["crypte-ouverte"]), e.id).not.toBeNull();
+    expect(planPath(st, m.enemies.find((e) => e.id === "ghoul-1")!, [])).toBeNull(); // derrière la porte verrouillée
     expect(key({ x: 1, y: 2 })).toBe("1,2");
   });
 });

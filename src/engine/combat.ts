@@ -143,7 +143,7 @@ export interface Combatant {
 
 export type CombatStatus = "ongoing" | "victory" | "defeat";
 
-export type RollKind = "initiative" | "attack" | "damage" | "deathSave" | "heal" | "save";
+export type RollKind = "initiative" | "attack" | "damage" | "deathSave" | "heal" | "save" | "check";
 export type RollOutcome = "hit" | "miss" | "crit" | "fumble" | "success" | "failure";
 
 /** Un jet de dés, avec de quoi l'animer : dés lancés, dé retenu, résultat. */

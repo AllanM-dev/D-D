@@ -5,6 +5,7 @@ import { migrateSpells } from "../engine/character";
 import { migrateCharacter } from "../engine/equipment";
 import type { ExplorationState } from "../engine/exploration";
 import type { Vitals } from "../engine/rest";
+import type { Applied } from "../engine/story";
 
 const KEY = "dd-mobile.characters";
 
@@ -37,9 +38,17 @@ export const useCharacters = defineStore("characters", () => {
     const c = list.value.find((x) => x.id === id);
     if (c) { c.exploration = JSON.parse(JSON.stringify(e)); persist(); }
   };
+  /** Enregistre les drapeaux de l'histoire et l'or gagné ou dépensé. */
+  const setStory = (id: string, a: Applied) => {
+    const c = list.value.find((x) => x.id === id);
+    if (!c) return;
+    c.story = { flags: [...a.flags] };
+    if (a.gold) c.equipment.gold = Math.max(0, c.equipment.gold + a.gold);
+    persist();
+  };
   const get = (id: string) => list.value.find((c) => c.id === id);
 
-  return { list, add, remove, get, setVitals, setExploration };
+  return { list, add, remove, get, setVitals, setExploration, setStory };
 });
 
 export function newId(): string {
