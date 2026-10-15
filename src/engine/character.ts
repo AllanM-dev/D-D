@@ -9,6 +9,7 @@ import {
 import { isFightingStyle, type FightingStyleId } from "../data/fighting-styles";
 import { CLASS_SPELLCASTING, defaultSpells, spellsFor } from "../data/spells";
 import type { AttackDef } from "./combat";
+import type { ExplorationState } from "./exploration";
 import type { Vitals } from "./rest";
 import { computeEquipment, getKit, type CharacterEquipment } from "./equipment";
 import { ABILITIES, abilityModifier, proficiencyBonus, type Ability } from "./rules";
@@ -78,6 +79,8 @@ export interface Character {
   spells?: SpellChoice;
   /** PV et ressources actuels (voir `rest.ts`) ; absent = tout au maximum. */
   vitals?: Vitals;
+  /** Position et exploration sur la carte (voir `exploration.ts`) ; absent = jamais exploré. */
+  exploration?: ExplorationState;
 }
 
 const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id);

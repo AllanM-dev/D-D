@@ -8,6 +8,7 @@ import HelpListView from "../views/HelpListView.vue";
 import HelpRulesView from "../views/HelpRulesView.vue";
 import HelpView from "../views/HelpView.vue";
 import HomeView from "../views/HomeView.vue";
+import MapView from "../views/MapView.vue";
 
 export default createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -16,6 +17,7 @@ export default createRouter({
     { path: "/create", component: CharacterCreateView },
     { path: "/character/:id", component: CharacterSheetView },
     { path: "/combat/:id", component: CombatView },
+    { path: "/map/:id", component: MapView },
     { path: "/credits", component: CreditsView },
     { path: "/help", component: HelpView },
     { path: "/help/rules", component: HelpRulesView },
