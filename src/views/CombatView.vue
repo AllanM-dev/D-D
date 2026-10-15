@@ -336,12 +336,14 @@ watch(() => state.value?.status, (st) => {
   store.setVitals(character.value.id, vitalsAfterCombat(character.value, state.value!));
   // Venu de la carte : l'ennemi vaincu disparaît ; en cas de défaite, le héros se réveille au départ.
   const ex = character.value.exploration;
-  if (fromMap.value && ex) store.setExploration(character.value.id, st === "victory" ? defeatEnemy(ex, enemyParam.value) : retreatToStart(ex));
-  // L'ennemi vaincu laisse un drapeau dans l'histoire (`defeated:<id>`) ; une défaite dans une scène ramène au départ.
-  if (fromMap.value && st === "victory" && enemyParam.value) {
-    store.setStory(character.value.id, { flags: applyEffects(character.value.story?.flags ?? [], { set: [`defeated:${enemyParam.value}`] }).flags, gold: 0 });
+  if ((fromMap.value || fromStory.value) && ex) {
+    if (st === "victory" && enemyParam.value) store.setExploration(character.value.id, defeatEnemy(ex, enemyParam.value));
+    else if (st === "defeat") store.setExploration(character.value.id, retreatToStart(ex));
   }
-  if (fromStory.value && st === "defeat" && ex) store.setExploration(character.value.id, retreatToStart(ex));
+  // L'ennemi vaincu laisse un drapeau dans l'histoire (`defeated:<id>`).
+  if ((fromMap.value || fromStory.value) && st === "victory" && enemyParam.value) {
+    store.setStory(character.value.id, { flags: applyEffects(character.value.story?.flags ?? [], { defeat: [enemyParam.value] }).flags, gold: 0 });
+  }
 });
 // Rencontre lancée depuis la carte : le combat démarre tout de suite.
 const fromMap = computed(() => route.query.from === "map");

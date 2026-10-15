@@ -17,6 +17,7 @@ export const ENCOUNTERS: readonly EncounterDef[] = [
   { id: "skeleton", name: "Un squelette dans la crypte", difficulty: "Moyen", monsters: [{ monsterId: "skeleton", count: 1 }] },
   { id: "goblins", name: "Embuscade de gobelins", difficulty: "Difficile", monsters: [{ monsterId: "goblin", count: 2 }] },
   { id: "bandits", name: "Bandits de grand chemin", difficulty: "Difficile", monsters: [{ monsterId: "bandit", count: 2 }] },
+  { id: "zombie", name: "Un zombie dans l'ossuaire", difficulty: "Moyen", monsters: [{ monsterId: "zombie", count: 1 }] },
   { id: "ghoul", name: "Une goule dans le cimetière", difficulty: "Difficile", monsters: [{ monsterId: "ghoul", count: 1 }] },
   { id: "orc", name: "Un orc solitaire", difficulty: "Difficile", monsters: [{ monsterId: "orc", count: 1 }] },
 ];

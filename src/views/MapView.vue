@@ -55,7 +55,7 @@ import { artKey } from "../data/illustrations";
 import { MAP_BY_ID } from "../data/maps";
 import { MONSTERS } from "../data/monsters";
 import {
-  cellMeters, key, liveSpots, livingEnemies, lockedCells, parseMap, planPath, startExploration, stepTo, visibleCells, type Cell, type ExplorationState,
+  cellMeters, key, liveSpots, livingEnemies, lockedCells, parseMap, planPath, startExploration, stepTo, travelTo, visibleCells, type Cell, type ExplorationState,
 } from "../engine/exploration";
 import { vitalsOf } from "../engine/rest";
 import { useCharacters } from "../stores/characters";
@@ -155,6 +155,13 @@ async function tap(x: number, y: number) {
       walking = false;
       return startFight(res.ambush.id, res.ambush.encounterId);
     }
+    if (res.travel) {
+      Object.assign(next, travelTo(next, res.travel));
+      store.setExploration(characterId.value, next);
+      message.value = res.travel.label;
+      centerOnHero();
+      break;
+    }
     if (res.spotted.length) {
       message.value = `Vous apercevez : ${res.spotted.map((e) => monsterOf(e.encounterId).name).join(", ")}.`;
       break;
@@ -183,6 +190,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .tile.door { background: #7a4a22; border: 3px solid #4a2c12; }
 .tile.tree { background: radial-gradient(circle at 50% 45%, #2f6a2a 0 55%, #1d4a1c 56% 100%); }
 .tile.water { background: repeating-linear-gradient(135deg, #2f6fb5 0 6px, #3a80c7 6px 12px); cursor: default; }
+.tile.stairs { background: repeating-linear-gradient(0deg, #6d6d78 0 5px, #8d8d98 5px 10px); }
 .tile.bridge { background: repeating-linear-gradient(90deg, #8b6a3a 0 6px, #6f5230 6px 8px); }
 .tile.wall, .tile.tree { cursor: default; }
 .tile.seen::after, .tile.unknown::after { content: ""; position: absolute; inset: 0; pointer-events: none; }

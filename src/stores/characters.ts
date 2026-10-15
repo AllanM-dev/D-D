@@ -39,7 +39,7 @@ export const useCharacters = defineStore("characters", () => {
     if (c) { c.exploration = JSON.parse(JSON.stringify(e)); persist(); }
   };
   /** Enregistre les drapeaux de l'histoire et l'or gagné ou dépensé. */
-  const setStory = (id: string, a: Applied) => {
+  const setStory = (id: string, a: Pick<Applied, "flags" | "gold">) => {
     const c = list.value.find((x) => x.id === id);
     if (!c) return;
     c.story = { flags: [...a.flags] };

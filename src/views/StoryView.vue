@@ -38,6 +38,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import DiceRoll from "../components/DiceRoll.vue";
 import { STORY_BY_ID } from "../data/stories";
+import { defeatEnemy } from "../engine/exploration";
 import type { RollEvent } from "../engine/combat";
 import { availableChoices, enterScene, resolveChoice, sceneText, skillName, type ChoiceOutcome } from "../engine/story";
 import { useCharacters } from "../stores/characters";
@@ -112,9 +113,11 @@ function proceed(o: ChoiceOutcome) {
   if (o.check) notice.value = `${skillName(o.check.skill)} : ${o.check.total} contre DD ${o.check.dc} — ${o.check.success ? "réussi" : "raté"}.`;
   store.setStory(characterId.value, { flags: o.flags, gold: o.gold });
   const id = characterId.value;
+  const ex = character.value?.exploration;
+  if (ex && o.defeated.length) store.setExploration(id, o.defeated.reduce(defeatEnemy, ex));
   if (o.fight) {
     const s = story.value!.id;
-    router.push(`/combat/${id}?encounter=${o.fight.encounterId}&from=story&story=${s}&win=${o.fight.win}&lose=${o.fight.lose ?? o.fight.win}&t=${Date.now()}`);
+    router.push(`/combat/${id}?encounter=${o.fight.encounterId}&from=story&story=${s}&enemy=${o.fight.enemy ?? ""}&win=${o.fight.win}&lose=${o.fight.lose ?? o.fight.win}&t=${Date.now()}`);
   } else if (o.end || !o.next) {
     router.push(`/map/${id}`);
   } else {

@@ -3,7 +3,7 @@ import { MAPS, MAP_BY_ID, type MapDef } from "../../data/maps";
 import { ENCOUNTERS } from "../../data/encounters";
 import {
   cellDistance, cellMeters, defeatEnemy, findPath, key, livingEnemies, mapOf, parseMap, planPath, reachableFrom, retreatToStart,
-  startExploration, stepTo, validateMap, visibleCells, visibleEnemies, walkable,
+  startExploration, stepTo, travelTo, validateMap, visibleCells, visibleEnemies, walkable,
 } from "../exploration";
 
 const tiny = (rows: string[], extra: Partial<MapDef> = {}): MapDef => ({ id: "tiny", name: "t", description: "t", rows, start: { x: 0, y: 0 }, enemies: [], ...extra });
@@ -127,22 +127,68 @@ describe("pas, ennemis et rencontres", () => {
     MAP_BY_ID.wall = m;
     expect(planPath(startExploration(m), { x: 2, y: 0 })).toBeNull();
   });
-  it("un ennemi vaincu disparaît ; la défaite ramène au départ", () => {
+  it("un ennemi vaincu disparaît ; la défaite ramène au village", () => {
     const st = withArena();
     st.x = 5;
     const won = defeatEnemy(st, "w");
     expect(livingEnemies(arena, won)).toHaveLength(0);
     expect(defeatEnemy(won, "w").defeated).toEqual(["w"]);
     const lost = retreatToStart(st);
-    expect(lost).toMatchObject({ x: 0, y: 1 });
+    expect(lost).toMatchObject({ mapId: "brumeval", x: MAP_BY_ID.brumeval.start.x, y: MAP_BY_ID.brumeval.start.y });
     expect(lost.defeated).toEqual([]);
-    expect(mapOf(lost).id).toBe("tiny");
   });
-  it("la carte du village : on atteint chaque ennemi", () => {
-    const m = MAP_BY_ID.brumeval;
-    const st = startExploration(m);
-    for (const e of m.enemies) expect(planPath(st, e, ["crypte-ouverte"]), e.id).not.toBeNull();
-    expect(planPath(st, m.enemies.find((e) => e.id === "ghoul-1")!, [])).toBeNull(); // derrière la porte verrouillée
+  it("chaque ennemi de chaque carte est atteignable (portes déverrouillées)", () => {
+    const open = ["crypte-ouverte", "sceau-brise"];
+    for (const m of MAPS) {
+      const st = startExploration(m);
+      for (const e of m.enemies) expect(planPath(st, e, open), `${m.id}/${e.id}`).not.toBeNull();
+    }
+    const st = startExploration(MAP_BY_ID.crypte);
+    expect(planPath(st, MAP_BY_ID.crypte.enemies.find((e) => e.id === "ghoul-1")!, [])).toBeNull(); // derrière la porte scellée
     expect(key({ x: 1, y: 2 })).toBe("1,2");
+  });
+  it("les identifiants d'ennemis sont uniques d'une carte à l'autre", () => {
+    const ids = MAPS.flatMap((m) => m.enemies.map((e) => e.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("passages entre cartes", () => {
+  const village = MAP_BY_ID.brumeval;
+  const crypt = MAP_BY_ID.crypte;
+  it("marcher sur le passage de la porte de la crypte propose le voyage (une fois ouverte)", () => {
+    const st = startExploration(village);
+    st.x = 17; st.y = 10;
+    const res = stepTo(st, { x: 17, y: 11 }, ["crypte-ouverte"]);
+    expect(res.travel?.to.map).toBe("crypte");
+  });
+  it("voyager garde la mémoire des zones explorées de chaque carte", () => {
+    const st = startExploration(village);
+    const villageSeen = st.explored.length;
+    const inside = travelTo(st, village.exits![0]);
+    expect(inside.mapId).toBe("crypte");
+    expect(inside).toMatchObject({ x: 3, y: 1 });
+    expect(inside.others!.brumeval).toHaveLength(villageSeen);
+    expect(inside.explored).toContain("3,1");
+    const back = travelTo(inside, crypt.exits![0]);
+    expect(back.mapId).toBe("brumeval");
+    expect(back.explored.length).toBeGreaterThanOrEqual(villageSeen);
+    for (const k of st.explored) expect(back.explored).toContain(k);
+    expect(back.others!.crypte).toContain("3,1");
+    expect(back.others!.brumeval).toBeUndefined();
+  });
+  it("on n'arrive pas sur un passage : il faut s'en éloigner pour le reprendre", () => {
+    const inside = travelTo(startExploration(village), village.exits![0]);
+    expect(inside.x === crypt.exits![0].x && inside.y === crypt.exits![0].y).toBe(false);
+  });
+  it("une défaite dans la crypte ramène au village", () => {
+    const inside = travelTo(startExploration(village), village.exits![0]);
+    const lost = retreatToStart(inside);
+    expect(lost.mapId).toBe("brumeval");
+    expect(lost).toMatchObject({ x: village.start.x, y: village.start.y });
+    expect(lost.others!.crypte).toBeTruthy();
+  });
+  it("les passages mènent à des cases libres de cartes existantes", () => {
+    for (const m of MAPS) expect(validateMap(m), m.id).toEqual([]);
   });
 });
