@@ -36,6 +36,14 @@
         </div>
       </div>
 
+      <ul class="legend" aria-label="Légende de la carte">
+        <li><span class="spot sm">!</span> Lieu où parler ou agir</li>
+        <li><span class="swatch locked-sw"></span> Passage verrouillé</li>
+        <li><span class="swatch enemy-sw"></span> Ennemi</li>
+        <li><span class="swatch hero-sw"></span> Vous</li>
+        <li><span class="swatch fog-sw"></span> Zone inexplorée</li>
+      </ul>
+
       <p class="message" aria-live="polite">{{ message }}</p>
       <p class="hint">Touchez une case pour voir le trajet, touchez-la une seconde fois pour y aller (1 case = 1,5 m). Même chose pour un ennemi à combattre ou un « ! » pour parler ou agir. Touchez ailleurs pour changer de destination. Les zones sombres ne sont pas encore explorées.</p>
       <ion-button expand="block" fill="outline" :router-link="`/character/${character.id}`">Fiche et repos</ion-button>
@@ -215,6 +223,14 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .spot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-weight: 800; box-shadow: 0 0 0 2px #3a2a00, 0 0 6px #ffd54a; }
 .tile.locked { box-shadow: inset 0 0 0 3px #c0392b; }
 .enemy { display: flex; filter: drop-shadow(0 0 3px #f44); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 8px 0 0; padding: 0; font-size: 0.8rem; opacity: 0.85; }
+.legend li { display: flex; align-items: center; gap: 5px; }
+.spot.sm { width: 16px; height: 16px; font-size: 0.7rem; box-shadow: 0 0 0 1px #3a2a00; }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+.locked-sw { background: #7a4a22; box-shadow: inset 0 0 0 3px #c0392b; }
+.enemy-sw { background: #f44; border-radius: 50%; }
+.hero-sw { background: #8a8a92; outline: 2px solid #ffd54a; outline-offset: -2px; }
+.fog-sw { background: #000; border: 1px solid #888; }
 .message { min-height: 1.4em; margin: 10px 0 0; }
 .hint { opacity: 0.75; font-size: 0.85rem; }
 </style>

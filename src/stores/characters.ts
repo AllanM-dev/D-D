@@ -9,6 +9,7 @@ import type { Vitals } from "../engine/rest";
 import type { Applied } from "../engine/story";
 import type { Loot } from "../data/items";
 import type { LoadoutPatch } from "../engine/loadout";
+import { exportSave, mergeCharacters, parseSave } from "../engine/savefile";
 import { changeItems, inventoryOf } from "../engine/inventory";
 
 const KEY = "dd-mobile.characters";
@@ -76,9 +77,20 @@ export const useCharacters = defineStore("characters", () => {
     const c = list.value.find((x) => x.id === id);
     if (c) { c.inventory = { ...inventory }; persist(); }
   };
+  /** Texte du fichier de sauvegarde (tous les personnages). */
+  const exportAll = () => exportSave(list.value);
+  /** Importe un fichier de sauvegarde ; renvoie un résumé ou une erreur. */
+  const importAll = (text: string): { added: number; replaced: number } | { error: string } => {
+    const r = parseSave(text);
+    if ("error" in r) return r;
+    const m = mergeCharacters(list.value, r.characters.map((c) => migrateMasteries(migrateSpells(migrateCharacter(c)))));
+    list.value = m.list;
+    persist();
+    return { added: m.added, replaced: m.replaced };
+  };
   const get = (id: string) => list.value.find((c) => c.id === id);
 
-  return { list, add, remove, get, setVitals, setExploration, setStory, addLoot, setInventory, applyLoadout };
+  return { list, add, remove, get, setVitals, setExploration, setStory, addLoot, setInventory, applyLoadout, exportAll, importAll };
 });
 
 export function newId(): string {

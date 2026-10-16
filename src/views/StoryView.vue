@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start"><ion-back-button :default-href="`/map/${characterId}`" /></ion-buttons>
-        <ion-title>{{ story?.title ?? "Histoire" }}</ion-title>
+        <ion-title :title="story?.title">{{ story?.title ?? "Histoire" }}</ion-title>
         <ion-buttons slot="end">
           <ion-toggle v-model="animate" aria-label="Animation de mes jets de dés">Mes dés</ion-toggle>
         </ion-buttons>

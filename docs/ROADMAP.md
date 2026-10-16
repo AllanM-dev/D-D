@@ -44,6 +44,8 @@
 - [x] Inventaire et butin : sac à dos, or, potions de soin (hors combat et en action bonus), butin des ennemis et des coffres, boutique de l'aubergiste, objets de quête ; section Aide → Objets
 - [x] Équipement : équiper et ranger armes, armure et bouclier (CA, vitesse et attaques recalculées), armes et armures du SRD en boutique et en butin, forge de Brumeval, maîtrise d'armure, propriétés Légère (deux armes), Lourde, Deux mains, Allonge
 - [ ] Équipement : objets magiques, poids porté, munitions comptées, maîtrises d'armes 2024, réparation
+- [x] Confort : sauvegarde exportable/importable (fichier JSON), légende de la carte
+- [ ] Confort : mode sombre/clair réglable, tailles de texte, sauvegarde dans le nuage
 
 ## Plus tard
 - [ ] Narration générée (MJ IA), multijoueur, repos, montée de niveau
