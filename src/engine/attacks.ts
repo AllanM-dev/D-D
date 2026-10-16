@@ -25,6 +25,7 @@ export function characterToCombatant(c: Character): CombatantInit {
       ...(itemCount(c, "healing-potion") > 0 ? [{ id: "potion" as const, uses: itemCount(c, "healing-potion"), max: itemCount(c, "healing-potion") }] : []),
     ],
     art: artKey("class", c.classDef.id),
+    sprite: `hero:${c.species.id}:${c.classDef.id}`,
     untrainedArmor: wearsUntrained(c.classDef.id, c.equipment),
     sneakDice: c.classDef.id === "rogue" ? 1 : undefined, // Attaque sournoise : 1d6 au niveau 1
     saveMods: Object.fromEntries(ABILITIES.map((a) => [a, c.saves[a].bonus])) as Record<Ability, number>,

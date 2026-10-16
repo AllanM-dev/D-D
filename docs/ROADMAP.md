@@ -46,7 +46,8 @@
 - [ ] Équipement : objets magiques, poids porté, munitions comptées, maîtrises d'armes 2024, réparation
 - [x] Confort : sauvegarde exportable/importable (fichier JSON), légende de la carte
 - [x] Apparence de la carte (lot 1) : cases dessinées en SVG (variantes, ombres, rives, lisières, torches), lueur du héros
-- [ ] Apparence (lot 2) : maisons du village, jetons et barres de PV des monstres, portraits des PNJ
+- [x] Apparence (lot 2) : personnages 2D (héros par espèce et classe, 10 monstres, 4 PNJ), socles d'équipe, barres de PV en combat
+- [ ] Apparence (lot 3) : maisons du village avec toits, animations (marche, coup reçu), personnages de l'écran de création
 - [ ] Confort : mode sombre/clair réglable, tailles de texte, sauvegarde dans le nuage
 
 ## Plus tard

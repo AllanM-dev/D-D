@@ -33,7 +33,7 @@ export function buildEnemies(encounter: EncounterDef): CombatantInit[] {
     for (let i = 1; i <= count; i++) {
       out.push({
         id: `${m.id}-${i}`, name: count > 1 ? `${m.name} ${i}` : m.name, side: "enemies",
-        maxHp: m.maxHp, ac: m.ac, initiativeBonus: m.initiativeBonus, attacks: m.attacks, art: artKey("monster", m.id), saveMods: m.saves, immunities: m.immunities, speed: m.speed, traits: m.traits,
+        maxHp: m.maxHp, ac: m.ac, initiativeBonus: m.initiativeBonus, attacks: m.attacks, art: artKey("monster", m.id), sprite: `monster:${m.id}`, saveMods: m.saves, immunities: m.immunities, speed: m.speed, traits: m.traits,
       });
     }
   }
