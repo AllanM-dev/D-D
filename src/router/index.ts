@@ -9,6 +9,7 @@ import HelpRulesView from "../views/HelpRulesView.vue";
 import HelpView from "../views/HelpView.vue";
 import HomeView from "../views/HomeView.vue";
 import MapView from "../views/MapView.vue";
+import ShopView from "../views/ShopView.vue";
 import StoryView from "../views/StoryView.vue";
 
 export default createRouter({
@@ -20,6 +21,7 @@ export default createRouter({
     { path: "/combat/:id", component: CombatView },
     { path: "/map/:id", component: MapView },
     { path: "/story/:id", component: StoryView },
+    { path: "/shop/:id", component: ShopView },
     { path: "/credits", component: CreditsView },
     { path: "/help", component: HelpView },
     { path: "/help/rules", component: HelpRulesView },

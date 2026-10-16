@@ -3,6 +3,7 @@ import type { Character } from "./character";
 import type { CombatantInit } from "./combat";
 import { featuresFor } from "./features";
 import { ABILITIES, type Ability } from "./rules";
+import { wearsUntrained } from "./equipment";
 import { itemCount } from "./inventory";
 import { castingInput, vitalsOf } from "./rest";
 import { castingFor } from "./spellcasting";
@@ -24,6 +25,7 @@ export function characterToCombatant(c: Character): CombatantInit {
       ...(itemCount(c, "healing-potion") > 0 ? [{ id: "potion" as const, uses: itemCount(c, "healing-potion"), max: itemCount(c, "healing-potion") }] : []),
     ],
     art: artKey("class", c.classDef.id),
+    untrainedArmor: wearsUntrained(c.classDef.id, c.equipment),
     saveMods: Object.fromEntries(ABILITIES.map((a) => [a, c.saves[a].bonus])) as Record<Ability, number>,
     tags: [c.species.id],
     spellcasting,

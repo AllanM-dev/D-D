@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { CLASSES } from "../../data/classes";
-import { ITEMS, ITEM_BY_ID } from "../../data/items";
+import { ITEMS, getItem } from "../../data/items";
 import { MAPS } from "../../data/maps";
 import { STORY_BY_ID } from "../../data/stories";
 import { characterToCombatant } from "../attacks";
 import { buildCharacter, type Character, type CharacterDraft } from "../character";
-import { availableChoices, resolveChoice, validateStory } from "../story";
+import { resolveChoice, validateStory } from "../story";
 import { getCombatant, playerOptions, startCombat, useFeature } from "../combat";
 import { canDrink, changeItems, describeLoot, drinkPotion, enemyLoot, inventoryOf, itemCount, potionsLeft } from "../inventory";
 import type { Rng } from "../dice";
@@ -40,8 +40,8 @@ describe("objets", () => {
     expect(describeLoot({})).toBe("");
   });
   it("tout le butin des cartes est valide", () => {
-    for (const m of MAPS) for (const e of m.enemies) for (const id of Object.keys(e.loot?.items ?? {})) expect(ITEM_BY_ID[id], `${m.id}/${e.id}/${id}`).toBeTruthy();
-    expect(enemyLoot("goblin-1")).toEqual({ gold: 6 });
+    for (const m of MAPS) for (const e of m.enemies) for (const id of Object.keys(e.loot?.items ?? {})) expect(getItem(id), `${m.id}/${e.id}/${id}`).toBeTruthy();
+    expect(enemyLoot("goblin-1")).toEqual({ gold: 6, items: { "weapon:scimitar": 1 } });
     expect(enemyLoot("ghoul-1").items).toEqual({ "healing-potion": 1 });
     expect(enemyLoot("inconnu")).toEqual({});
     expect(enemyLoot("wolf-1")).toEqual({});
@@ -100,40 +100,32 @@ describe("potions en combat", () => {
   });
 });
 
-describe("boutique de l'aubergiste", () => {
+describe("histoire : or, objets et boutiques", () => {
   const story = STORY_BY_ID.brumeval;
-  const shop = story.scenes.boutique;
-  const wallet = (gold: number, items: Record<string, number> = {}) => ({ gold, items });
-  const idx = (text: string) => shop.choices.findIndex((c) => c.text.startsWith(text));
-
-  it("l'achat exige assez d'or ; la vente exige l'objet", () => {
-    expect(availableChoices(shop, [], wallet(49)).some((c) => c.choice.text.startsWith("Acheter"))).toBe(false);
-    expect(availableChoices(shop, [], wallet(50)).some((c) => c.choice.text.startsWith("Acheter"))).toBe(true);
-    expect(availableChoices(shop, [], wallet(500)).some((c) => c.choice.text.startsWith("Vendre"))).toBe(false);
-    expect(availableChoices(shop, [], wallet(0, { gem: 1 })).some((c) => c.choice.text.startsWith("Vendre"))).toBe(true);
-  });
-  it("acheter : −50 po et +1 potion ; vendre : +10 po et −1 gemme", () => {
-    const buy = resolveChoice(shop, idx("Acheter"), [], () => 0, Math.random, wallet(80));
-    expect(buy).toMatchObject({ gold: -50, items: { "healing-potion": 1 }, next: "boutique" });
-    const sell = resolveChoice(shop, idx("Vendre"), [], () => 0, Math.random, wallet(0, { gem: 2 }));
-    expect(sell).toMatchObject({ gold: 10, items: { gem: -1 } });
-    expect(() => resolveChoice(shop, idx("Acheter"), [], () => 0, Math.random, wallet(10))).toThrow();
-  });
-  it("l'histoire dépense de l'or et retire des objets seulement quand c'est possible (validation)", () => {
+  it("la validation de l'histoire passe (dépenses conditionnées, boutiques connues)", () => {
     expect(validateStory(story, "maire")).toEqual([]);
-    const broken = { id: "b", title: "b", scenes: { a: { id: "a", title: "a", text: ["x"], choices: [{ text: "pay", goto: "a", gold: -5 }, { text: "take", goto: "a", items: { gem: -1 } }] } } };
-    expect(validateStory(broken, "a").length).toBe(2);
+    const broken = { id: "b", title: "b", scenes: { a: { id: "a", title: "a", text: ["x"], choices: [{ text: "pay", goto: "a", gold: -5 }, { text: "take", goto: "a", items: { gem: -1 } }, { text: "shop", shop: "nulle-part" }] } } };
+    expect(validateStory(broken, "a").length).toBe(3);
   });
-  it("la clé, le journal, la potion du coffre et la gemme du squelette arrivent dans le sac", () => {
+  it("les choix de boutique mènent à une boutique", () => {
+    const shops = Object.values(story.scenes).flatMap((sc) => sc.choices.filter((c) => c.shop).map((c) => c.shop));
+    expect(shops.sort()).toEqual(["auberge", "forge"]);
+    const aub = story.scenes.aubergiste;
+    const i = aub.choices.findIndex((c) => c.shop === "auberge");
+    expect(resolveChoice(aub, i, [], () => 0).shop).toBe("auberge");
+  });
+  it("la clé, le journal, la potion du coffre, la gemme et les armes du butin arrivent dans le sac", () => {
+    const wallet = { gold: 0, items: {} };
     const give = (scene: string, text: string) => {
       const i = story.scenes[scene].choices.findIndex((c) => c.text.startsWith(text));
-      return resolveChoice(story.scenes[scene], i, [], () => 0, Math.random, wallet(0)).items;
+      return resolveChoice(story.scenes[scene], i, [], () => 0, Math.random, wallet).items;
     };
     expect(give("aubergiste-cle-ok", "Prendre la clé")).toEqual({ "cle-crypte": 1 });
     expect(give("aubergiste-pere", "Prendre la clé")).toEqual({ "cle-crypte": 1 });
     expect(give("journal-lecture", "Refermer")).toEqual({ "journal-gedeon": 1 });
     expect(give("coffre", "Prendre la bourse")).toEqual({ "healing-potion": 1 });
-    expect(enemyLoot("skeleton-1").items).toEqual({ gem: 1 });
+    expect(enemyLoot("skeleton-1").items).toEqual({ gem: 1, "weapon:shortsword": 1 });
+    expect(enemyLoot("goblin-1").items).toEqual({ "weapon:scimitar": 1 });
   });
   it("inventoryOf copie le sac", () => {
     const c = hero({ inventory: { gem: 1 } });

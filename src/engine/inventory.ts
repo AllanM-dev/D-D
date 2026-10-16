@@ -1,4 +1,4 @@
-import { ITEM_BY_ID, type Loot } from "../data/items";
+import { getItem, type Loot } from "../data/items";
 import { MAPS } from "../data/maps";
 import type { Character } from "./character";
 import { getCombatant, type CombatState } from "./combat";
@@ -14,7 +14,7 @@ export const itemCount = (c: Pick<Character, "inventory">, id: string) => c.inve
 export function changeItems(inv: Inventory, delta: Record<string, number>): Inventory {
   const out = { ...inv };
   for (const [id, n] of Object.entries(delta)) {
-    if (!ITEM_BY_ID[id]) throw new Error(`Objet inconnu : ${id}`);
+    if (!getItem(id)) throw new Error(`Objet inconnu : ${id}`);
     const q = Math.max(0, (out[id] ?? 0) + n);
     if (q) out[id] = q;
     else delete out[id];
@@ -26,7 +26,7 @@ export function changeItems(inv: Inventory, delta: Record<string, number>): Inve
 export function describeLoot(loot: Loot): string {
   const parts: string[] = [];
   if (loot.gold) parts.push(`${loot.gold} po`);
-  for (const [id, n] of Object.entries(loot.items ?? {})) parts.push(n > 1 ? `${ITEM_BY_ID[id]?.name ?? id} × ${n}` : (ITEM_BY_ID[id]?.name ?? id));
+  for (const [id, n] of Object.entries(loot.items ?? {})) parts.push(n > 1 ? `${getItem(id)?.name ?? id} × ${n}` : (getItem(id)?.name ?? id));
   return parts.join(", ");
 }
 

@@ -81,7 +81,8 @@ export function spellOptionsFor(state: CombatState, c: Combatant): SpellOption[]
     const hasFree = !!free && free.uses > 0;
     const slotsLeft = sc.slots.max - sc.slots.used;
     let reason: string | undefined;
-    if (spell.time === "action" && c.turnState.action) reason = "Action déjà utilisée";
+    if (c.untrainedArmor) reason = "Impossible en armure ou bouclier non maîtrisé";
+    else if (spell.time === "action" && c.turnState.action) reason = "Action déjà utilisée";
     else if (spell.time === "bonus" && c.turnState.bonus) reason = "Action bonus déjà utilisée";
     else if (spell.level >= 1 && !hasFree && slotsLeft <= 0) reason = "Plus d'emplacement de sort";
     else reason = turnRestriction(c, spell);

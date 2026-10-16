@@ -1,6 +1,7 @@
 /** Objets du sac à dos. Textes originaux en français. */
+import { ARMORS, PRICES, WEAPONS } from "./equipment";
 
-export type ItemKind = "consumable" | "treasure" | "key";
+export type ItemKind = "consumable" | "treasure" | "key" | "weapon" | "armor";
 
 export interface ItemDef {
   id: string;
@@ -39,7 +40,28 @@ export const ITEMS: readonly ItemDef[] = [
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
-export const ITEM_KIND_NAMES: Record<ItemKind, string> = { consumable: "Consommable", treasure: "Trésor", key: "Objet de quête" };
+export const ITEM_KIND_NAMES: Record<ItemKind, string> = {
+  consumable: "Consommable", treasure: "Trésor", key: "Objet de quête", weapon: "Arme", armor: "Armure",
+};
+
+export const weaponItemId = (id: string) => `weapon:${id}`;
+export const armorItemId = (id: string) => `armor:${id}`;
+
+/**
+ * Fiche d'un objet du sac : objets de `ITEMS`, ou arme (`weapon:<id>`) et armure (`armor:<id>`) tirées des données d'équipement.
+ */
+export function getItem(id: string): ItemDef | undefined {
+  if (ITEM_BY_ID[id]) return ITEM_BY_ID[id];
+  if (id.startsWith("weapon:")) {
+    const w = WEAPONS.find((x) => x.id === id.slice(7));
+    return w && { id, name: w.name, kind: "weapon", value: PRICES[w.id], text: `${w.category === "simple" ? "Arme courante" : "Arme de guerre"} : ${w.damage.count}d${w.damage.sides} dégâts ${w.damageType}.`, note: "Se range ou s'équipe depuis la fiche du personnage ; achat et vente chez la forgeronne." };
+  }
+  if (id.startsWith("armor:")) {
+    const a = ARMORS.find((x) => x.id === id.slice(6));
+    return a && { id, name: a.name, kind: "armor", value: PRICES[a.id], text: a.kind === "shield" ? "Bouclier : +2 à la CA." : `Armure ${a.kind === "light" ? "légère" : a.kind === "medium" ? "intermédiaire" : "lourde"} : CA de base ${a.baseAc}.`, note: "Se range ou s'équipe depuis la fiche du personnage ; achat et vente chez la forgeronne." };
+  }
+  return undefined;
+}
 
 /** Ce qu'une victoire rapporte : de l'or et des objets. */
 export interface Loot {

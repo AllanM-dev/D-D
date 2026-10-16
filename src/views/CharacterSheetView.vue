@@ -70,6 +70,7 @@
             <p>{{ ITEM_KIND_NAMES[b.def.kind] }}<template v-if="b.def.value"> · {{ b.def.value }} po</template> · {{ b.def.text }}</p>
           </ion-label>
           <ion-button v-if="b.def.id === 'healing-potion'" slot="end" size="small" :disabled="!canDrink(c)" @click="drink">Boire</ion-button>
+          <ion-button v-else-if="b.def.kind === 'weapon' || b.def.kind === 'armor'" slot="end" size="small" :disabled="!canEquip(c, b.def.id)" @click="wear(b.def.id)">Équiper</ion-button>
         </ion-item>
         <ion-item v-if="!bag.length" lines="none"><ion-label class="ion-text-wrap"><p>Aucun objet pour l'instant.</p></ion-label></ion-item>
         <ion-item v-if="bagReport" lines="none"><ion-label class="ion-text-wrap report">{{ bagReport }}</ion-label></ion-item>
@@ -130,7 +131,9 @@
         <ion-item v-for="a in c.attacks" :key="a.name" lines="full">
           <ion-label class="ion-text-wrap">
             {{ a.name }}
-            <p>{{ a.damage.count }}d{{ a.damage.sides }}{{ a.damage.bonus ? signed(a.damage.bonus) : "" }} {{ a.damageType }}{{ a.ranged ? " · à distance" : " · corps à corps" }}</p>
+            <p>{{ a.damage.count }}d{{ a.damage.sides }}{{ a.damage.bonus ? signed(a.damage.bonus) : "" }} {{ a.damageType }}{{ a.ranged ? " · à distance" : " · corps à corps" }}<template v-if="a.reach"> · allonge {{ formatMeters(a.reach * 1.5) }}</template><template v-if="a.offhand"> · seconde arme possible (action bonus)</template></p>
+            <p v-if="a.blocked" class="warn">{{ a.blocked }}</p>
+            <p v-else-if="a.penalty" class="warn">Désavantage : {{ a.penalty }}</p>
           </ion-label>
           <ion-note slot="end">{{ signed(a.toHit) }}</ion-note>
         </ion-item>
@@ -138,14 +141,28 @@
 
       <ion-list inset>
         <ion-list-header><ion-label>Équipement</ion-label></ion-list-header>
-        <ion-item lines="full"><ion-label>Armure</ion-label><ion-note slot="end">{{ c.equipment.armor?.name ?? "Aucune" }}</ion-note></ion-item>
-        <ion-item lines="full"><ion-label>Bouclier</ion-label><ion-note slot="end">{{ c.equipment.shield ? "Oui (+2 CA)" : "Non" }}</ion-note></ion-item>
+        <ion-item lines="full">
+          <ion-label class="ion-text-wrap">Armure<p>{{ c.equipment.armor?.name ?? "Aucune" }}</p></ion-label>
+          <ion-button v-if="c.equipment.armor" slot="end" size="small" fill="outline" @click="stow({ kind: 'armor' })">Ranger</ion-button>
+        </ion-item>
+        <ion-item lines="full">
+          <ion-label class="ion-text-wrap">Bouclier<p>{{ c.equipment.shield ? "Oui (+2 CA)" : "Non" }}</p></ion-label>
+          <ion-button v-if="c.equipment.shield" slot="end" size="small" fill="outline" @click="stow({ kind: 'shield' })">Ranger</ion-button>
+        </ion-item>
+        <ion-item v-if="untrained" lines="full">
+          <ion-label class="ion-text-wrap warn">Armure ou bouclier non maîtrisé : désavantage à vos attaques et aucun sort jusqu'à ce que vous l'ôtiez.</ion-label>
+        </ion-item>
+        <ion-item v-if="armorSlow" lines="full">
+          <ion-label class="ion-text-wrap warn">Force insuffisante pour cette armure : vitesse réduite de 3 m.</ion-label>
+        </ion-item>
         <ion-item v-for="w in c.equipment.weapons" :key="w.id" lines="full">
-          <ion-label>{{ w.name }}</ion-label><ion-note v-if="w.qty > 1" slot="end">× {{ w.qty }}</ion-note>
+          <ion-label class="ion-text-wrap">{{ w.name }}<template v-if="w.qty > 1"> × {{ w.qty }}</template></ion-label>
+          <ion-button slot="end" size="small" fill="outline" @click="stow({ kind: 'weapon', id: w.id })">Ranger</ion-button>
         </ion-item>
         <ion-item v-for="g in c.equipment.gear" :key="g.name" lines="full">
           <ion-label class="ion-text-wrap">{{ g.name }}</ion-label><ion-note v-if="g.qty > 1" slot="end">× {{ g.qty }}</ion-note>
         </ion-item>
+        <ion-item v-if="bagReport" lines="full"><ion-label class="ion-text-wrap report">{{ bagReport }}</ion-label></ion-item>
         <ion-item lines="none"><ion-label>Pièces d'or</ion-label><ion-note slot="end">{{ c.equipment.gold }} po</ion-note></ion-item>
       </ion-list>
 
@@ -171,15 +188,18 @@ import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
 import { SPELL_BY_ID, isPlayable } from "../data/spells";
 import { castingFor } from "../engine/spellcasting";
-import { ITEM_BY_ID, ITEM_KIND_NAMES } from "../data/items";
+import { getItem, ITEM_KIND_NAMES } from "../data/items";
+import { ARMORS } from "../data/equipment";
+import { wearsUntrained } from "../engine/equipment";
 import { canDrink, drinkPotion } from "../engine/inventory";
+import { canEquip, equipItem, unequip, type Slot } from "../engine/loadout";
 import { hitDiceMax, longRest, shortRest, vitalsOf, type RestResult } from "../engine/rest";
 import { FEATURE_LABELS } from "../engine/combat";
 import { featuresFor } from "../engine/features";
 import { artKey } from "../data/illustrations";
 import { CLASS_FEATURE_TEXT, FEATURE_STATUS } from "../data/help";
 import { ABILITIES } from "../engine/rules";
-import { ABILITY_NAMES, fmtNumber, signed } from "../ui/format";
+import { ABILITY_NAMES, fmtNumber, formatMeters, signed } from "../ui/format";
 import { useCharacters } from "../stores/characters";
 
 const store = useCharacters();
@@ -207,9 +227,22 @@ const resources = computed(() => {
   return out;
 });
 const bag = computed(() =>
-  Object.entries(c.value?.inventory ?? {}).map(([id, n]) => ({ def: ITEM_BY_ID[id], n })).filter((b) => b.def),
+  Object.entries(c.value?.inventory ?? {}).map(([id, n]) => ({ def: getItem(id)!, n })).filter((b) => b.def),
 );
 const bagReport = ref("");
+const untrained = computed(() => (c.value ? wearsUntrained(c.value.classDef.id, c.value.equipment) : false));
+const armorSlow = computed(() => {
+  const a = c.value?.equipment.armor && ARMORS.find((x) => x.id === c.value!.equipment.armor!.id);
+  return !!a && !!a.minStr && c.value!.scores.STR < a.minStr;
+});
+function wear(id: string) {
+  try { store.applyLoadout(c.value!.id, equipItem(c.value!, id)); bagReport.value = `Équipé : ${getItem(id)!.name} (CA ${c.value!.armorClass}).`; }
+  catch (e) { bagReport.value = (e as Error).message; }
+}
+function stow(slot: Slot) {
+  try { store.applyLoadout(c.value!.id, unequip(c.value!, slot)); bagReport.value = `Rangé dans le sac (CA ${c.value!.armorClass}).`; }
+  catch (e) { bagReport.value = (e as Error).message; }
+}
 function drink() {
   const r = drinkPotion(c.value!);
   store.setVitals(c.value!.id, r.vitals);
@@ -257,4 +290,5 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .rest-row { display: flex; align-items: center; gap: 8px; padding: 4px 16px 10px; }
 .rest-row .grow { flex: 1; }
 .report { font-size: 0.9rem; }
+.warn { color: var(--ion-color-warning, #ffc409); font-size: 0.9rem; }
 </style>

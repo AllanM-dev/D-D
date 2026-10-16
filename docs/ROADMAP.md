@@ -41,7 +41,8 @@
 - [x] Une aventure courte jouable de bout en bout : « Les morts de Brumeval » (village, crypte à deux cartes reliées, deux fins possibles, récompense en or) ; cartes reliées par des passages, zones explorées gardées par carte
 - [ ] Aventure : expérience et montée de niveau, inventaire et butin, autres aventures
 - [x] Inventaire et butin : sac à dos, or, potions de soin (hors combat et en action bonus), butin des ennemis et des coffres, boutique de l'aubergiste, objets de quête ; section Aide → Objets
-- [ ] Inventaire : changer d'arme et d'armure, objets magiques, poids
+- [x] Équipement : équiper et ranger armes, armure et bouclier (CA, vitesse et attaques recalculées), armes et armures du SRD en boutique et en butin, forge de Brumeval, maîtrise d'armure, propriétés Légère (deux armes), Lourde, Deux mains, Allonge
+- [ ] Équipement : objets magiques, poids porté, munitions comptées, maîtrises d'armes 2024, réparation
 
 ## Plus tard
 - [ ] Narration générée (MJ IA), multijoueur, repos, montée de niveau

@@ -116,8 +116,8 @@
             </div>
             <template v-else-if="o.needsTarget">
               <template v-for="e in livingEnemies" :key="e.id">
-                <ion-button expand="block" :disabled="!strikeStatus(e).ok" @click="bonusStrike(e.id)">{{ o.label }} : {{ e.name }}</ion-button>
-                <p v-if="!strikeStatus(e).ok" class="hint">{{ strikeStatus(e).reason }}</p>
+                <ion-button expand="block" :disabled="!strikeStatus(e, o.id).ok" @click="bonusStrike(o.id, e.id)">{{ o.label }} : {{ e.name }}</ion-button>
+                <p v-if="!strikeStatus(e, o.id).ok" class="hint">{{ strikeStatus(e, o.id).reason }}</p>
               </template>
             </template>
             <ion-button v-else expand="block" @click="bonus(o.id)">{{ o.label }} ({{ o.detail }})</ion-button>
@@ -463,9 +463,14 @@ const hero = computed(() => state.value?.combatants.find((c) => c.side === "part
 const NO_CHECK: TargetCheck = { ok: true, disadvantage: [], meters: 0 };
 const attackStatus = (e: Combatant) =>
   state.value && hero.value ? attackCheck(state.value, hero.value, e, attacks.value[attackIndex.value] ?? attacks.value[0]) : NO_CHECK;
-const strikeStatus = (e: Combatant) => {
-  const strike = attacks.value.find((a) => a.unarmed);
-  return state.value && hero.value && strike ? attackCheck(state.value, hero.value, e, strike) : NO_CHECK;
+/** Contrôle de la frappe bonus : arts martiaux (mains nues) ou seconde arme légère. */
+const strikeStatus = (e: Combatant, featureId: string) => {
+  const h = hero.value;
+  const off = h?.turnState.offhand;
+  const strike = featureId === "offhand" && off
+    ? { name: off.name, toHit: off.toHit, damage: off.damage, damageType: off.damageType, ranged: false }
+    : attacks.value.find((a) => a.unarmed);
+  return state.value && h && strike ? attackCheck(state.value, h, e, strike) : NO_CHECK;
 };
 const spellStatus = (e: Combatant) =>
   state.value && hero.value && pickedSpell.value ? spellTargetCheck(state.value, hero.value, e, rangeMeters(SPELL_BY_ID[pickedSpell.value.id])) : NO_CHECK;
@@ -496,7 +501,7 @@ watch(availableSpells, (list) => { if (!list.some((o) => o.id === spellId.value)
 const cast = (id: string, targetId?: string) => act((s) => castSpell(s, id, Math.random, { targetId }));
 const spellName = (id: string) => SPELL_BY_ID[id]?.name ?? id;
 const isMarked = (id: string) => !!state.value?.combatants.some((x) => x.mark?.targetId === id);
-const bonusStrike = (targetId: string) => act((s) => useFeature(s, "martial-arts", Math.random, { targetId }));
+const bonusStrike = (id: FeatureId, targetId: string) => act((s) => useFeature(s, id, Math.random, { targetId }));
 /** Quantité de soins choisie (imposition des mains), toujours ramenée entre 1 et le maximum utile. */
 const layChoice = ref(5);
 const layAmount = (max: number) => Math.min(Math.max(1, layChoice.value), max);
