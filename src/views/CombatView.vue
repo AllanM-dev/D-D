@@ -54,6 +54,7 @@
                 <template v-if="c.raging"> · en rage</template>
                 <template v-if="c.innateSorcery"> · magie innée</template>
                 <template v-if="c.spellcasting"> · emplacements {{ c.spellcasting.slots.max - c.spellcasting.slots.used }}/{{ c.spellcasting.slots.max }}</template>
+                <template v-if="c.inspiration"> · inspiration bardique (d{{ c.inspiration }})</template>
                 <template v-if="c.concentrating"> · concentré : {{ spellName(c.concentrating.spellId) }}</template>
                 <template v-if="isMarked(c.id)"> · marqué</template>
                 <template v-if="c.guided"> · éclairé</template>
@@ -170,6 +171,7 @@
           <template v-if="state.arena">
             <ion-button expand="block" fill="outline" @click="dash">Foncer (déplacement doublé)</ion-button>
             <ion-button expand="block" fill="outline" @click="disengage">Se désengager (pas d'attaque d'opportunité)</ion-button>
+            <ion-button v-if="heroBound" expand="block" color="warning" @click="breakFree">Se libérer ({{ heroBound.source }} : DD {{ heroBound.escape!.dc }})</ion-button>
           </template>
           <ion-button expand="block" fill="outline" @click="dodge">Esquiver (désavantage aux attaques contre vous)</ion-button>
         </template>
@@ -227,7 +229,7 @@ import { applyEffects } from "../engine/story";
 import { changeItems, describeLoot, enemyLoot, inventoryOf, potionsLeft } from "../engine/inventory";
 import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
-  attackCheck, type TargetCheck, conditionName, currentCombatant, planMove, playerAttack, playerDash, playerDisengage, playerDodge, playerEndTurn, playerMove,
+  attackCheck, type TargetCheck, conditionName, currentCombatant, planMove, playerAttack, playerBreakFree, playerDash, playerDisengage, playerDodge, playerEndTurn, playerMove,
   playerOptions, resolveReaction, spellTargetCheck, startCombat, useFeature,
   type Combatant, type CombatState, type FeatureId, type RollEvent,
 } from "../engine/combat";
@@ -455,6 +457,8 @@ const attackTarget = (id: string) => act((s) => playerAttack(s, id, Math.random,
 const react = (id: string | null) => act((s) => resolveReaction(s, id));
 const dodge = () => act((s) => playerDodge(s));
 const dash = () => act((s) => playerDash(s));
+const breakFree = () => act((s) => playerBreakFree(s));
+const heroBound = computed(() => hero.value?.conditions.find((x) => x.escape));
 const disengage = () => act((s) => playerDisengage(s));
 const endTurn = () => act((s) => playerEndTurn(s));
 

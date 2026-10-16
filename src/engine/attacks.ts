@@ -20,12 +20,13 @@ export function characterToCombatant(c: Character): CombatantInit {
     id: c.id, name: c.name, side: "party", maxHp: c.maxHp, hp: v.hp, ac: c.armorClass, speed: c.speed,
     initiativeBonus: c.initiative, attacks: c.attacks, level: c.level,
     features: [
-      ...featuresFor(c.classDef.id, c.level).map((f) => ({ ...f, uses: f.unlimited ? f.uses : Math.min(v.features[f.id] ?? f.max, f.max) })),
+      ...featuresFor(c.classDef.id, c.level, c.modifiers).map((f) => ({ ...f, uses: f.unlimited ? f.uses : Math.min(v.features[f.id] ?? f.max, f.max) })),
       // Les potions du sac à dos : une utilisation par potion.
       ...(itemCount(c, "healing-potion") > 0 ? [{ id: "potion" as const, uses: itemCount(c, "healing-potion"), max: itemCount(c, "healing-potion") }] : []),
     ],
     art: artKey("class", c.classDef.id),
     untrainedArmor: wearsUntrained(c.classDef.id, c.equipment),
+    sneakDice: c.classDef.id === "rogue" ? 1 : undefined, // Attaque sournoise : 1d6 au niveau 1
     saveMods: Object.fromEntries(ABILITIES.map((a) => [a, c.saves[a].bonus])) as Record<Ability, number>,
     tags: [c.species.id],
     spellcasting,

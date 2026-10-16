@@ -5,10 +5,11 @@ import { ARMORS, WEAPONS } from "../data/equipment";
 import { artKey } from "../data/illustrations";
 import { CONDITIONS } from "../data/conditions";
 import { ITEMS, ITEM_KIND_NAMES } from "../data/items";
+import { MONSTERS } from "../data/monsters";
 import { SPELLS, isPlayable } from "../data/spells";
 import { BACKGROUND_TEXT, WEAPON_PROPERTY_TEXT } from "../data/help";
 
-export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors" | "spells" | "conditions" | "items";
+export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors" | "spells" | "conditions" | "items" | "monsters";
 
 export const HELP_KINDS: Record<HelpKind, { title: string; singular: string }> = {
   classes: { title: "Classes", singular: "Classe" },
@@ -19,6 +20,7 @@ export const HELP_KINDS: Record<HelpKind, { title: string; singular: string }> =
   spells: { title: "Sorts", singular: "Sort" },
   conditions: { title: "États", singular: "État" },
   items: { title: "Objets", singular: "Objet" },
+  monsters: { title: "Bestiaire", singular: "Monstre" },
 };
 
 export const isHelpKind = (k: string): k is HelpKind => k in HELP_KINDS;
@@ -39,6 +41,8 @@ export function helpEntries(kind: HelpKind): { id: string; name: string; summary
         id: sp.id, name: sp.name,
         summary: `${sp.level === 0 ? "Sort mineur" : "Niveau 1"} · ${sp.school}${isPlayable(sp) ? "" : " · pas encore jouable en combat"}`,
       }));
+  if (kind === "monsters")
+    return MONSTERS.map((m) => ({ id: m.id, name: m.name, summary: `${m.maxHp} PV · CA ${m.ac} · ${String(m.speed).replace(".", ",")} m · ${m.text}` }));
   if (kind === "items")
     return ITEMS.map((i) => ({ id: i.id, name: i.name, summary: `${ITEM_KIND_NAMES[i.kind]}${i.value ? ` · ${i.value} po` : ""} · ${i.text}` }));
   if (kind === "conditions")
@@ -56,5 +60,6 @@ export function helpArt(kind: HelpKind | string, id: string): string | undefined
   if (kind === "classes") return artKey("class", id);
   if (kind === "species") return artKey("species", id);
   if (kind === "backgrounds") return artKey("background", id);
+  if (kind === "monsters") return artKey("monster", id);
   return undefined;
 }

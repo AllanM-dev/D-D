@@ -96,6 +96,44 @@
         </p>
       </template>
 
+      <!-- Monstre -->
+      <template v-else-if="mon">
+        <ion-list inset>
+          <ion-item><ion-label>Points de vie</ion-label><ion-note slot="end">{{ mon.maxHp }}</ion-note></ion-item>
+          <ion-item><ion-label>Classe d'armure</ion-label><ion-note slot="end">{{ mon.ac }}</ion-note></ion-item>
+          <ion-item><ion-label>Vitesse</ion-label><ion-note slot="end">{{ formatMeters(mon.speed) }}</ion-note></ion-item>
+          <ion-item><ion-label>Initiative</ion-label><ion-note slot="end">{{ signed(mon.initiativeBonus) }}</ion-note></ion-item>
+        </ion-list>
+        <p>{{ mon.text }}</p>
+        <h3>Attaques</h3>
+        <ion-list inset>
+          <ion-item v-for="a in mon.attacks" :key="a.name" lines="full">
+            <ion-label class="ion-text-wrap">
+              {{ a.name }}
+              <p>
+                {{ signed(a.toHit) }} au toucher
+                <template v-if="a.damage.count">· {{ a.damage.count }}d{{ a.damage.sides }}{{ a.damage.bonus ? signed(a.damage.bonus) : "" }} {{ a.damageType }}</template>
+                · {{ a.ranged ? `à distance (${formatMeters(a.range?.[0] ?? 0)})` : "corps à corps" }}
+                <template v-if="a.rider"> · inflige : {{ CONDITION_BY_ID[a.rider.condition]?.name ?? a.rider.condition }}<template v-if="a.rider.save"> (jet de {{ a.rider.save.ability }} DD {{ a.rider.save.dc }})</template></template>
+                <template v-if="a.saveDamage"> · poison : {{ a.saveDamage.dice[0] }}d{{ a.saveDamage.dice[1] }} (jet de {{ a.saveDamage.ability }} DD {{ a.saveDamage.dc }}, moitié si réussi)</template>
+              </p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+        <template v-if="mon.traits?.length || mon.immunities?.length">
+          <h3>Capacités appliquées</h3>
+          <ion-list inset>
+            <ion-item v-for="t in mon.traits" :key="t" lines="full">
+              <ion-label class="ion-text-wrap">{{ MONSTER_TRAIT_TEXT[t].name }}<p>{{ MONSTER_TRAIT_TEXT[t].text }}</p></ion-label>
+            </ion-item>
+            <ion-item v-if="mon.immunities?.length" lines="full">
+              <ion-label class="ion-text-wrap">Immunités<p>{{ mon.immunities.map((i) => CONDITION_BY_ID[i]?.name ?? i).join(", ") }}</p></ion-label>
+            </ion-item>
+          </ion-list>
+        </template>
+        <p v-if="mon.notApplied" class="status todo"><strong>Pas encore appliqué.</strong> {{ mon.notApplied }}</p>
+      </template>
+
       <!-- Objet -->
       <template v-else-if="item">
         <ion-list inset>
@@ -132,6 +170,13 @@
           </ion-list>
         </template>
         <p v-else class="note">Aucune propriété particulière.</p>
+        <template v-if="WEAPON_MASTERY[wp.id]">
+          <h3>Maîtrise d'arme</h3>
+          <ion-list inset>
+            <ion-item lines="full"><ion-label class="ion-text-wrap"><h2>{{ MASTERY_TEXT[WEAPON_MASTERY[wp.id]].name }}</h2><p>{{ MASTERY_TEXT[WEAPON_MASTERY[wp.id]].text }}</p></ion-label></ion-item>
+          </ion-list>
+          <p class="note">L'effet n'est actif que si vous maîtrisez cette arme (fiche du personnage, « Maîtrises d'armes »), pour les classes qui y ont droit : guerrier, barbare, paladin, rôdeur, roublard.</p>
+        </template>
         <p class="note">Maîtrisée par les classes dont la fiche mentionne ce type d'arme.</p>
       </template>
 
@@ -203,13 +248,15 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { BACKGROUNDS } from "../data/backgrounds";
 import { CLASSES } from "../data/classes";
-import { ARMORS, CLASS_TRAINING, WEAPONS, type Kit } from "../data/equipment";
+import { ARMORS, CLASS_TRAINING, WEAPONS, WEAPON_MASTERY, type Kit } from "../data/equipment";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
 import {
   ARMOR_KIND_TEXT, ARMOR_TRAINING_TEXT, BACKGROUND_TEXT, CLASS_FEATURE_TEXT, FEAT_TEXT, FEATURE_STATUS, FEATURE_STATUS_LABEL, SPECIES_TRAIT_TEXT,
   WEAPON_PROPERTY_TEXT, WEAPON_TRAINING_TEXT,
 } from "../data/help";
 import { CONDITION_BY_ID } from "../data/conditions";
+import { MONSTERS } from "../data/monsters";
+import { MASTERY_TEXT, MONSTER_TRAIT_TEXT } from "../data/help";
 import { ITEM_BY_ID, ITEM_KIND_NAMES } from "../data/items";
 import { CLASS_SPELLCASTING, SPELL_BY_ID, isPlayable } from "../data/spells";
 import { kitsFor } from "../engine/equipment";
@@ -217,7 +264,7 @@ import { SKILLS, type SkillId } from "../data/skills";
 import { SPECIES } from "../data/species";
 import { KEY_ABILITY_COUNT } from "../engine/advice";
 import Illustration from "../components/Illustration.vue";
-import { ABILITY_NAMES, fmtNumber, formatMeters } from "../ui/format";
+import { ABILITY_NAMES, fmtNumber, formatMeters, signed } from "../ui/format";
 import { helpArt } from "../ui/helpLists";
 
 const route = useRoute();
@@ -227,6 +274,7 @@ const cls = computed(() => (kind.value === "classes" ? CLASSES.find((c) => c.id 
 const sp = computed(() => (kind.value === "species" ? SPECIES.find((s) => s.id === id.value) : undefined));
 const bg = computed(() => (kind.value === "backgrounds" ? BACKGROUNDS.find((b) => b.id === id.value) : undefined));
 const sp2 = computed(() => (kind.value === "spells" ? SPELL_BY_ID[id.value] : undefined));
+const mon = computed(() => (kind.value === "monsters" ? MONSTERS.find((m) => m.id === id.value) : undefined));
 const item = computed(() => (kind.value === "items" ? ITEM_BY_ID[id.value] : undefined));
 const cond = computed(() => (kind.value === "conditions" ? CONDITION_BY_ID[id.value] : undefined));
 const spellCfg = computed(() => (cls.value ? CLASS_SPELLCASTING[cls.value.id] : undefined));
@@ -235,7 +283,7 @@ const className = (id: string) => CLASSES.find((c) => c.id === id)?.name ?? id;
 const wp = computed(() => (kind.value === "weapons" ? WEAPONS.find((w) => w.id === id.value) : undefined));
 const ar = computed(() => (kind.value === "armors" ? ARMORS.find((a) => a.id === id.value) : undefined));
 const heroArt = computed(() => helpArt(kind.value, id.value));
-const title = computed(() => cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? sp2.value?.name ?? cond.value?.name ?? item.value?.name ?? "Aide");
+const title = computed(() => cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? sp2.value?.name ?? cond.value?.name ?? item.value?.name ?? mon.value?.name ?? "Aide");
 const training = computed(() => CLASS_TRAINING[cls.value?.id ?? ""]);
 const kits = computed(() => (cls.value ? kitsFor(cls.value.id) : []));
 const kitLines = (k: Kit) =>

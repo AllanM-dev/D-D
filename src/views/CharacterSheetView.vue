@@ -126,12 +126,23 @@
         </ion-item>
       </ion-list>
 
+      <ion-list v-if="masteryMax" inset>
+        <ion-list-header><ion-label>Maîtrises d'armes ({{ masteryList.length }}/{{ masteryMax }})</ion-label></ion-list-header>
+        <ion-item lines="full"><ion-label class="ion-text-wrap"><p>Vous maîtrisez l'effet spécial de {{ masteryMax }} arme{{ masteryMax > 1 ? "s" : "" }} : cochez celles que vous voulez. L'effet s'applique quand vous attaquez avec cette arme.</p></ion-label></ion-item>
+        <ion-item v-for="w in masterable" :key="w.id" lines="full">
+          <ion-checkbox :checked="masteryList.includes(w.id)" :disabled="!masteryList.includes(w.id) && masteryList.length >= masteryMax" label-placement="end" justify="start" @ionChange="toggleMastery(w.id, $event.detail.checked)">
+            <span class="ion-text-wrap">{{ w.name }} — {{ MASTERY_TEXT[WEAPON_MASTERY[w.id]].name }}</span>
+          </ion-checkbox>
+        </ion-item>
+        <ion-item v-if="masteryReport" lines="none"><ion-label class="ion-text-wrap report">{{ masteryReport }}</ion-label></ion-item>
+      </ion-list>
+
       <ion-list inset>
         <ion-list-header><ion-label>Attaques</ion-label></ion-list-header>
         <ion-item v-for="a in c.attacks" :key="a.name" lines="full">
           <ion-label class="ion-text-wrap">
             {{ a.name }}
-            <p>{{ a.damage.count }}d{{ a.damage.sides }}{{ a.damage.bonus ? signed(a.damage.bonus) : "" }} {{ a.damageType }}{{ a.ranged ? " · à distance" : " · corps à corps" }}<template v-if="a.reach"> · allonge {{ formatMeters(a.reach * 1.5) }}</template><template v-if="a.offhand"> · seconde arme possible (action bonus)</template></p>
+            <p>{{ a.damage.count }}d{{ a.damage.sides }}{{ a.damage.bonus ? signed(a.damage.bonus) : "" }} {{ a.damageType }}{{ a.ranged ? " · à distance" : " · corps à corps" }}<template v-if="a.reach"> · allonge {{ formatMeters(a.reach * 1.5) }}</template><template v-if="a.offhand"> · seconde arme possible (action bonus)</template><template v-if="a.mastery"> · maîtrise : {{ MASTERY_TEXT[a.mastery].name }}</template><template v-if="a.sneak && c.classDef.id === 'rogue'"> · attaque sournoise possible</template></p>
             <p v-if="a.blocked" class="warn">{{ a.blocked }}</p>
             <p v-else-if="a.penalty" class="warn">Désavantage : {{ a.penalty }}</p>
           </ion-label>
@@ -179,7 +190,7 @@
 
 <script setup lang="ts">
 import {
-  IonBackButton, IonButton, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader,
+  IonBackButton, IonButton, IonCheckbox, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader,
   IonMenuButton, IonNote, IonPage, IonTitle, IonToolbar, useIonRouter,
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
@@ -189,10 +200,11 @@ import { FIGHTING_STYLES } from "../data/fighting-styles";
 import { SPELL_BY_ID, isPlayable } from "../data/spells";
 import { castingFor } from "../engine/spellcasting";
 import { getItem, ITEM_KIND_NAMES } from "../data/items";
-import { ARMORS } from "../data/equipment";
-import { wearsUntrained } from "../engine/equipment";
+import { ARMORS, MASTERY_COUNT, WEAPON_MASTERY } from "../data/equipment";
+import { MASTERY_TEXT } from "../data/help";
+import { masterableWeapons, wearsUntrained } from "../engine/equipment";
 import { canDrink, drinkPotion } from "../engine/inventory";
-import { canEquip, equipItem, unequip, type Slot } from "../engine/loadout";
+import { canEquip, equipItem, masteriesOf, setMasteries, unequip, type Slot } from "../engine/loadout";
 import { hitDiceMax, longRest, shortRest, vitalsOf, type RestResult } from "../engine/rest";
 import { FEATURE_LABELS } from "../engine/combat";
 import { featuresFor } from "../engine/features";
@@ -217,7 +229,7 @@ const casting = computed(() =>
 const vitals = computed(() => vitalsOf(c.value!));
 const resources = computed(() => {
   const ch = c.value!;
-  const out = featuresFor(ch.classDef.id, ch.level)
+  const out = featuresFor(ch.classDef.id, ch.level, ch.modifiers)
     .filter((f) => !f.unlimited)
     .map((f) => `${FEATURE_LABELS[f.id]} : ${vitals.value.features[f.id] ?? f.max}/${f.max}`);
   if (casting.value) {
@@ -248,6 +260,17 @@ function drink() {
   store.setVitals(c.value!.id, r.vitals);
   store.setInventory(c.value!.id, r.inventory);
   bagReport.value = `Potion de soin : ${r.dice.join(" + ")} + 2 = ${r.dice[0] + r.dice[1] + 2}, ${r.healed} PV regagnés (${r.vitals.hp}/${c.value!.maxHp}).`;
+}
+const masteryMax = computed(() => (c.value ? MASTERY_COUNT[c.value.classDef.id] ?? 0 : 0));
+const masterable = computed(() => (c.value ? masterableWeapons(c.value.classDef.id) : []));
+const masteryList = computed(() => (c.value ? masteriesOf(c.value) : []));
+const masteryReport = ref("");
+function toggleMastery(id: string, on: boolean) {
+  const next = on ? [...masteryList.value, id] : masteryList.value.filter((x) => x !== id);
+  try {
+    store.applyLoadout(c.value!.id, setMasteries(c.value!, next));
+    masteryReport.value = `${MASTERY_TEXT[WEAPON_MASTERY[id]].name} : ${MASTERY_TEXT[WEAPON_MASTERY[id]].text}`;
+  } catch (e) { masteryReport.value = (e as Error).message; }
 }
 const spend = ref(0);
 watch(() => vitals.value.hitDice, (n) => { if (spend.value > n) spend.value = n; });

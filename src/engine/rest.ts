@@ -24,7 +24,7 @@ export const hitDiceMax = (c: Character) => c.level;
 /** Ressources d'un personnage frais : tout au maximum. */
 export function freshVitals(c: Character): Vitals {
   const features: Vitals["features"] = {};
-  for (const f of featuresFor(c.classDef.id, c.level)) if (!f.unlimited) features[f.id] = f.max;
+  for (const f of featuresFor(c.classDef.id, c.level, c.modifiers)) if (!f.unlimited) features[f.id] = f.max;
   const sc = castingFor(castingInput(c));
   const free: Vitals["free"] = {};
   for (const f of sc?.free ?? []) free[f.spellId] = f.max;
@@ -78,7 +78,7 @@ export function shortRest(c: Character, spend: number, rng: Rng = Math.random): 
     rolls.push({ die, sides: c.classDef.hitDie, modifier, healed: gain });
   }
   const recovered: string[] = [];
-  const max = new Map(featuresFor(c.classDef.id, c.level).map((f) => [f.id, f.max]));
+  const max = new Map(featuresFor(c.classDef.id, c.level, c.modifiers).map((f) => [f.id, f.max]));
   for (const id of ["second-wind", "rage"] as const) {
     const cap = max.get(id);
     if (cap !== undefined && (v.features[id] ?? cap) < cap) {

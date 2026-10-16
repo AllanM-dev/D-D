@@ -14,7 +14,7 @@
 - [ ] Traits d'espèce et de classe de niveau 1 appliqués, sorts de départ, don d'origine appliqué
 
 - [x] Distances en mètres partout (vitesses, portées, malus d'armure), anciennes sauvegardes converties
-- [x] Illustrations (icônes game-icons.net, CC BY 3.0) : 12 classes, 9 espèces, 4 historiques, 8 monstres (création, fiche, accueil, Aide, combat) ; page Crédits
+- [x] Illustrations (icônes game-icons.net, CC BY 3.0) : 12 classes, 9 espèces, 4 historiques, 10 monstres (création, fiche, accueil, Aide, combat) ; page Crédits
 - [ ] Illustrations des armes, armures et objets ; fonds d'écran d'ambiance ; images plus artistiques (si une source libre devient accessible)
 - [x] Menu latéral et page Aide : règles de base, caractéristiques, fiches des 12 classes, 9 espèces et 4 historiques
 
@@ -30,8 +30,9 @@
 - [x] Sorts (lot 1) : 43 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
 - [ ] Sorts : grimoire du magicien, niveaux supérieurs, zones à plusieurs cibles, soins des alliés
 - [x] États (conditions) : empoisonné, effrayé, aveuglé, entravé, à terre, neutralisé, étourdi, paralysé ; infligés par le loup (à terre), la goule (paralysie) et les sorts Rayon empoisonné, Enchevêtrement, Fou rire de Tasha ; section Aide → États
-- [ ] États restants (charmé, assourdi, épuisement, agrippé, invisible, pétrifié), autres capacités de classe (Attaque sournoise, Expertise, Inspiration bardique…), autres styles de combat
-- [x] Bestiaire de départ (8 monstres, SRD 5.1) et 8 rencontres
+- [x] Capacités de classe (lot 2) : Attaque sournoise, Inspiration bardique (pour soi), maîtrises d'armes (8 effets) ; capacités de monstres : tactique de meute, robustesse des morts-vivants, agressif, toile et venin de l'araignée ; Bestiaire (10 monstres) dans l'Aide
+- [ ] États restants (charmé, assourdi, épuisement, agrippé, invisible, pétrifié), autres capacités de classe (Expertise, Ordre divin, Ordre primordial, Druidique, Adepte des rituels, Invocations occultes…), autres styles de combat
+- [x] Bestiaire de départ (10 monstres, SRD 5.1) et 10 rencontres
 - [ ] Bestiaire complet, capacités spéciales des monstres, compagnons, propriétés d'armes (lourde, légère, maîtrises), munitions
 
 ## Jalon 3 — Aventure

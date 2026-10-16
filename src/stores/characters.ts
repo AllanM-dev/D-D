@@ -3,6 +3,7 @@ import { ref } from "vue";
 import type { Character } from "../engine/character";
 import { migrateSpells } from "../engine/character";
 import { migrateCharacter } from "../engine/equipment";
+import { migrateMasteries } from "../engine/loadout";
 import type { ExplorationState } from "../engine/exploration";
 import type { Vitals } from "../engine/rest";
 import type { Applied } from "../engine/story";
@@ -15,7 +16,7 @@ const KEY = "dd-mobile.characters";
 function load(): Character[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Character[]).map((c) => migrateSpells(migrateCharacter(c))) : [];
+    return raw ? (JSON.parse(raw) as Character[]).map((c) => migrateMasteries(migrateSpells(migrateCharacter(c)))) : [];
   } catch {
     return [];
   }
@@ -62,6 +63,7 @@ export const useCharacters = defineStore("characters", () => {
   const applyLoadout = (id: string, patch: LoadoutPatch) => {
     const c = list.value.find((x) => x.id === id);
     if (!c) return;
+    if ((patch as LoadoutPatch & { masteries?: string[] }).masteries) c.masteries = (patch as LoadoutPatch & { masteries?: string[] }).masteries;
     c.equipment = patch.equipment;
     c.attacks = patch.attacks;
     c.armorClass = patch.armorClass;

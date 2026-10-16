@@ -1,4 +1,4 @@
-import { ARMORS, CLASS_TRAINING, STARTING_KITS, WEAPONS, type ArmorDef, type Kit, type WeaponDef } from "../data/equipment";
+import { ARMORS, CLASS_TRAINING, MASTERY_COUNT, STARTING_KITS, WEAPONS, WEAPON_MASTERY, type ArmorDef, type Kit, type WeaponDef } from "../data/equipment";
 import type { AbilityScores } from "./abilities";
 import type { FightingStyleId } from "../data/fighting-styles";
 import type { AttackDef } from "./combat";
@@ -39,6 +39,8 @@ export interface EquipmentInput {
   /** Vitesse de l'espèce en mètres, avant malus d'armure. */
   baseSpeed: number;
   fightingStyle?: FightingStyleId;
+  /** Armes dont l'effet de maîtrise est connu (identifiants d'armes). */
+  masteries?: string[];
 }
 
 const weaponById = (id: string): WeaponDef => {
@@ -160,6 +162,8 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
     // Propriétés d'arme
     if (w.range && w.ranged) base.range = w.range;
     if (w.properties.includes("reach")) base.reach = 2; // allonge : 3 m
+    if (input.masteries?.includes(w.id) && WEAPON_MASTERY[w.id]) base.mastery = WEAPON_MASTERY[w.id];
+    if (w.properties.includes("finesse") || w.ranged) base.sneak = true; // arme éligible à l'Attaque sournoise
     if (w.properties.includes("light") && !w.ranged) base.light = true;
     if (w.properties.includes("two-handed") && shield) base.blocked = "Deux mains : impossible avec un bouclier";
     if (w.properties.includes("heavy") && scores[w.ranged ? "DEX" : "STR"] < 13) base.penalty = `arme lourde, ${w.ranged ? "Dextérité" : "Force"} inférieure à 13`;
@@ -168,7 +172,7 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
       const throwAbility = w.properties.includes("finesse") && mod.DEX > mod.STR ? "DEX" : "STR";
       attacks.push({
         ...base, name: `${w.name} (lancer)`, ranged: true, ability: throwAbility, toHit: mod[throwAbility] + (proficient ? prof : 0),
-        damage: { count: w.damage.count, sides: w.damage.sides, bonus: mod[throwAbility] }, range: w.range, reach: undefined, light: undefined,
+        damage: { count: w.damage.count, sides: w.damage.sides, bonus: mod[throwAbility] }, range: w.range, reach: undefined, light: undefined, sneak: true,
       });
     }
   }
@@ -177,6 +181,13 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
   for (const a of lights) {
     const other = lights.find((o) => o !== a && o.weaponId !== a.weaponId) ?? (weapons.get(a.weaponId!)!.qty >= 2 ? a : undefined);
     if (other) a.offhand = { name: other.name, toHit: other.toHit, damage: { ...other.damage, bonus: Math.min(0, other.damage.bonus) }, damageType: other.damageType, ability: other.ability };
+  }
+  // Mains nues : toujours possible (dégâts 1 + Force), même sans arme en main.
+  if (classId !== "monk") {
+    attacks.push({
+      name: "Coup à mains nues", toHit: mod.STR + prof, damage: { count: 0, sides: 4, bonus: 1 + mod.STR },
+      damageType: "contondant", ranged: false, ability: "STR",
+    });
   }
   attacks.sort((a, b) => Number(!!a.blocked) - Number(!!b.blocked) || score(b) - score(a));
   return { attacks, armorClass: ac, speed };
@@ -236,4 +247,17 @@ export function migrateCharacter<T extends { classDef: { id: string }; species: 
     baseSpeed: c.species.speed,
   });
   return { ...c, equipment: eq.equipment, attacks: eq.attacks, armorClass: eq.armorClass, speed: eq.speed };
+}
+
+/** Armes dont un personnage de cette classe peut maîtriser l'effet : armes qu'il sait manier et qui ont une maîtrise. */
+export function masterableWeapons(classId: string): WeaponDef[] {
+  if (!MASTERY_COUNT[classId]) return [];
+  return WEAPONS.filter((w) => WEAPON_MASTERY[w.id] && isWeaponProficient(classId, w));
+}
+
+/** Maîtrises par défaut : les premières armes du lot de départ que la classe peut maîtriser. */
+export function defaultMasteries(classId: string, weaponIds: string[]): string[] {
+  const n = MASTERY_COUNT[classId] ?? 0;
+  const ok = new Set(masterableWeapons(classId).map((w) => w.id));
+  return [...new Set(weaponIds.filter((id) => ok.has(id)))].slice(0, n);
 }

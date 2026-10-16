@@ -1,7 +1,8 @@
 import { ARMORS, WEAPONS } from "../data/equipment";
 import { armorItemId, weaponItemId } from "../data/items";
 import type { Character } from "./character";
-import { deriveStats, type EquipmentInput, type Loadout } from "./equipment";
+import { MASTERY_COUNT } from "../data/equipment";
+import { defaultMasteries, deriveStats, masterableWeapons, type EquipmentInput, type Loadout } from "./equipment";
 import { changeItems, inventoryOf, itemCount } from "./inventory";
 
 /** Ce que change un changement d'équipement sur le personnage. */
@@ -11,9 +12,13 @@ export const loadoutOf = (c: Pick<Character, "equipment">): Loadout => ({
   armor: c.equipment.armor, shield: c.equipment.shield, weapons: c.equipment.weapons.map((w) => ({ ...w })),
 });
 
+/** Armes dont la maîtrise est active : le choix du joueur, ou par défaut les premières armes portées. */
+export const masteriesOf = (c: Character): string[] =>
+  c.masteries ?? defaultMasteries(c.classDef.id, c.equipment.weapons.map((w) => w.id));
+
 const inputOf = (c: Character): EquipmentInput => ({
   classId: c.classDef.id, scores: c.scores, modifiers: c.modifiers, proficiencyBonus: c.proficiencyBonus, baseSpeed: c.species.speed,
-  fightingStyle: c.classDef.id === "fighter" ? c.fightingStyle : undefined,
+  fightingStyle: c.classDef.id === "fighter" ? c.fightingStyle : undefined, masteries: masteriesOf(c),
 });
 
 /** Applique un équipement au personnage : CA, vitesse et attaques sont recalculées. */
@@ -82,3 +87,22 @@ export const canEquip = (c: Character, itemId: string) => {
   if (itemId === armorItemId("shield")) return !c.equipment.shield;
   return itemId.startsWith("weapon:") || itemId.startsWith("armor:");
 };
+
+/** Choisit les armes dont on active la maîtrise (au plus le nombre permis par la classe). */
+export function setMasteries(c: Character, ids: string[]): LoadoutPatch & { masteries: string[] } {
+  const max = MASTERY_COUNT[c.classDef.id] ?? 0;
+  const ok = new Set(masterableWeapons(c.classDef.id).map((w) => w.id));
+  const unique = [...new Set(ids)];
+  if (unique.length > max) throw new Error(`Au plus ${max} maîtrise${max > 1 ? "s" : ""} d'arme.`);
+  if (unique.some((id) => !ok.has(id))) throw new Error("Maîtrise impossible pour cette arme.");
+  const patch = apply({ ...c, masteries: unique }, loadoutOf(c), inventoryOf(c));
+  return { ...patch, masteries: unique };
+}
+
+/** Les personnages créés avant les maîtrises reçoivent le choix par défaut (et leurs attaques sont recalculées). */
+export function migrateMasteries<T extends Character>(c: T): T {
+  if (c.masteries !== undefined || !MASTERY_COUNT[c.classDef.id]) return c;
+  const masteries = masteriesOf(c);
+  const patch = apply({ ...c, masteries }, loadoutOf(c), inventoryOf(c));
+  return { ...c, masteries, attacks: patch.attacks };
+}
