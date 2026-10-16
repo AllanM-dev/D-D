@@ -155,7 +155,7 @@
         <template v-if="options.canAct">
           <h4>Action</h4>
           <ion-item v-if="attacks.length > 1" lines="none">
-            <ion-select v-model="attackIndex" label="Arme ou sort" label-placement="stacked" interface="action-sheet">
+            <ion-select v-model="attackChoice" label="Arme ou sort" label-placement="stacked" interface="action-sheet">
               <ion-select-option v-for="(a, i) in attacks" :key="a.name" :value="i">{{ attackLabel(a) }}</ion-select-option>
             </ion-select>
           </ion-item>
@@ -224,7 +224,7 @@ import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";
 import { characterToCombatant } from "../engine/attacks";
-import { defeatEnemy, retreatToStart } from "../engine/exploration";
+import { defeatEnemy, livingEnemies as mapEnemies, retreatToStart } from "../engine/exploration";
 import { applyEffects } from "../engine/story";
 import { changeItems, describeLoot, enemyLoot, inventoryOf, potionsLeft } from "../engine/inventory";
 import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
@@ -243,6 +243,8 @@ const character = computed(() => store.get(characterId.value));
 const vitals = computed(() => vitalsOf(character.value!));
 const attacks = computed(() => character.value?.attacks ?? []);
 const attackIndex = ref(0);
+/** Le joueur a choisi lui-même son arme ou son sort : on ne la change plus. */
+const userPicked = ref(false);
 const attackLabel = (a: (typeof attacks.value)[number]) =>
   `${a.name} · ${signed(a.toHit)} · ${a.damage.count}d${a.damage.sides}${a.damage.bonus ? signed(a.damage.bonus) : ""}${a.ranged ? " · distance" : ""}`;
 
@@ -374,6 +376,7 @@ const outfit = computed(() => {
 
 async function start(e: EncounterDef) {
   attackIndex.value = 0;
+  userPicked.value = false;
   movePreview.value = null;
   moveMessage.value = "";
   const c = character.value!;
@@ -381,7 +384,9 @@ async function start(e: EncounterDef) {
   const enemies = buildEnemies(e);
   // Sur le terrain : depuis la carte, le combat se joue sur la carte, chacun à sa place ; sinon dans une clairière.
   const fromTrip = fromMap.value || fromStory.value;
-  const enemyCell = fromTrip ? MAP_BY_ID[c.exploration?.mapId ?? ""]?.enemies.find((x) => x.id === enemyParam.value) : undefined;
+  // Position réelle de l'ennemi : il a pu quitter son poste pour poursuivre le héros.
+  const mapDef = MAP_BY_ID[c.exploration?.mapId ?? ""];
+  const enemyCell = fromTrip && mapDef && c.exploration ? mapEnemies(mapDef, c.exploration).find((x) => x.id === enemyParam.value) : undefined;
   const setup = buildSetup(enemies.length, fromTrip && c.exploration ? { exploration: c.exploration, enemyCell } : undefined);
   party.pos = setup.hero;
   enemies.forEach((en, i) => { en.pos = setup.enemies[i]; });
@@ -453,7 +458,7 @@ watch(
   },
   { immediate: true },
 );
-const attackTarget = (id: string) => act((s) => playerAttack(s, id, Math.random, attackIndex.value));
+const attackTarget = (id: string) => act((s) => playerAttack(s, id, Math.random, attackChoice.value));
 const react = (id: string | null) => act((s) => resolveReaction(s, id));
 const dodge = () => act((s) => playerDodge(s));
 const dash = () => act((s) => playerDash(s));
@@ -466,7 +471,24 @@ const endTurn = () => act((s) => playerEndTurn(s));
 const hero = computed(() => state.value?.combatants.find((c) => c.side === "party"));
 const NO_CHECK: TargetCheck = { ok: true, disadvantage: [], meters: 0 };
 const attackStatus = (e: Combatant) =>
-  state.value && hero.value ? attackCheck(state.value, hero.value, e, attacks.value[attackIndex.value] ?? attacks.value[0]) : NO_CHECK;
+  state.value && hero.value ? attackCheck(state.value, hero.value, e, attacks.value[attackChoice.value] ?? attacks.value[0]) : NO_CHECK;
+/**
+ * Tant que le joueur n'a pas choisi lui-même, on sélectionne une arme utilisable : si l'arme par défaut ne peut atteindre
+ * aucun ennemi (hors de portée…) mais qu'une autre le peut (arc, arme de jet), c'est elle qui est proposée.
+ */
+const attackChoice = computed<number>({
+  get() {
+    const st = state.value, h = hero.value;
+    if (userPicked.value || !st || !h || st.status !== "ongoing") return attackIndex.value;
+    const foes = st.combatants.filter((c) => c.side === "enemies" && !c.dead);
+    const usable = (i: number) => foes.some((e) => attackCheck(st, h, e, attacks.value[i]).ok);
+    if (!attacks.value[attackIndex.value] || usable(attackIndex.value)) return attackIndex.value;
+    const alt = attacks.value.findIndex((_, i) => usable(i));
+    return alt >= 0 ? alt : attackIndex.value;
+  },
+  set(v) { userPicked.value = true; attackIndex.value = v; },
+});
+
 /** Contrôle de la frappe bonus : arts martiaux (mains nues) ou seconde arme légère. */
 const strikeStatus = (e: Combatant, featureId: string) => {
   const h = hero.value;
