@@ -65,6 +65,17 @@
         </ion-item>
       </ion-list>
 
+      <!-- Terrain -->
+      <CombatGrid
+        v-if="state.arena"
+        :arena="state.arena"
+        :combatants="shown?.combatants ?? state.combatants"
+        :active-id="currentId"
+        :route="movePreview?.path"
+        :dest="movePreview?.target"
+        @tap="tapCell"
+      />
+
       <!-- Lancer de dés -->
       <DiceRoll v-if="currentRoll" :key="currentRoll.id" :event="currentRoll" :start-mode="startMode" :next-label="nextLabel" @done="nextRoll" />
       <ion-button v-if="busy" expand="block" fill="clear" size="small" @click="skipAll">Passer l'animation</ion-button>
@@ -83,6 +94,16 @@
       <div v-else-if="state.status === 'ongoing' && options" class="actions">
         <h3>À vous de jouer, {{ currentName }}</h3>
 
+        <!-- Déplacement -->
+        <template v-if="state.arena && options.movementCells !== undefined">
+          <h4>Déplacement</h4>
+          <p class="hint">
+            Il vous reste {{ formatMeters(options.movementCells * CELL_METERS) }} de déplacement. Touchez une case du terrain pour voir le trajet,
+            puis touchez-la à nouveau pour y aller. S'éloigner d'un ennemi au contact lui donne une attaque d'opportunité.
+          </p>
+          <p v-if="moveMessage" class="move-msg" role="status">{{ moveMessage }}</p>
+        </template>
+
         <!-- Action bonus -->
         <template v-if="options.bonus.length">
           <h4>Action bonus</h4>
@@ -94,9 +115,10 @@
               <ion-button class="grow" @click="layOnHands(o.amountMax)">{{ o.label }} ({{ o.detail }})</ion-button>
             </div>
             <template v-else-if="o.needsTarget">
-              <ion-button v-for="e in livingEnemies" :key="e.id" expand="block" @click="bonusStrike(e.id)">
-                {{ o.label }} : {{ e.name }}
-              </ion-button>
+              <template v-for="e in livingEnemies" :key="e.id">
+                <ion-button expand="block" :disabled="!strikeStatus(e).ok" @click="bonusStrike(e.id)">{{ o.label }} : {{ e.name }}</ion-button>
+                <p v-if="!strikeStatus(e).ok" class="hint">{{ strikeStatus(e).reason }}</p>
+              </template>
             </template>
             <ion-button v-else expand="block" @click="bonus(o.id)">{{ o.label }} ({{ o.detail }})</ion-button>
           </template>
@@ -115,9 +137,12 @@
           <template v-if="pickedSpell">
             <p class="hint">{{ SPELL_BY_ID[pickedSpell.id].description }}</p>
             <template v-if="pickedSpell.target === 'enemy'">
-              <ion-button v-for="e in livingEnemies" :key="e.id" expand="block" color="tertiary" @click="cast(pickedSpell.id, e.id)">
-                {{ pickedSpell.name }} sur {{ e.name }}{{ pickedSpell.time === "bonus" ? " (action bonus)" : "" }}
-              </ion-button>
+              <template v-for="e in livingEnemies" :key="e.id">
+                <ion-button expand="block" color="tertiary" :disabled="!spellStatus(e).ok" @click="cast(pickedSpell.id, e.id)">
+                  {{ pickedSpell.name }} sur {{ e.name }}{{ pickedSpell.time === "bonus" ? " (action bonus)" : "" }}
+                </ion-button>
+                <p v-if="!spellStatus(e).ok" class="hint">{{ spellStatus(e).reason }}</p>
+              </template>
             </template>
             <ion-button v-else expand="block" color="tertiary" @click="cast(pickedSpell.id)">
               Lancer {{ pickedSpell.name }}{{ pickedSpell.time === "bonus" ? " (action bonus)" : "" }}
@@ -135,9 +160,17 @@
           </ion-item>
           <p v-else class="hint">Attaque : {{ attackLabel(attacks[0]) }}</p>
           <p class="hint">Choisissez une cible.</p>
-          <ion-button v-for="e in livingEnemies" :key="e.id" expand="block" @click="attackTarget(e.id)">
-            Attaquer {{ e.name }} ({{ e.hp }}/{{ e.maxHp }} PV, CA {{ e.ac }})
-          </ion-button>
+          <template v-for="e in livingEnemies" :key="e.id">
+            <ion-button expand="block" :disabled="!attackStatus(e).ok" @click="attackTarget(e.id)">
+              Attaquer {{ e.name }} ({{ e.hp }}/{{ e.maxHp }} PV, CA {{ e.ac }}<template v-if="state.arena"> · {{ formatMeters(attackStatus(e).meters) }}</template>)
+            </ion-button>
+            <p v-if="!attackStatus(e).ok" class="hint">{{ attackStatus(e).reason }}</p>
+            <p v-else-if="attackStatus(e).disadvantage.length" class="hint">Désavantage : {{ attackStatus(e).disadvantage.join(", ") }}.</p>
+          </template>
+          <template v-if="state.arena">
+            <ion-button expand="block" fill="outline" @click="dash">Foncer (déplacement doublé)</ion-button>
+            <ion-button expand="block" fill="outline" @click="disengage">Se désengager (pas d'attaque d'opportunité)</ion-button>
+          </template>
           <ion-button expand="block" fill="outline" @click="dodge">Esquiver (désavantage aux attaques contre vous)</ion-button>
         </template>
 
@@ -176,10 +209,14 @@ import {
   IonPage, IonProgressBar, IonSelect, IonSelectOption, IonTitle, IonToggle, IonToolbar,
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
+import CombatGrid from "../components/CombatGrid.vue";
 import DiceRoll from "../components/DiceRoll.vue";
 import Illustration from "../components/Illustration.vue";
 import { artKey } from "../data/illustrations";
-import { SPELL_BY_ID } from "../data/spells";
+import { SPELL_BY_ID, rangeMeters } from "../data/spells";
+import { MAP_BY_ID } from "../data/maps";
+import { buildSetup } from "../engine/arena";
+import { CELL_METERS, placeAt, type Cell } from "../engine/exploration";
 import { castSpell } from "../engine/spellcasting";
 import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
@@ -190,11 +227,12 @@ import { applyEffects } from "../engine/story";
 import { changeItems, describeLoot, enemyLoot, inventoryOf, potionsLeft } from "../engine/inventory";
 import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
-  conditionName, currentCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions, resolveReaction, startCombat, useFeature,
+  attackCheck, type TargetCheck, conditionName, currentCombatant, planMove, playerAttack, playerDash, playerDisengage, playerDodge, playerEndTurn, playerMove,
+  playerOptions, resolveReaction, spellTargetCheck, startCombat, useFeature,
   type Combatant, type CombatState, type FeatureId, type RollEvent,
 } from "../engine/combat";
 import { useCharacters } from "../stores/characters";
-import { ROLL_BUTTON_LABEL, signed } from "../ui/format";
+import { ROLL_BUTTON_LABEL, formatMeters, signed } from "../ui/format";
 
 const route = useRoute();
 const store = useCharacters();
@@ -207,6 +245,9 @@ const attackLabel = (a: (typeof attacks.value)[number]) =>
   `${a.name} · ${signed(a.toHit)} · ${a.damage.count}d${a.damage.sides}${a.damage.bonus ? signed(a.damage.bonus) : ""}${a.ranged ? " · distance" : ""}`;
 
 const state = ref<CombatState | null>(null);
+const movePreview = ref<{ target: Cell; path: Cell[]; ok: boolean } | null>(null);
+const moveMessage = ref("");
+
 const badge = { Facile: "success", Moyen: "warning", Difficile: "danger" } as const;
 
 const describe = (e: EncounterDef) =>
@@ -269,6 +310,12 @@ async function play(events: RollEvent[]) {
   while (queue.length) {
     const ev = queue.shift()!;
     const mine = ev.side === "party";
+    if (ev.kind === "move") {
+      // Déplacement : pas de dés, l'affichage suit simplement (avec une courte pause).
+      reveal(ev);
+      if (!skipping) await sleep(450);
+      continue;
+    }
     if (!animateDice.value || skipping) {
       reveal(ev);
     } else if (mine) {
@@ -307,6 +354,8 @@ const finished = computed(() => !!state.value && state.value.status !== "ongoing
 
 async function act(run: (s: CombatState) => void) {
   const s = state.value!;
+  movePreview.value = null;
+  moveMessage.value = "";
   const before = s.rolls.length;
   // Fige l'affichage sur l'état d'avant l'action : les PV ne bougent qu'au fil des jets.
   shown.value = { combatants: JSON.parse(JSON.stringify(s.combatants)), logLen: s.log.length, round: s.round };
@@ -323,12 +372,26 @@ const outfit = computed(() => {
 
 async function start(e: EncounterDef) {
   attackIndex.value = 0;
-  const s = startCombat([characterToCombatant(character.value!)], buildEnemies(e));
+  movePreview.value = null;
+  moveMessage.value = "";
+  const c = character.value!;
+  const party = characterToCombatant(c);
+  const enemies = buildEnemies(e);
+  // Sur le terrain : depuis la carte, le combat se joue sur la carte, chacun à sa place ; sinon dans une clairière.
+  const fromTrip = fromMap.value || fromStory.value;
+  const enemyCell = fromTrip ? MAP_BY_ID[c.exploration?.mapId ?? ""]?.enemies.find((x) => x.id === enemyParam.value) : undefined;
+  const setup = buildSetup(enemies.length, fromTrip && c.exploration ? { exploration: c.exploration, enemyCell } : undefined);
+  party.pos = setup.hero;
+  enemies.forEach((en, i) => { en.pos = setup.enemies[i]; });
+  const s = startCombat([party], enemies, Math.random, setup.arena);
   state.value = s;
-  // Affichage de départ : tout le monde à pleins PV (les ennemis qui jouent en premier le seront après leur jet).
+  // Affichage de départ : tout le monde à pleins PV et à sa place de départ (les ennemis qui jouent en premier avancent après leur jet).
   const fresh: Combatant[] = JSON.parse(JSON.stringify(s.combatants));
-  const startHp = vitalsOf(character.value!).hp;
-  for (const c of fresh) Object.assign(c, { hp: c.side === "party" ? startHp : c.maxHp, dead: false, stable: false, dodging: false, deathSaves: { successes: 0, failures: 0 } });
+  const startHp = vitalsOf(c).hp;
+  for (const f of fresh) {
+    const start = f.side === "party" ? setup.hero : setup.enemies[enemies.findIndex((en) => en.id === f.id)];
+    Object.assign(f, { hp: f.side === "party" ? startHp : f.maxHp, dead: false, stable: false, dodging: false, deathSaves: { successes: 0, failures: 0 }, pos: start });
+  }
   shown.value = { combatants: fresh, logLen: 0, round: 1 };
   await play(s.rolls);
 }
@@ -339,7 +402,12 @@ watch(() => state.value?.status, (st) => {
   // Venu de la carte : l'ennemi vaincu disparaît ; en cas de défaite, le héros se réveille au départ.
   const ex = character.value.exploration;
   if ((fromMap.value || fromStory.value) && ex) {
-    if (st === "victory" && enemyParam.value) store.setExploration(character.value.id, defeatEnemy(ex, enemyParam.value));
+    if (st === "victory") {
+      // Le héros reste là où le combat l'a mené ; l'ennemi vaincu disparaît de la carte.
+      const h = state.value!.combatants.find((x) => x.side === "party");
+      const placed = h?.pos ? placeAt(ex, h.pos) : ex;
+      store.setExploration(character.value.id, enemyParam.value ? defeatEnemy(placed, enemyParam.value) : placed);
+    }
     else if (st === "defeat") store.setExploration(character.value.id, retreatToStart(ex));
   }
   // Potions bues pendant le combat : le sac à dos est mis à jour.
@@ -386,7 +454,33 @@ watch(
 const attackTarget = (id: string) => act((s) => playerAttack(s, id, Math.random, attackIndex.value));
 const react = (id: string | null) => act((s) => resolveReaction(s, id));
 const dodge = () => act((s) => playerDodge(s));
+const dash = () => act((s) => playerDash(s));
+const disengage = () => act((s) => playerDisengage(s));
 const endTurn = () => act((s) => playerEndTurn(s));
+
+// --- terrain : déplacement en deux temps, portées
+const hero = computed(() => state.value?.combatants.find((c) => c.side === "party"));
+const NO_CHECK: TargetCheck = { ok: true, disadvantage: [], meters: 0 };
+const attackStatus = (e: Combatant) =>
+  state.value && hero.value ? attackCheck(state.value, hero.value, e, attacks.value[attackIndex.value] ?? attacks.value[0]) : NO_CHECK;
+const strikeStatus = (e: Combatant) => {
+  const strike = attacks.value.find((a) => a.unarmed);
+  return state.value && hero.value && strike ? attackCheck(state.value, hero.value, e, strike) : NO_CHECK;
+};
+const spellStatus = (e: Combatant) =>
+  state.value && hero.value && pickedSpell.value ? spellTargetCheck(state.value, hero.value, e, rangeMeters(SPELL_BY_ID[pickedSpell.value.id])) : NO_CHECK;
+
+/** Premier toucher : trajet affiché ; second toucher au même endroit : déplacement. */
+function tapCell(cell: Cell) {
+  const s = state.value;
+  const h = hero.value;
+  if (!s || !h || busy.value || s.status !== "ongoing" || s.pending || !options.value || currentId.value !== h.id) return;
+  const p = movePreview.value;
+  if (p && p.ok && p.target.x === cell.x && p.target.y === cell.y) return void act((st) => playerMove(st, cell));
+  const plan = planMove(s, h, cell);
+  movePreview.value = { target: cell, path: plan.path, ok: plan.ok };
+  moveMessage.value = plan.ok ? `Aller ici : ${formatMeters(plan.meters)}. Touchez à nouveau pour confirmer.` : (plan.reason ?? "");
+}
 
 // --- actions bonus
 const options = computed(() => (state.value ? playerOptions(state.value) : null));
@@ -413,6 +507,7 @@ const layOnHands = (max: number) => act((s) => useFeature(s, "lay-on-hands", Mat
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
 .loot { font-weight: 600; }
+.move-msg { font-style: italic; margin: 4px 0; }
 .cond { color: var(--ion-color-warning, #ffc409); }
 .hint { opacity: 0.8; font-size: 0.9rem; }
 .active { --background: var(--ion-color-step-150, #333); }

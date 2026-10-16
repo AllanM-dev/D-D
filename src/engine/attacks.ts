@@ -16,7 +16,7 @@ export function characterToCombatant(c: Character): CombatantInit {
     for (const f of spellcasting.free) f.uses = Math.min(v.free[f.spellId] ?? f.max, f.max);
   }
   return {
-    id: c.id, name: c.name, side: "party", maxHp: c.maxHp, hp: v.hp, ac: c.armorClass,
+    id: c.id, name: c.name, side: "party", maxHp: c.maxHp, hp: v.hp, ac: c.armorClass, speed: c.speed,
     initiativeBonus: c.initiative, attacks: c.attacks, level: c.level,
     features: [
       ...featuresFor(c.classDef.id, c.level).map((f) => ({ ...f, uses: f.unlimited ? f.uses : Math.min(v.features[f.id] ?? f.max, f.max) })),
