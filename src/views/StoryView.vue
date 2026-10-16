@@ -118,7 +118,9 @@ function proceed(o: ChoiceOutcome) {
   const id = characterId.value;
   const ex = character.value?.exploration;
   if (ex && o.defeated.length) store.setExploration(id, o.defeated.reduce(defeatEnemy, ex));
-  if (o.fight) {
+  if (o.shop) {
+    router.push(`/shop/${id}?shop=${o.shop}&t=${Date.now()}`);
+  } else if (o.fight) {
     const s = story.value!.id;
     router.push(`/combat/${id}?encounter=${o.fight.encounterId}&from=story&story=${s}&enemy=${o.fight.enemy ?? ""}&win=${o.fight.win}&lose=${o.fight.lose ?? o.fight.win}&t=${Date.now()}`);
   } else if (o.end || !o.next) {

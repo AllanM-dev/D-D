@@ -88,28 +88,36 @@ const average = (a: AttackDef) => a.damage.count * ((a.damage.sides + 1) / 2) + 
 /** Estimation grossière de l'intérêt d'une attaque, pour proposer la meilleure en premier. */
 const score = (a: AttackDef) => average(a) * Math.min(1, Math.max(0.05, (a.toHit + 10) / 20));
 
-/** Calcule CA, vitesse et attaques à partir de l'équipement de départ choisi. */
-export function computeEquipment(input: EquipmentInput, kitId?: string): EquipmentResult {
-  const { classId, scores, modifiers: mod, proficiencyBonus: prof } = input;
-  const kit = getKit(classId, kitId);
+/** Ce qui est porté ou en main : armure, bouclier, armes. */
+export interface Loadout {
+  armor?: { id: string; name: string };
+  shield: boolean;
+  weapons: OwnedItem[];
+}
 
-  let armor: ArmorDef | undefined;
-  let shield = false;
-  const weapons = new Map<string, OwnedItem>();
-  const gear: { name: string; qty: number }[] = [];
-  for (const e of kit.entries) {
-    if ("armor" in e) {
-      const a = armorById(e.armor);
-      if (a.kind === "shield") shield = true;
-      else armor = a;
-    } else if ("weapon" in e) {
-      const w = weaponById(e.weapon);
-      const prev = weapons.get(w.id);
-      weapons.set(w.id, { id: w.id, name: w.name, qty: (prev?.qty ?? 0) + (e.qty ?? 1) });
-    } else {
-      gear.push({ name: e.gear, qty: e.qty ?? 1 });
-    }
-  }
+export interface DerivedStats {
+  attacks: AttackDef[];
+  armorClass: number;
+  speed: number;
+}
+
+/** Une classe sait-elle porter cette armure (ou ce bouclier) ? Sinon : désavantage aux attaques et aucun sort. */
+export function armorTrained(classId: string, kind: ArmorDef["kind"]): boolean {
+  return (CLASS_TRAINING[classId]?.armor ?? []).includes(kind);
+}
+
+/** Le personnage porte-t-il une armure ou un bouclier qu'il ne maîtrise pas ? */
+export function wearsUntrained(classId: string, loadout: Pick<Loadout, "armor" | "shield">): boolean {
+  const a = loadout.armor ? armorById(loadout.armor.id) : undefined;
+  return (!!a && !armorTrained(classId, a.kind)) || (loadout.shield && !armorTrained(classId, "shield"));
+}
+
+/** CA, vitesse et attaques d'un personnage pour un équipement donné (utilisé à la création et à chaque changement d'équipement). */
+export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedStats {
+  const { classId, scores, modifiers: mod, proficiencyBonus: prof } = input;
+  const armor = loadout.armor ? armorById(loadout.armor.id) : undefined;
+  const shield = loadout.shield;
+  const weapons = new Map(loadout.weapons.map((w) => [w.id, w]));
 
   // --- classe d'armure
   let ac: number;
@@ -147,31 +155,61 @@ export function computeEquipment(input: EquipmentInput, kitId?: string): Equipme
     const sides = w.properties.includes("versatile") && !shield && w.versatileSides ? w.versatileSides : w.damage.sides;
     const base: AttackDef = {
       name: w.name, toHit: mod[ability] + (proficient ? prof : 0) + (w.ranged ? archery : 0),
-      damage: { count: w.damage.count, sides, bonus: mod[ability] }, damageType: w.damageType, ranged: w.ranged, ability,
+      damage: { count: w.damage.count, sides, bonus: mod[ability] }, damageType: w.damageType, ranged: w.ranged, ability, weaponId: w.id,
     };
+    // Propriétés d'arme
+    if (w.range && w.ranged) base.range = w.range;
+    if (w.properties.includes("reach")) base.reach = 2; // allonge : 3 m
+    if (w.properties.includes("light") && !w.ranged) base.light = true;
+    if (w.properties.includes("two-handed") && shield) base.blocked = "Deux mains : impossible avec un bouclier";
+    if (w.properties.includes("heavy") && scores[w.ranged ? "DEX" : "STR"] < 13) base.penalty = `arme lourde, ${w.ranged ? "Dextérité" : "Force"} inférieure à 13`;
     attacks.push(base);
     if (w.properties.includes("thrown") && !w.ranged) {
       const throwAbility = w.properties.includes("finesse") && mod.DEX > mod.STR ? "DEX" : "STR";
       attacks.push({
         ...base, name: `${w.name} (lancer)`, ranged: true, ability: throwAbility, toHit: mod[throwAbility] + (proficient ? prof : 0),
-        damage: { count: w.damage.count, sides: w.damage.sides, bonus: mod[throwAbility] },
+        damage: { count: w.damage.count, sides: w.damage.sides, bonus: mod[throwAbility] }, range: w.range, reach: undefined, light: undefined,
       });
     }
   }
-  attacks.sort((a, b) => score(b) - score(a));
+  // Combat à deux armes : une arme légère de mêlée peut être doublée d'une seconde arme légère (action bonus, sans modificateur aux dégâts).
+  const lights = attacks.filter((a) => a.light);
+  for (const a of lights) {
+    const other = lights.find((o) => o !== a && o.weaponId !== a.weaponId) ?? (weapons.get(a.weaponId!)!.qty >= 2 ? a : undefined);
+    if (other) a.offhand = { name: other.name, toHit: other.toHit, damage: { ...other.damage, bonus: Math.min(0, other.damage.bonus) }, damageType: other.damageType, ability: other.ability };
+  }
+  attacks.sort((a, b) => Number(!!a.blocked) - Number(!!b.blocked) || score(b) - score(a));
+  return { attacks, armorClass: ac, speed };
+}
 
+/** Calcule CA, vitesse et attaques à partir de l'équipement de départ choisi. */
+export function computeEquipment(input: EquipmentInput, kitId?: string): EquipmentResult {
+  const kit = getKit(input.classId, kitId);
+
+  let armor: ArmorDef | undefined;
+  let shield = false;
+  const weapons = new Map<string, OwnedItem>();
+  const gear: { name: string; qty: number }[] = [];
+  for (const e of kit.entries) {
+    if ("armor" in e) {
+      const a = armorById(e.armor);
+      if (a.kind === "shield") shield = true;
+      else armor = a;
+    } else if ("weapon" in e) {
+      const w = weaponById(e.weapon);
+      const prev = weapons.get(w.id);
+      weapons.set(w.id, { id: w.id, name: w.name, qty: (prev?.qty ?? 0) + (e.qty ?? 1) });
+    } else {
+      gear.push({ name: e.gear, qty: e.qty ?? 1 });
+    }
+  }
+  const loadout: Loadout = { armor: armor ? { id: armor.id, name: armor.name } : undefined, shield, weapons: [...weapons.values()] };
+  const stats = deriveStats(input, loadout);
   return {
-    equipment: {
-      kitId: kit.id,
-      armor: armor ? { id: armor.id, name: armor.name } : undefined,
-      shield,
-      weapons: [...weapons.values()],
-      gear,
-      gold: kit.gold,
-    },
-    attacks,
-    armorClass: ac,
-    speed,
+    equipment: { kitId: kit.id, armor: loadout.armor, shield, weapons: loadout.weapons, gear, gold: kit.gold },
+    attacks: stats.attacks,
+    armorClass: stats.armorClass,
+    speed: stats.speed,
   };
 }
 

@@ -94,14 +94,15 @@ export const MAPS: readonly MapDef[] = [
     start: { x: 9, y: 6 },
     enemies: [
       { id: "wolf-1", encounterId: "wolf", x: 4, y: 2 },
-      { id: "goblin-1", encounterId: "goblin", x: 15, y: 8, loot: { gold: 6 } },
-      { id: "skeleton-1", encounterId: "skeleton", x: 17, y: 9, loot: { gold: 4, items: { gem: 1 } } },
+      { id: "goblin-1", encounterId: "goblin", x: 15, y: 8, loot: { gold: 6, items: { "weapon:scimitar": 1 } } },
+      { id: "skeleton-1", encounterId: "skeleton", x: 17, y: 9, loot: { gold: 4, items: { gem: 1, "weapon:shortsword": 1 } } },
     ],
     spots: [
       { id: "maire", x: 6, y: 8, label: "Odile, la maire", story: "brumeval", scene: "maire" },
       { id: "aubergiste", x: 11, y: 7, label: "Thibaud, l'aubergiste", story: "brumeval", scene: "aubergiste" },
       { id: "crypte", x: 17, y: 11, label: "Porte de la crypte", story: "brumeval", scene: "crypte", hiddenWhen: "crypte-ouverte" },
       { id: "leo", x: 14, y: 5, label: "Léo, fils du meunier", story: "brumeval", scene: "leo" },
+      { id: "forge", x: 7, y: 9, label: "Maëlle, la forgeronne", story: "brumeval", scene: "forge" },
     ],
     locks: [{ x: 17, y: 11, flag: "crypte-ouverte" }],
     exits: [{ x: 17, y: 11, label: "Descendre dans la crypte", to: { map: "crypte", x: 3, y: 1 } }],

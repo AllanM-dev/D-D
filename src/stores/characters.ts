@@ -7,6 +7,7 @@ import type { ExplorationState } from "../engine/exploration";
 import type { Vitals } from "../engine/rest";
 import type { Applied } from "../engine/story";
 import type { Loot } from "../data/items";
+import type { LoadoutPatch } from "../engine/loadout";
 import { changeItems, inventoryOf } from "../engine/inventory";
 
 const KEY = "dd-mobile.characters";
@@ -57,6 +58,17 @@ export const useCharacters = defineStore("characters", () => {
     if (loot.items) c.inventory = changeItems(inventoryOf(c), loot.items);
     persist();
   };
+  /** Applique un changement d'équipement (armes, armure, bouclier, attaques, CA, vitesse) et le nouveau contenu du sac. */
+  const applyLoadout = (id: string, patch: LoadoutPatch) => {
+    const c = list.value.find((x) => x.id === id);
+    if (!c) return;
+    c.equipment = patch.equipment;
+    c.attacks = patch.attacks;
+    c.armorClass = patch.armorClass;
+    c.speed = patch.speed;
+    c.inventory = { ...patch.inventory };
+    persist();
+  };
   /** Remplace le sac à dos (et les PV) après avoir bu une potion ou combattu. */
   const setInventory = (id: string, inventory: Record<string, number>) => {
     const c = list.value.find((x) => x.id === id);
@@ -64,7 +76,7 @@ export const useCharacters = defineStore("characters", () => {
   };
   const get = (id: string) => list.value.find((c) => c.id === id);
 
-  return { list, add, remove, get, setVitals, setExploration, setStory, addLoot, setInventory };
+  return { list, add, remove, get, setVitals, setExploration, setStory, addLoot, setInventory, applyLoadout };
 });
 
 export function newId(): string {

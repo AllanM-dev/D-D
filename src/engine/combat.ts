@@ -32,10 +32,22 @@ export interface AttackDef {
   range?: [number, number];
   /** Frappe à mains nues (arts martiaux). */
   unarmed?: boolean;
+  /** Identifiant de l'arme (données d'équipement), pour les armes. */
+  weaponId?: string;
+  /** Allonge en cases (2 = 3 m) ; sinon 1. */
+  reach?: number;
+  /** Arme légère de mêlée : peut être suivie d'une attaque à la seconde arme (action bonus). */
+  light?: boolean;
+  /** Seconde arme légère utilisable en action bonus après cette attaque. */
+  offhand?: { name: string; toHit: number; damage: DamageDice; damageType: string; ability?: Ability };
+  /** Attaque impossible avec l'équipement actuel (raison). */
+  blocked?: string;
+  /** Désavantage permanent à cause de l'équipement (arme lourde sans la Force requise…). */
+  penalty?: string;
 }
 
 /** Capacités de classe utilisables en combat (toutes en action bonus). */
-export type FeatureId = "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts" | "potion";
+export type FeatureId = "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts" | "potion" | "offhand";
 
 export interface FeatureUse {
   id: FeatureId;
@@ -53,6 +65,7 @@ export const FEATURE_LABELS: Record<FeatureId, string> = {
   "innate-sorcery": "Magie innée",
   "martial-arts": "Frappe bonus (arts martiaux)",
   potion: "Boire une potion de soin",
+  offhand: "Attaque à la seconde arme",
 };
 
 /** Capacité d'incantation d'un combattant (voir `spellcasting.ts`). */
@@ -97,6 +110,8 @@ export interface TurnState {
   reaction?: boolean;
   /** Cases parcourues ce tour. */
   moved?: number;
+  /** Seconde arme légère utilisable en action bonus (après une attaque avec une arme légère). */
+  offhand?: AttackDef["offhand"];
   /** A utilisé l'action Foncer : déplacement doublé. */
   dashed?: boolean;
   /** A utilisé l'action Se désengager : pas d'attaque d'opportunité ce tour. */
@@ -141,6 +156,8 @@ export interface Combatant {
   guidedUntilRound: number;
   /** Moquerie cruelle : désavantage à sa prochaine attaque. */
   mocked: boolean;
+  /** Porte une armure ou un bouclier qu'il ne maîtrise pas : désavantage aux attaques, aucun sort. */
+  untrainedArmor?: boolean;
   /** Position sur le terrain (absente : combat sans carte). */
   pos?: Cell;
   /** Vitesse en mètres. */
@@ -209,7 +226,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed">>;
+  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
@@ -405,7 +422,7 @@ export interface PendingReaction {
 /** Réactions (sorts) que ce combattant peut utiliser maintenant : Bouclier quand l'attaque touche, Représailles infernales après des dégâts. */
 export function reactionOptions(c: Combatant, stage: "hit" | "damage"): ReactionOption[] {
   const sc = c.spellcasting;
-  if (!sc || c.side !== "party" || !isConscious(c) || isIncapacitated(c) || c.turnState.reaction) return [];
+  if (!sc || c.side !== "party" || !isConscious(c) || isIncapacitated(c) || c.turnState.reaction || c.untrainedArmor) return [];
   if (sc.slots.max - sc.slots.used <= 0) return [];
   const id = stage === "hit" ? "shield" : "hellish-rebuke";
   if (!sc.prepared.includes(id)) return [];
@@ -722,12 +739,16 @@ const fm = (n: number) => String(n).replace(".", ",");
 
 /** Peut-on viser `target` avec cette attaque ? (portée, ligne de vue, désavantages). Toujours oui sans terrain. */
 export function attackCheck(state: CombatState, attacker: Combatant, target: Combatant, attack: AttackDef): TargetCheck {
-  if (!state.arena || !attacker.pos || !target.pos) return { ok: true, disadvantage: [], meters: 0 };
+  if (attack.blocked) return { ok: false, reason: attack.blocked, disadvantage: [], meters: 0 };
+  // Désavantages venant de l'équipement (arme lourde sans la Force requise, armure non maîtrisée).
+  const gear = [...(attack.penalty ? [attack.penalty] : []), ...(attacker.untrainedArmor ? ["armure non maîtrisée"] : [])];
+  if (!state.arena || !attacker.pos || !target.pos) return { ok: true, disadvantage: gear, meters: 0 };
   const meters = metersBetween(attacker.pos, target.pos);
   const range = attackRange(attack);
-  const disadvantage: string[] = [];
+  const disadvantage: string[] = [...gear];
   if (!range) {
-    if (cellDistance(attacker.pos, target.pos) > 1) return { ok: false, reason: `Hors de portée (${fm(meters)} m ; corps à corps : 1,5 m)`, disadvantage, meters };
+    const reach = attack.reach ?? 1;
+    if (cellDistance(attacker.pos, target.pos) > reach) return { ok: false, reason: `Hors de portée (${fm(meters)} m ; corps à corps : ${fm(reach * CELL_METERS)} m)`, disadvantage, meters };
     return { ok: true, disadvantage, meters };
   }
   if (meters > range[1]) return { ok: false, reason: `Hors de portée (${fm(meters)} m ; maximum ${fm(range[1])} m)`, disadvantage, meters };
@@ -1024,6 +1045,9 @@ export function availableBonus(state: CombatState, c: Combatant): FeatureOption[
     else if (f.id === "martial-arts" && c.turnState.attacked && enemiesAlive && c.attacks.some((a) => a.unarmed))
       out.push({ id: f.id, label, detail: "après l'action Attaquer", needsTarget: true });
   }
+  // Combat à deux armes : après une attaque avec une arme légère, une attaque avec une seconde arme légère.
+  const off = c.turnState.offhand;
+  if (off && enemiesAlive) out.push({ id: "offhand", label: FEATURE_LABELS.offhand, detail: `${off.name}, sans modificateur aux dégâts`, needsTarget: true });
   return out;
 }
 
@@ -1071,6 +1095,7 @@ export function playerAttack(state: CombatState, targetId: string, rng: Rng = Ma
   if (!check.ok) throw new Error(check.reason);
   cur.turnState.action = true;
   cur.turnState.attacked = true;
+  if (attack.light && attack.offhand) cur.turnState.offhand = attack.offhand;
   resolveAttack(state, cur, target, attack, rng);
   afterPlayerAction(state, rng);
 }
@@ -1162,6 +1187,18 @@ export function useFeature(state: CombatState, id: FeatureId, rng: Rng = Math.ra
       cur.innateUntilRound = state.round + EFFECT_ROUNDS - 1;
       state.log.push(`${cur.name} libère sa magie innée.`);
       break;
+    case "offhand": {
+      const target = enemyTarget(state, choice.targetId ?? "");
+      const off = cur.turnState.offhand!;
+      const strike: AttackDef = { name: off.name, toHit: off.toHit, damage: off.damage, damageType: off.damageType, ranged: false, ability: off.ability, light: true };
+      const check = attackCheck(state, cur, target, strike);
+      if (!check.ok) throw new Error(check.reason);
+      cur.turnState.bonus = true;
+      cur.turnState.offhand = undefined;
+      resolveAttack(state, cur, target, strike, rng);
+      afterPlayerAction(state, rng);
+      return;
+    }
     case "martial-arts": {
       const target = enemyTarget(state, choice.targetId ?? "");
       const strike = cur.attacks.find((a) => a.unarmed)!;

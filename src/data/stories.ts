@@ -43,6 +43,8 @@ export interface Choice extends Effects {
   };
   /** Combat : le joueur se bat, puis la suite dépend du résultat. */
   fight?: { encounterId: string; /** Ennemi de la carte affronté : il disparaît s'il est vaincu. */ enemy?: string; win: string; lose?: string };
+  /** Ouvre une boutique (identifiant dans `shops.ts`). */
+  shop?: string;
   /** Quitte l'histoire et revient à la carte. */
   end?: boolean;
   /** Le choix ne peut être pris qu'une fois. */
@@ -163,7 +165,7 @@ const aubergiste: Scene[] = [
       { text: "Léo dit que votre père a disparu dans la crypte. C'est vrai ?", requires: { flags: ["pere-disparu"], notFlags: ["histoire-pere"] }, check: { skill: "insight", dc: 12, success: "aubergiste-pere", failure: "aubergiste-pere-ko" } },
       { text: "Observer la salle d'un œil attentif.", requires: { notFlags: ["indice-cave"] }, check: { skill: "perception", dc: 11, success: "aubergiste-indice", failure: "aubergiste-rien", onSuccess: { set: ["indice-cave"] } } },
       { text: "Écouter les rumeurs du village.", goto: "aubergiste-rumeurs" },
-      { text: "Voir ce que Thibaud vend et achète.", goto: "boutique" },
+      { text: "Voir ce que Thibaud vend et achète.", shop: "auberge" },
       { text: "Je vous laisse.", end: true },
     ],
   },
@@ -286,18 +288,6 @@ const village: Scene[] = [
     choices: [{ text: "Prendre la clé, avec respect.", goto: "aubergiste", set: ["cle-crypte", "histoire-pere"], items: { "cle-crypte": 1 } }],
   },
   {
-    id: "boutique",
-    title: "Thibaud, l'aubergiste",
-    text: [
-      "Thibaud pose sur le comptoir quelques fioles et une balance. « Je vends des potions de soin, cinquante pièces pièce. Et j'achète les pierres précieuses, à dix pièces la petite gemme. Je ne marchande pas. »",
-    ],
-    choices: [
-      { text: "Acheter une potion de soin (50 po).", requires: { minGold: 50 }, goto: "boutique", gold: -50, items: { "healing-potion": 1 } },
-      { text: "Vendre une petite gemme (10 po).", requires: { items: ["gem"] }, goto: "boutique", gold: 10, items: { gem: -1 } },
-      { text: "Revenir au comptoir.", goto: "aubergiste" },
-    ],
-  },
-  {
     id: "aubergiste-pere-ko",
     title: "Thibaud, l'aubergiste",
     text: ["Thibaud se ferme comme une huître. « Je ne sais pas de quoi vous parlez. Les enfants racontent n'importe quoi. »"],
@@ -404,11 +394,31 @@ const crypteInterieur: Scene[] = [
   },
 ];
 
+
+const forge: Scene[] = [
+  {
+    id: "forge",
+    title: "Maëlle, la forgeronne",
+    text: [
+      "La forge de Brumeval sent le charbon et le fer chaud. Maëlle, une femme aux avant-bras massifs, frappe une lame sur l'enclume avant de vous remarquer.",
+      "« Une arme ? Une armure ? Je répare aussi, mais ça vous coûtera. »",
+    ],
+    textIf: [
+      { requires: { flags: ["quete-acceptee"], notFlags: ["quete-terminee"] }, text: ["« Vous allez à la crypte ? Alors ne partez pas sans une bonne lame. Et un bouclier, si vous savez vous en servir. »"] },
+      { requires: { flags: ["quete-terminee"] }, text: ["« Alors c'est vous qui avez réglé cette histoire de crypte ! Mes meilleurs prix sont les mêmes pour tout le monde, mais je vous sers avec plaisir. »"] },
+    ],
+    choices: [
+      { text: "Voir les armes et armures à vendre, et vendre les miennes.", shop: "forge" },
+      { text: "Je repasserai.", end: true },
+    ],
+  },
+];
+
 export const STORIES: readonly StoryDef[] = [
   {
     id: "brumeval",
     title: "Les morts de Brumeval",
-    scenes: Object.fromEntries([...maire, ...aubergiste, ...crypte, ...village, ...crypteInterieur].map((s) => [s.id, s])),
+    scenes: Object.fromEntries([...maire, ...aubergiste, ...crypte, ...village, ...forge, ...crypteInterieur].map((s) => [s.id, s])),
   },
 ];
 

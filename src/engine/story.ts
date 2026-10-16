@@ -1,6 +1,7 @@
 import { STORY_BY_ID, type Choice, type Effects, type Requires, type Scene, type StoryDef } from "../data/stories";
 import { ENCOUNTERS } from "../data/encounters";
-import { ITEM_BY_ID } from "../data/items";
+import { getItem } from "../data/items";
+import { SHOP_BY_ID } from "../data/shops";
 import { SKILLS, type SkillId } from "../data/skills";
 import { rollD20, type Rng } from "./dice";
 
@@ -108,6 +109,8 @@ export interface ChoiceOutcome {
   /** Scène suivante (absente si le choix quitte l'histoire ou lance un combat). */
   next?: string;
   fight?: { encounterId: string; enemy?: string; win: string; lose?: string };
+  /** Ouvre une boutique. */
+  shop?: string;
   end?: boolean;
   check?: CheckResult;
 }
@@ -130,6 +133,7 @@ export function resolveChoice(
   }
   const applied = applyEffects(flags, base);
   if (choice.fight) return { ...applied, fight: choice.fight };
+  if (choice.shop) return { ...applied, shop: choice.shop };
   if (choice.end) return { ...applied, end: true };
   return { ...applied, next: choice.goto };
 }
@@ -145,14 +149,15 @@ export function validateStory(story: StoryDef, startScene: string): string[] {
     if (!scene.text.length) errors.push(`${story.id}/${id} : pas de texte`);
     if (!scene.choices.length) errors.push(`${story.id}/${id} : aucun choix (impasse)`);
     scene.choices.forEach((c, i) => {
-      const kinds = [c.goto, c.check, c.fight, c.end].filter(Boolean).length;
-      if (kinds !== 1) errors.push(`${story.id}/${id}#${i} : un choix doit avoir exactement une issue (goto, check, fight ou end)`);
+      const kinds = [c.goto, c.check, c.fight, c.end, c.shop].filter(Boolean).length;
+      if (kinds !== 1) errors.push(`${story.id}/${id}#${i} : un choix doit avoir exactement une issue (goto, check, fight, shop ou end)`);
+      if (c.shop && !SHOP_BY_ID[c.shop]) errors.push(`${story.id}/${id}#${i} : boutique inconnue ${c.shop}`);
       for (const t of targets(c)) if (!scenes[t]) errors.push(`${story.id}/${id}#${i} : scène ${t} inconnue`);
       if (c.check && !SKILLS.some((s) => s.id === c.check!.skill)) errors.push(`${story.id}/${id}#${i} : compétence inconnue`);
       const spend = -((c.gold ?? 0) + (c.check?.onSuccess?.gold ?? 0) + (c.check?.onFailure?.gold ?? 0));
       if (spend > 0 && (c.requires?.minGold ?? 0) < spend) errors.push(`${story.id}/${id}#${i} : un choix qui dépense de l'or doit exiger assez d'or (minGold)`);
       for (const [item, n] of Object.entries(c.items ?? {})) {
-        if (!ITEM_BY_ID[item]) errors.push(`${story.id}/${id}#${i} : objet inconnu ${item}`);
+        if (!getItem(item)) errors.push(`${story.id}/${id}#${i} : objet inconnu ${item}`);
         else if (n < 0 && !c.requires?.items?.includes(item)) errors.push(`${story.id}/${id}#${i} : un choix qui retire ${item} doit l'exiger`);
       }
       if (c.fight && !ENCOUNTERS.some((e) => e.id === c.fight!.encounterId)) errors.push(`${story.id}/${id}#${i} : rencontre inconnue`);

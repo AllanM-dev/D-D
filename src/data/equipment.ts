@@ -1,4 +1,4 @@
-export type WeaponProperty = "finesse" | "light" | "heavy" | "two-handed" | "thrown" | "versatile" | "ammunition";
+export type WeaponProperty = "finesse" | "light" | "heavy" | "two-handed" | "thrown" | "versatile" | "ammunition" | "reach";
 
 export interface WeaponDef {
   id: string;
@@ -14,7 +14,7 @@ export interface WeaponDef {
   range?: [number, number];
 }
 
-/** Armes de départ du SRD 5.2 (les autres armes seront ajoutées avec la boutique). */
+/** Armes du SRD 5.2 : celles des lots de départ et celles que l'on trouve ou achète. */
 export const WEAPONS: readonly WeaponDef[] = [
   { id: "greataxe", name: "Hache à deux mains", category: "martial", ranged: false, damage: { count: 1, sides: 12 }, damageType: "tranchant", properties: ["heavy", "two-handed"] },
   { id: "handaxe", name: "Hachette", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "tranchant", properties: ["light", "thrown"], range: [6, 18] },
@@ -31,6 +31,19 @@ export const WEAPONS: readonly WeaponDef[] = [
   { id: "shortbow", name: "Arc court", category: "simple", ranged: true, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["ammunition", "two-handed"], range: [24, 96] },
   { id: "spear", name: "Lance", category: "simple", ranged: false, damage: { count: 1, sides: 6 }, damageType: "perforant", properties: ["thrown", "versatile"], versatileSides: 8, range: [6, 18] },
   { id: "longsword", name: "Épée longue", category: "martial", ranged: false, damage: { count: 1, sides: 8 }, damageType: "tranchant", properties: ["versatile"], versatileSides: 10 },
+  { id: "club", name: "Gourdin", category: "simple", ranged: false, damage: { count: 1, sides: 4 }, damageType: "contondant", properties: ["light"] },
+  { id: "light-hammer", name: "Marteau léger", category: "simple", ranged: false, damage: { count: 1, sides: 4 }, damageType: "contondant", properties: ["light", "thrown"], range: [6, 18] },
+  { id: "dart", name: "Fléchette", category: "simple", ranged: true, damage: { count: 1, sides: 4 }, damageType: "perforant", properties: ["finesse", "thrown"], range: [6, 18] },
+  { id: "light-crossbow", name: "Arbalète légère", category: "simple", ranged: true, damage: { count: 1, sides: 8 }, damageType: "perforant", properties: ["ammunition", "two-handed"], range: [24, 96] },
+  { id: "battleaxe", name: "Hache d'armes", category: "martial", ranged: false, damage: { count: 1, sides: 8 }, damageType: "tranchant", properties: ["versatile"], versatileSides: 10 },
+  { id: "warhammer", name: "Marteau de guerre", category: "martial", ranged: false, damage: { count: 1, sides: 8 }, damageType: "contondant", properties: ["versatile"], versatileSides: 10 },
+  { id: "rapier", name: "Rapière", category: "martial", ranged: false, damage: { count: 1, sides: 8 }, damageType: "perforant", properties: ["finesse"] },
+  { id: "morningstar", name: "Morgenstern", category: "martial", ranged: false, damage: { count: 1, sides: 8 }, damageType: "perforant", properties: [] },
+  { id: "trident", name: "Trident", category: "martial", ranged: false, damage: { count: 1, sides: 8 }, damageType: "perforant", properties: ["thrown", "versatile"], versatileSides: 10, range: [6, 18] },
+  { id: "whip", name: "Fouet", category: "martial", ranged: false, damage: { count: 1, sides: 4 }, damageType: "tranchant", properties: ["finesse", "reach"] },
+  { id: "glaive", name: "Coutille", category: "martial", ranged: false, damage: { count: 1, sides: 10 }, damageType: "tranchant", properties: ["heavy", "reach", "two-handed"] },
+  { id: "halberd", name: "Hallebarde", category: "martial", ranged: false, damage: { count: 1, sides: 10 }, damageType: "tranchant", properties: ["heavy", "reach", "two-handed"] },
+  { id: "maul", name: "Maillet", category: "martial", ranged: false, damage: { count: 2, sides: 6 }, damageType: "contondant", properties: ["heavy", "two-handed"] },
 ];
 
 export interface ArmorDef {
@@ -52,7 +65,25 @@ export const ARMORS: readonly ArmorDef[] = [
   { id: "chain-shirt", name: "Chemise de mailles", kind: "medium", baseAc: 13, dexCap: 2 },
   { id: "chain-mail", name: "Cotte de mailles", kind: "heavy", baseAc: 16, dexCap: 0, minStr: 13, stealthDisadvantage: true },
   { id: "shield", name: "Bouclier", kind: "shield", baseAc: 2 },
+  { id: "padded", name: "Armure matelassée", kind: "light", baseAc: 11, stealthDisadvantage: true },
+  { id: "hide", name: "Armure de peaux", kind: "medium", baseAc: 12, dexCap: 2 },
+  { id: "breastplate", name: "Cuirasse", kind: "medium", baseAc: 14, dexCap: 2 },
+  { id: "half-plate", name: "Demi-plate", kind: "medium", baseAc: 15, dexCap: 2, stealthDisadvantage: true },
+  { id: "ring-mail", name: "Cotte d'anneaux", kind: "heavy", baseAc: 14, dexCap: 0, stealthDisadvantage: true },
+  { id: "splint", name: "Clibanion", kind: "heavy", baseAc: 17, dexCap: 0, minStr: 15, stealthDisadvantage: true },
+  { id: "plate", name: "Harnois", kind: "heavy", baseAc: 18, dexCap: 0, minStr: 15, stealthDisadvantage: true },
 ];
+
+/** Prix en pièces d'or (arrondis à 1 po au minimum ; valeurs du SRD écrites de mémoire). */
+export const PRICES: Record<string, number> = {
+  // armes
+  club: 1, dagger: 2, handaxe: 5, mace: 5, sickle: 1, quarterstaff: 1, spear: 1, javelin: 1, "light-hammer": 2, dart: 1,
+  shortbow: 25, "light-crossbow": 25, longbow: 50, greataxe: 30, greatsword: 50, flail: 10, scimitar: 25, shortsword: 10,
+  longsword: 15, battleaxe: 10, warhammer: 15, rapier: 25, morningstar: 15, trident: 5, whip: 2, glaive: 20, halberd: 20, maul: 10,
+  // armures
+  leather: 10, "studded-leather": 45, "chain-shirt": 50, "chain-mail": 75, shield: 10, padded: 5, hide: 10, breastplate: 400,
+  "half-plate": 750, "ring-mail": 30, splint: 200, plate: 1500,
+};
 
 export type KitEntry = { weapon: string; qty?: number } | { armor: string } | { gear: string; qty?: number };
 
