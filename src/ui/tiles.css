@@ -1,13 +1,13 @@
-/* Cases des cartes, partagées par l'exploration et le combat. */
+/* Cases des cartes, partagées par l'exploration et le combat. Le dessin vient de `tileArt.ts` (fond en ligne) ; les couleurs ci-dessous servent de repli. */
 .grid { display: grid; width: max-content; }
-.tile { position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; cursor: pointer; }
-.tile.grass { background: #4f7f3a; }
-.tile.path { background: #b59a63; }
-.tile.floor { background: #8a8a92; background-image: linear-gradient(#0002 1px, transparent 1px), linear-gradient(90deg, #0002 1px, transparent 1px); background-size: 16px 16px; }
-.tile.wall { background: #55555c; background-image: repeating-linear-gradient(0deg, #0004 0 2px, transparent 2px 10px), repeating-linear-gradient(90deg, #0003 0 2px, transparent 2px 16px); }
-.tile.door { background: #7a4a22; border: 3px solid #4a2c12; }
-.tile.tree { background: radial-gradient(circle at 50% 45%, #2f6a2a 0 55%, #1d4a1c 56% 100%); }
-.tile.water { background: repeating-linear-gradient(135deg, #2f6fb5 0 6px, #3a80c7 6px 12px); cursor: default; }
-.tile.stairs { background: repeating-linear-gradient(0deg, #6d6d78 0 5px, #8d8d98 5px 10px); }
-.tile.bridge { background: repeating-linear-gradient(90deg, #8b6a3a 0 6px, #6f5230 6px 8px); }
+.tile { position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; cursor: pointer; background-size: 100% 100%; background-repeat: no-repeat; image-rendering: auto; }
+.tile.grass { background-color: #4f7f3a; }
+.tile.path { background-color: #b59a63; }
+.tile.floor { background-color: #8a8a92; }
+.tile.wall { background-color: #55555c; }
+.tile.door { background-color: #7a4a22; }
+.tile.tree { background-color: #2f6a2a; }
+.tile.water { background-color: #2f6fb5; cursor: default; }
+.tile.stairs { background-color: #6d6d78; }
+.tile.bridge { background-color: #8b6a3a; }
 .tile.wall, .tile.tree { cursor: default; }

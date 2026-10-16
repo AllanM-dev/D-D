@@ -23,13 +23,24 @@
               :key="`${x},${y}`"
               class="tile"
               :class="[kind, fog(x, y), { hero: ex.x === x && ex.y === y, locked: isLocked(x, y), route: onRoute(x, y), dest: isDest(x, y) }]"
-              :style="{ width: TILE + 'px', height: TILE + 'px' }"
+              :style="{ width: TILE + 'px', height: TILE + 'px', backgroundImage: tileBackground(grid.tiles, x, y) }"
               @click="tap(x, y)"
             >
-              <Illustration v-if="ex.x === x && ex.y === y" :art="artKey('class', character.classDef.id)" :size="TILE - 4" :label="character.name" />
-              <span v-else-if="spotAt(x, y)" class="spot" role="img" :aria-label="spotAt(x, y)!.label" :title="spotAt(x, y)!.label">!</span>
-              <span v-else-if="enemyAt(x, y)" class="enemy" :title="enemyAt(x, y)!.name">
-                <Illustration :art="enemyAt(x, y)!.art" :size="TILE - 4" :label="enemyAt(x, y)!.name" />
+              <span v-if="ex.x === x && ex.y === y" class="figure hero-fig">
+                <span class="base" />
+                <Sprite :sprite="heroSpriteKey(character.species.id, character.classDef.id)" :size="TILE + 4" :label="character.name" />
+              </span>
+              <template v-else-if="spotAt(x, y)">
+                <span v-if="isNpc(spotAt(x, y)!.id)" class="figure npc-fig" :title="spotAt(x, y)!.label">
+                  <span class="base" />
+                  <Sprite :sprite="npcSpriteKey(spotAt(x, y)!.id)" :size="TILE + 4" :label="spotAt(x, y)!.label" />
+                  <span class="badge" aria-hidden="true">!</span>
+                </span>
+                <span v-else class="spot" role="img" :aria-label="spotAt(x, y)!.label" :title="spotAt(x, y)!.label">!</span>
+              </template>
+              <span v-else-if="enemyAt(x, y)" class="figure enemy" :title="enemyAt(x, y)!.name">
+                <span class="base" />
+                <Sprite :sprite="enemyAt(x, y)!.art" :size="TILE + 4" :label="enemyAt(x, y)!.name" />
               </span>
             </div>
           </template>
@@ -37,10 +48,10 @@
       </div>
 
       <ul class="legend" aria-label="Légende de la carte">
-        <li><span class="spot sm">!</span> Lieu où parler ou agir</li>
+        <li><span class="spot sm">!</span> Lieu ou personnage à qui parler</li>
         <li><span class="swatch locked-sw"></span> Passage verrouillé</li>
-        <li><span class="swatch enemy-sw"></span> Ennemi</li>
-        <li><span class="swatch hero-sw"></span> Vous</li>
+        <li><span class="swatch enemy-sw"></span> Ennemi (socle rouge)</li>
+        <li><span class="swatch hero-sw"></span> Vous (socle bleu)</li>
         <li><span class="swatch fog-sw"></span> Zone inexplorée</li>
       </ul>
 
@@ -57,9 +68,10 @@ import {
 } from "@ionic/vue";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import Illustration from "../components/Illustration.vue";
+import Sprite from "../components/Sprite.vue";
 import { ENCOUNTERS } from "../data/encounters";
 import { artKey } from "../data/illustrations";
+import { NPC_SPRITES, heroSpriteKey, npcSpriteKey } from "../ui/sprites";
 import { MAP_BY_ID } from "../data/maps";
 import { MONSTERS } from "../data/monsters";
 import {
@@ -68,6 +80,7 @@ import {
 import { vitalsOf } from "../engine/rest";
 import { useCharacters } from "../stores/characters";
 import { formatMeters } from "../ui/format";
+import { tileBackground } from "../ui/tileArt";
 import "../ui/tiles.css";
 
 const TILE = 32;
@@ -116,6 +129,7 @@ const visibleEnemyMap = computed(() => {
 });
 const enemyAt = (x: number, y: number) => visibleEnemyMap.value.get(`${x},${y}`);
 const flags = computed(() => character.value?.story?.flags ?? []);
+const isNpc = (id: string) => NPC_SPRITES.includes(id);
 const spotAt = (x: number, y: number) =>
   liveSpots(map.value, flags.value).find((s) => s.x === x && s.y === y && visible.value.has(`${x},${y}`));
 const isLocked = (x: number, y: number) => lockedCells(map.value, flags.value).some((l) => l.x === x && l.y === y);
@@ -219,17 +233,23 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .tile.unknown::after { background: #000; }
 .tile.route::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #ffd54a; opacity: 0.9; z-index: 2; pointer-events: none; }
 .tile.dest { outline: 2px dashed #fff; outline-offset: -3px; z-index: 1; }
-.tile.hero { outline: 2px solid #ffd54a; outline-offset: -2px; z-index: 1; }
+.tile.hero { z-index: 1; box-shadow: 0 0 26px 12px #ffd37a55; }
 .spot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-weight: 800; box-shadow: 0 0 0 2px #3a2a00, 0 0 6px #ffd54a; }
 .tile.locked { box-shadow: inset 0 0 0 3px #c0392b; }
-.enemy { display: flex; filter: drop-shadow(0 0 3px #f44); }
+.figure { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 100%; }
+.figure :deep(.sprite) { position: relative; z-index: 1; margin-bottom: 1px; filter: drop-shadow(0 1px 1px #0008); }
+.base { position: absolute; left: 3px; right: 3px; bottom: 0; height: 9px; border-radius: 50%; background: #0006; box-shadow: 0 0 0 2px var(--team, #fff8); }
+.hero-fig { --team: #4aa3ff; }
+.enemy { --team: #e0554f; }
+.npc-fig { --team: #ffd54a; }
+.badge { position: absolute; top: -3px; right: -1px; z-index: 2; display: grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-size: 10px; font-weight: 800; box-shadow: 0 0 0 1.5px #3a2a00; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 8px 0 0; padding: 0; font-size: 0.8rem; opacity: 0.85; }
 .legend li { display: flex; align-items: center; gap: 5px; }
 .spot.sm { width: 16px; height: 16px; font-size: 0.7rem; box-shadow: 0 0 0 1px #3a2a00; }
 .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
 .locked-sw { background: #7a4a22; box-shadow: inset 0 0 0 3px #c0392b; }
 .enemy-sw { background: #f44; border-radius: 50%; }
-.hero-sw { background: #8a8a92; outline: 2px solid #ffd54a; outline-offset: -2px; }
+.hero-sw { background: #4aa3ff; border-radius: 50%; }
 .fog-sw { background: #000; border: 1px solid #888; }
 .message { min-height: 1.4em; margin: 10px 0 0; }
 .hint { opacity: 0.75; font-size: 0.85rem; }
