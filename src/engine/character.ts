@@ -12,7 +12,7 @@ import type { AttackDef } from "./combat";
 import type { ExplorationState } from "./exploration";
 import type { StoryProgress } from "./story";
 import type { Vitals } from "./rest";
-import { computeEquipment, getKit, type CharacterEquipment } from "./equipment";
+import { computeEquipment, defaultMasteries, getKit, type CharacterEquipment } from "./equipment";
 import { ABILITIES, abilityModifier, proficiencyBonus, type Ability } from "./rules";
 
 /** Bonus de caractéristiques de l'historique (règles 2024). */
@@ -86,6 +86,8 @@ export interface Character {
   story?: StoryProgress;
   /** Objets du sac à dos : identifiant → quantité (voir `inventory.ts`). */
   inventory?: Record<string, number>;
+  /** Armes dont la maîtrise est active (identifiants d'armes) ; absent = choix par défaut d'après l'équipement. */
+  masteries?: string[];
 }
 
 const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id);
@@ -185,9 +187,11 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
     }),
   ) as Character["saves"];
 
+  const kit = getKit(classDef.id, d.kitId);
+  const masteries = defaultMasteries(classDef.id, kit.entries.flatMap((e) => ("weapon" in e ? [e.weapon] : [])));
   const eq = computeEquipment(
     { classId: classDef.id, scores, modifiers, proficiencyBonus: prof, baseSpeed: species.speed,
-      fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined },
+      fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined, masteries },
     d.kitId,
   );
 
@@ -196,6 +200,7 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
     proficiencyBonus: prof,
     maxHp: Math.max(1, classDef.hitDie + modifiers.CON), // niveau 1 : dé de vie max + mod. CON
     armorClass: eq.armorClass,
+    masteries: masteries.length ? masteries : undefined,
     initiative: modifiers.DEX,
     speed: eq.speed,
     equipment: eq.equipment,

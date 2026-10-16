@@ -2,9 +2,9 @@ import { rollD20, rollDie, type AdvantageMode, type Rng } from "./dice";
 import { SPELL_BY_ID } from "../data/spells";
 import { hasBonusSpell, spellOptionsFor, type SpellOption } from "./spellcasting";
 import type { Ability } from "./rules";
-import { WEAPONS } from "../data/equipment";
-import { CLEARING, freeCellsNear, hasLineOfSight, metersBetween, pathBetween, speedCells, type Arena } from "./battlefield";
-import { CELL_METERS, cellDistance, type Cell } from "./exploration";
+import { WEAPONS, type Mastery } from "../data/equipment";
+import { CLEARING, freeCellsNear, gridOf, hasLineOfSight, metersBetween, pathBetween, speedCells, type Arena } from "./battlefield";
+import { CELL_METERS, cellDistance, walkable, type Cell } from "./exploration";
 import type { ActiveCondition, ConditionId, ConditionRider } from "../data/conditions";
 
 export type Side = "party" | "enemies";
@@ -40,6 +40,12 @@ export interface AttackDef {
   light?: boolean;
   /** Seconde arme légère utilisable en action bonus après cette attaque. */
   offhand?: { name: string; toHit: number; damage: DamageDice; damageType: string; ability?: Ability };
+  /** Dégâts supplémentaires sur un jet de sauvegarde de la cible (poison d'araignée) : moitié en cas de réussite. */
+  saveDamage?: { ability: Ability; dc: number; dice: [number, number]; damageType: string };
+  /** Effet de maîtrise d'arme (si le personnage maîtrise cette arme). */
+  mastery?: Mastery;
+  /** Arme éligible à l'Attaque sournoise (finesse ou à distance). */
+  sneak?: boolean;
   /** Attaque impossible avec l'équipement actuel (raison). */
   blocked?: string;
   /** Désavantage permanent à cause de l'équipement (arme lourde sans la Force requise…). */
@@ -47,7 +53,7 @@ export interface AttackDef {
 }
 
 /** Capacités de classe utilisables en combat (toutes en action bonus). */
-export type FeatureId = "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts" | "potion" | "offhand";
+export type FeatureId = "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts" | "potion" | "offhand" | "bardic-inspiration";
 
 export interface FeatureUse {
   id: FeatureId;
@@ -66,6 +72,7 @@ export const FEATURE_LABELS: Record<FeatureId, string> = {
   "martial-arts": "Frappe bonus (arts martiaux)",
   potion: "Boire une potion de soin",
   offhand: "Attaque à la seconde arme",
+  "bardic-inspiration": "Inspiration bardique",
 };
 
 /** Capacité d'incantation d'un combattant (voir `spellcasting.ts`). */
@@ -112,6 +119,12 @@ export interface TurnState {
   moved?: number;
   /** Seconde arme légère utilisable en action bonus (après une attaque avec une arme légère). */
   offhand?: AttackDef["offhand"];
+  /** Attaque sournoise déjà utilisée ce tour. */
+  sneakUsed?: boolean;
+  /** Enchaînement déjà utilisé ce tour. */
+  cleaved?: boolean;
+  /** La seconde arme (Entaille) ne coûte pas l'action bonus. */
+  offhandFree?: boolean;
   /** A utilisé l'action Foncer : déplacement doublé. */
   dashed?: boolean;
   /** A utilisé l'action Se désengager : pas d'attaque d'opportunité ce tour. */
@@ -156,6 +169,17 @@ export interface Combatant {
   guidedUntilRound: number;
   /** Moquerie cruelle : désavantage à sa prochaine attaque. */
   mocked: boolean;
+  /** Dés de l'Attaque sournoise (d6). */
+  sneakDice?: number;
+  /** Dé d'Inspiration bardique en réserve (faces) : ajouté à un jet d'attaque ou de sauvegarde raté s'il le réussit. */
+  inspiration?: number;
+  /** Cible de la Gêne (maîtrise Vex) : avantage à la prochaine attaque contre elle. */
+  vexTargetId?: string;
+  vexUntilRound?: number;
+  /** Ralenti (maîtrise Ralentissement) : −3 m de vitesse jusqu'à la fin de ce round. */
+  slowedUntilRound?: number;
+  /** Capacités propres aux monstres. */
+  traits?: MonsterTrait[];
   /** Porte une armure ou un bouclier qu'il ne maîtrise pas : désavantage aux attaques, aucun sort. */
   untrainedArmor?: boolean;
   /** Position sur le terrain (absente : combat sans carte). */
@@ -173,6 +197,9 @@ export interface Combatant {
   /** Modificateurs de caractéristiques pour les jets de sauvegarde (monstres). */
   saveMods?: Partial<Record<Ability, number>>;
 }
+
+/** Capacités de monstres gérées par le moteur. */
+export type MonsterTrait = "pack-tactics" | "undead-fortitude" | "aggressive";
 
 export type CombatStatus = "ongoing" | "victory" | "defeat";
 
@@ -226,7 +253,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor">>;
+  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor" | "sneakDice" | "traits">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
@@ -400,6 +427,8 @@ interface AttackContext {
   roll: { natural: number; rolls: number[]; total: number; critical: boolean; fumble: boolean };
   reasons: string[];
   melee: boolean;
+  /** L'attaque a l'avantage (net) : condition de l'Attaque sournoise. */
+  advantaged?: boolean;
 }
 
 export interface ReactionOption {
@@ -478,14 +507,24 @@ export function rollSave(state: CombatState, target: Combatant, ability: Ability
   const disadvantage = ability === "DEX" && hasCondition(target, "restrained");
   const mod = target.saveMods?.[ability] ?? 0;
   const roll = rollD20(mod, disadvantage ? "disadvantage" : "normal", rng);
-  const success = roll.total >= dc;
+  let success = roll.total >= dc;
+  // Inspiration bardique : le dé en réserve peut transformer un échec en réussite.
+  let inspired = 0;
+  if (!success && target.inspiration && target.side === "party") {
+    const die = rollDie(target.inspiration, rng);
+    if (roll.total + die >= dc) {
+      success = true;
+      inspired = die;
+      target.inspiration = undefined;
+    }
+  }
   state.log.push(
     `${target.name} : sauvegarde de ${ABILITY_FR[ability]} ${roll.natural}${mod >= 0 ? "+" : ""}${mod} = ${roll.total} contre DD ${dc}${disadvantage ? " (désavantage : entravé)" : ""} — ${success ? "réussie" : "ratée"}.`,
   );
   pushRoll(state, {
     kind: "save", actorId: target.id, actorName: target.name, side: target.side, title: name,
-    sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: mod, total: roll.total, dc, outcome: success ? "success" : "failure",
-    ...(disadvantage ? { note: "Désavantage : entravé" } : {}),
+    sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: mod, total: roll.total + inspired, dc, outcome: success ? "success" : "failure",
+    ...(disadvantage || inspired ? { note: [disadvantage ? "Désavantage : entravé" : "", inspired ? `Inspiration bardique +${inspired}` : ""].filter(Boolean).join(" · ") } : {}),
   });
   return { success, total: roll.total };
 }
@@ -511,23 +550,28 @@ export function resolveAttack(
   // Avantage : cible inconsciente au corps à corps, attaque de sort sous Magie innée, ou cible marquée par Éclair guidé.
   const guidedAdvantage = target.guided && attacker.side === "party";
   const cm = conditionModes(attacker, target, melee);
-  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell) || guidedAdvantage || cm.advantage.length > 0;
+  // Gêne (maîtrise Vex) et tactique de meute (monstres).
+  const vexed = attacker.vexTargetId === target.id && (attacker.vexUntilRound ?? 0) >= state.round;
+  const pack = !!attacker.traits?.includes("pack-tactics") && !!state.arena && !!target.pos &&
+    state.combatants.some((a) => a.side === attacker.side && a.id !== attacker.id && !a.dead && !isIncapacitated(a) && a.pos && cellDistance(a.pos, target.pos!) <= 1);
+  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell) || guidedAdvantage || vexed || pack || cm.advantage.length > 0;
   // Désavantage : cible qui esquive, attaquant visé par Moquerie cruelle, ou états (empoisonné, effrayé…).
   const rangeDis = attackCheck(state, attacker, target, attack).disadvantage;
   const disadvantage = target.dodging || attacker.mocked || cm.disadvantage.length > 0 || rangeDis.length > 0;
   const reasons = [
-    advantage && !disadvantage ? `Avantage : ${[unconscious && melee ? "cible inconsciente" : "", attacker.innateSorcery && attack.spell ? "Magie innée" : "", guidedAdvantage ? "cible éclairée" : "", ...cm.advantage].filter(Boolean).join(", ")}` : "",
+    advantage && !disadvantage ? `Avantage : ${[unconscious && melee ? "cible inconsciente" : "", attacker.innateSorcery && attack.spell ? "Magie innée" : "", guidedAdvantage ? "cible éclairée" : "", vexed ? "gêne (maîtrise)" : "", pack ? "tactique de meute" : "", ...cm.advantage].filter(Boolean).join(", ")}` : "",
     disadvantage && !advantage ? `Désavantage : ${[target.dodging ? "cible qui esquive" : "", attacker.mocked ? "moquerie" : "", ...cm.disadvantage, ...rangeDis].filter(Boolean).join(", ")}` : "",
     advantage && disadvantage ? "Avantage et désavantage s'annulent" : "",
   ].filter(Boolean);
   if (guidedAdvantage) target.guided = false;
+  if (vexed) attacker.vexTargetId = undefined;
   if (attacker.mocked) attacker.mocked = false;
   if (advantage && !disadvantage) mode = "advantage";
   else if (disadvantage && !advantage) mode = "disadvantage";
 
   const roll = rollD20(attack.toHit, mode, rng);
   const ctx: AttackContext = {
-    attackerId: attacker.id, targetId: target.id, attack, reasons, melee,
+    attackerId: attacker.id, targetId: target.id, attack, reasons, melee, advantaged: advantage && !disadvantage,
     roll: { natural: roll.natural, rolls: roll.rolls, total: roll.total, critical: roll.critical, fumble: roll.fumble },
   };
   // Un ennemi qui touche un héros capable de réagir (Bouclier) attend la décision du joueur avant les dégâts.
@@ -551,8 +595,19 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
   const target = getCombatant(state, ctx.targetId);
   const { attack, roll, reasons, melee } = ctx;
   const unconscious = isDown(target);
-  const hit = roll.critical || (!roll.fumble && roll.total >= target.ac);
-  const label = `${attacker.name} attaque ${target.name} (${attack.name}) : ${roll.natural}${attack.toHit >= 0 ? "+" : ""}${attack.toHit} = ${roll.total} contre CA ${target.ac}`;
+  let hit = roll.critical || (!roll.fumble && roll.total >= target.ac);
+  // Inspiration bardique : le dé en réserve est ajouté à un jet raté, s'il le fait réussir.
+  let inspired = 0;
+  if (!hit && !roll.fumble && attacker.inspiration && attacker.side === "party") {
+    const die = rollDie(attacker.inspiration, rng);
+    if (roll.total + die >= target.ac) {
+      hit = true;
+      inspired = die;
+      attacker.inspiration = undefined;
+    }
+  }
+  const shownTotal = roll.total + inspired;
+  const label = `${attacker.name} attaque ${target.name} (${attack.name}) : ${roll.natural}${attack.toHit >= 0 ? "+" : ""}${attack.toHit}${inspired ? ` + ${inspired} (inspiration bardique)` : ""} = ${shownTotal} contre CA ${target.ac}`;
   // Un coup au corps à corps contre une cible inconsciente est toujours un critique.
   const paralyzed = hasCondition(target, "paralyzed");
   const crit = hit && (roll.critical || ((unconscious || paralyzed) && melee));
@@ -560,12 +615,22 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
     kind: "attack", actorId: attacker.id, actorName: attacker.name, side: attacker.side,
     title: `${attacker.name} attaque ${target.name} (${attack.name})`,
     sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: attack.toHit,
-    total: roll.total, dc: target.ac, outcome: roll.fumble ? "fumble" : !hit ? "miss" : crit ? "crit" : "hit",
-    ...(reasons.length ? { note: reasons.join(" · ") } : {}),
+    total: shownTotal, dc: target.ac, outcome: roll.fumble ? "fumble" : !hit ? "miss" : crit ? "crit" : "hit",
+    ...(reasons.length || inspired ? { note: [...reasons, ...(inspired ? [`Inspiration bardique +${inspired}`] : [])].join(" · ") } : {}),
   };
   if (!hit) {
     state.log.push(`${label} — raté.`);
     pushRoll(state, attackRoll);
+    // Maîtrise Écorchure : même sur un coup raté, le modificateur de caractéristique est infligé.
+    if (attack.mastery === "graze" && attacker.side === "party" && attack.damage.bonus > 0 && !target.dead) {
+      const g = attack.damage.bonus;
+      state.log.push(`Écorchure : ${g} dégâts malgré l'échec (${attack.damageType}).`);
+      applyDamage(state, target, g, false);
+      pushRoll(state, {
+        kind: "damage", actorId: attacker.id, actorName: attacker.name, side: attacker.side, title: `Écorchure : dégâts (${attack.damageType})`,
+        sides: 0, dice: [], modifier: g, total: g, outcome: "hit",
+      });
+    }
     return { hit: false, crit: false, damage: 0 };
   }
   pushRoll(state, attackRoll); // état et journal d'avant les dégâts
@@ -578,7 +643,7 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
   const damage = resisted ? Math.floor(rolled / 2) : rolled;
   const notes = [rageBonus ? `rage +${rageBonus}` : "", resisted ? "réduits de moitié par la rage" : ""].filter(Boolean);
   state.log.push(
-    `${label} — ${crit ? "coup critique" : "touché"} : ${damage} dégâts (${attack.damageType}${notes.length ? ", " + notes.join(", ") : ""}).`,
+    damage === 0 && attack.damage.count === 0 ? `${label} — touché.` : `${label} — ${crit ? "coup critique" : "touché"} : ${damage} dégâts (${attack.damageType}${notes.length ? ", " + notes.join(", ") : ""}).`,
   );
   applyDamage(state, target, damage, crit);
   pushRoll(state, {
@@ -588,6 +653,15 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
     ...(resisted ? { rolled, note: "réduits de moitié (résistance de la rage)" } : {}),
   });
   let total = damage;
+  // Robustesse des morts-vivants : à 0 PV, jet de Constitution pour rester à 1 PV (sauf dégâts radiants ou coup critique).
+  if (target.dead && target.traits?.includes("undead-fortitude") && attack.damageType !== "radiant" && !crit) {
+    const r = rollSave(state, target, "CON", 5 + damage, rng, `${target.name} : robustesse des morts-vivants`);
+    if (r.success) {
+      target.dead = false;
+      target.hp = 1;
+      state.log.push(`${target.name} refuse de tomber : il reste à 1 PV.`);
+    }
+  }
 
   // Maléfice, Marque du chasseur : dégâts supplémentaires sur la cible marquée.
   const mark = attacker.mark;
@@ -603,6 +677,21 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
     total += extra.total;
   }
 
+  // Attaque sournoise : une fois par tour, arme à finesse ou à distance, avec l'avantage.
+  if (attacker.sneakDice && attack.sneak && ctx.advantaged && !attacker.turnState.sneakUsed && !target.dead) {
+    attacker.turnState.sneakUsed = true;
+    const extra = rollDamageDetailed({ count: attacker.sneakDice, sides: 6, bonus: 0 }, crit, rng);
+    state.log.push(`Attaque sournoise : ${extra.total} dégâts supplémentaires.`);
+    applyDamage(state, target, extra.total, crit);
+    pushRoll(state, {
+      kind: "damage", actorId: attacker.id, actorName: attacker.name, side: attacker.side, title: `Attaque sournoise : dégâts supplémentaires (${attack.damageType})`,
+      sides: 6, dice: extra.dice, modifier: 0, total: extra.total, outcome: crit ? "crit" : "hit",
+    });
+    total += extra.total;
+  }
+  // Effet de maîtrise d'arme.
+  if (attack.mastery && attacker.side === "party" && !target.dead) applyMastery(state, attacker, target, attack, rng);
+
   // Un lanceur de sorts qui subit des dégâts doit garder sa concentration.
   concentrationCheck(state, target, damage, rng);
   // État infligé par le coup (jet de sauvegarde de la cible).
@@ -614,9 +703,24 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
       applyCondition(state, target, {
         id: rider.condition, source: attack.name,
         ...(rider.rounds ? { expiresRound: state.round + rider.rounds } : {}),
+        ...(rider.escape ? { escape: rider.escape } : {}),
         ...(rider.repeatSave && save ? { save } : {}),
       });
     }
+  }
+  // Dégâts supplémentaires sur jet de sauvegarde (poison).
+  const sd = attack.saveDamage;
+  if (sd && !target.dead && target.hp > 0) {
+    const r = rollSave(state, target, sd.ability, sd.dc, rng, `${target.name} : sauvegarde de ${ABILITY_FR[sd.ability]} contre ${attack.name}`);
+    const dmg = rollDamageDetailed({ count: sd.dice[0], sides: sd.dice[1], bonus: 0 }, false, rng);
+    const amount = r.success ? Math.floor(dmg.total / 2) : dmg.total;
+    state.log.push(`${attack.name} : ${amount} dégâts supplémentaires (${sd.damageType})${r.success ? ", moitié car le jet est réussi" : ""}.`);
+    applyDamage(state, target, amount, false);
+    pushRoll(state, {
+      kind: "damage", actorId: attacker.id, actorName: attacker.name, side: attacker.side, title: `${attack.name} : dégâts (${sd.damageType})`,
+      sides: sd.dice[1], dice: dmg.dice, modifier: 0, total: amount, outcome: "hit", ...(r.success ? { rolled: dmg.total, note: "moitié : jet de sauvegarde réussi" } : {}),
+    });
+    total += amount;
   }
   // Représailles infernales : le héros blessé peut réagir.
   if (attacker.side === "enemies" && target.side === "party" && total > 0) {
@@ -672,6 +776,61 @@ export function resolveReaction(state: CombatState, choice: string | null, rng: 
   endOfTurnConditions(state, attacker, rng);
   advanceTurn(state);
   processTurns(state, rng);
+}
+
+/** Effets des maîtrises d'armes (2024) : appliqués quand l'attaque touche avec une arme maîtrisée. */
+function applyMastery(state: CombatState, attacker: Combatant, target: Combatant, attack: AttackDef, rng: Rng) {
+  switch (attack.mastery) {
+    case "vex":
+      attacker.vexTargetId = target.id;
+      attacker.vexUntilRound = state.round + 1;
+      state.log.push(`Gêne : ${attacker.name} aura l'avantage à sa prochaine attaque contre ${target.name}.`);
+      break;
+    case "sap":
+      target.mocked = true;
+      state.log.push(`Sape : ${target.name} aura un désavantage à sa prochaine attaque.`);
+      break;
+    case "slow":
+      target.slowedUntilRound = state.round + 1;
+      state.log.push(`Ralentissement : la vitesse de ${target.name} baisse de 3 m jusqu'à votre prochain tour.`);
+      break;
+    case "topple": {
+      const r = rollSave(state, target, "CON", 8 + attack.toHit, rng, `${target.name} : sauvegarde de Constitution contre le renversement`);
+      if (!r.success) applyCondition(state, target, { id: "prone", source: `${attack.name} (renversement)` });
+      break;
+    }
+    case "push": {
+      if (!state.arena || !attacker.pos || !target.pos) break;
+      const dx = Math.sign(target.pos.x - attacker.pos.x), dy = Math.sign(target.pos.y - attacker.pos.y);
+      const occupied = occupiedCells(state, target.id);
+      const grid = gridOf(state.arena);
+      let pos = target.pos;
+      for (let i = 0; i < 2; i++) {
+        const n = { x: pos.x + dx, y: pos.y + dy };
+        if (!walkable(grid, n) || occupied.has(cellKey(n))) break;
+        pos = n;
+      }
+      if (pos !== target.pos) {
+        target.pos = pos;
+        state.log.push(`Poussée : ${target.name} est repoussé de ${fm(cellDistance(pos, attacker.pos) * CELL_METERS - CELL_METERS)} m.`);
+      }
+      break;
+    }
+    case "cleave": {
+      if (!state.arena || attack.ranged || attacker.turnState.cleaved || !target.pos || !attacker.pos) break;
+      const reach = attack.reach ?? 1;
+      const other = state.combatants.find(
+        (c) => c.side !== attacker.side && !c.dead && c.id !== target.id && c.pos && cellDistance(c.pos, target.pos!) <= 1 && cellDistance(c.pos, attacker.pos!) <= reach,
+      );
+      if (!other) break;
+      attacker.turnState.cleaved = true;
+      state.log.push(`Enchaînement : ${attacker.name} frappe aussi ${other.name}.`);
+      resolveAttack(state, attacker, other, { ...attack, name: `${attack.name} (enchaînement)`, mastery: undefined, damage: { ...attack.damage, bonus: Math.min(0, attack.damage.bonus) } }, rng);
+      break;
+    }
+    default:
+      break; // Entaille (nick) : voir la seconde arme
+  }
 }
 
 function deathSave(state: CombatState, c: Combatant, rng: Rng) {
@@ -770,9 +929,11 @@ export function spellTargetCheck(state: CombatState, caster: Combatant, target: 
 }
 
 /** Cases de déplacement qu'il reste à ce combattant ce tour. */
-export function movementLeft(c: Combatant): number {
+export function movementLeft(c: Combatant, state?: CombatState): number {
   if (hasCondition(c, "restrained")) return 0;
-  const base = speedCells(c.speed ?? SPEED_DEFAULT) * (c.turnState.dashed ? 2 : 1);
+  // Ralenti (maîtrise d'arme) : −3 m de vitesse.
+  const slowed = !!state && c.slowedUntilRound !== undefined && state.round <= c.slowedUntilRound;
+  const base = speedCells((c.speed ?? SPEED_DEFAULT) - (slowed ? 3 : 0)) * (c.turnState.dashed ? 2 : 1);
   return Math.max(0, base - (c.turnState.moved ?? 0));
 }
 
@@ -792,7 +953,7 @@ export function planMove(state: CombatState, c: Combatant, to: Cell): MovePlan {
   const path = pathBetween(state.arena, c.pos, to, occupiedCells(state, c.id));
   if (!path) return { ok: false, reason: "Chemin impossible.", path: [], meters: 0 };
   const meters = path.length * CELL_METERS;
-  const left = movementLeft(c);
+  const left = movementLeft(c, state);
   if (path.length > left) return { ok: false, reason: `Trop loin : ${fm(meters)} m, il vous reste ${fm(left * CELL_METERS)} m.`, path, meters };
   return { ok: true, path, meters };
 }
@@ -827,13 +988,25 @@ export function playerMove(state: CombatState, to: Cell, rng: Rng = Math.random)
   updateStatus(state);
 }
 
+/** Action Se libérer : test de Force contre le DD de ce qui vous entrave (toile…). */
+export function playerBreakFree(state: CombatState, rng: Rng = Math.random) {
+  const cur = assertPlayerTurn(state);
+  if (cur.turnState.action) throw new Error("Action déjà utilisée ce tour.");
+  const bound = cur.conditions.find((x) => x.escape);
+  if (!bound?.escape) throw new Error("Rien ne vous retient.");
+  cur.turnState.action = true;
+  const res = rollSave(state, cur, bound.escape.ability, bound.escape.dc, rng, `${cur.name} tente de se libérer`);
+  if (res.success) removeCondition(state, cur, bound.id, "vous vous êtes libéré");
+  afterPlayerAction(state, rng);
+}
+
 /** Action Foncer : le déplacement de ce tour est doublé. */
 export function playerDash(state: CombatState, rng: Rng = Math.random) {
   const cur = assertPlayerTurn(state);
   if (cur.turnState.action) throw new Error("Action déjà utilisée ce tour.");
   cur.turnState.action = true;
   cur.turnState.dashed = true;
-  state.log.push(`${cur.name} fonce : déplacement doublé (${fm(movementLeft(cur) * CELL_METERS)} m possibles).`);
+  state.log.push(`${cur.name} fonce : déplacement doublé (${fm(movementLeft(cur, state) * CELL_METERS)} m possibles).`);
   afterPlayerAction(state, rng);
 }
 
@@ -850,7 +1023,7 @@ export function playerDisengage(state: CombatState, rng: Rng = Math.random) {
 /** Un ennemi s'approche de sa cible aussi loin que sa vitesse le permet. */
 function enemyApproach(state: CombatState, enemy: Combatant, target: Combatant) {
   if (!state.arena || !enemy.pos || !target.pos) return;
-  const budget = movementLeft(enemy);
+  const budget = movementLeft(enemy, state);
   if (!budget || cellDistance(enemy.pos, target.pos) <= 1) return;
   const occupied = occupiedCells(state, enemy.id);
   let best: Cell[] | null = null;
@@ -897,10 +1070,22 @@ function enemyTurn(state: CombatState, enemy: Combatant, rng: Rng) {
     return;
   }
   const target = nearestTarget(state, enemy, pool, rng);
-  const attack = enemy.attacks.length > 1 ? enemy.attacks[Math.floor(rng() * enemy.attacks.length)] : enemy.attacks[0];
+  // Une attaque qui entrave (toile) est lancée de loin sur une cible libre ; sinon une attaque au hasard parmi celles de mêlée.
+  const netter = enemy.attacks.find((a) => a.rider?.condition === "restrained");
+  const melee = enemy.attacks.filter((a) => !a.rider || a.rider.condition !== "restrained");
+  const attack = netter && !hasCondition(target, "restrained") && state.arena && enemy.pos && target.pos && cellDistance(enemy.pos, target.pos) > 1 && attackCheck(state, enemy, target, netter).ok
+    ? netter
+    : (melee.length > 1 ? melee[Math.floor(rng() * melee.length)] : melee[0] ?? enemy.attacks[0]);
   if (state.arena) {
-    // Sur le terrain : l'ennemi avance d'abord, puis attaque s'il est à portée.
-    enemyApproach(state, enemy, target);
+    // Sur le terrain : l'ennemi avance d'abord (sauf s'il peut déjà viser), puis attaque s'il est à portée.
+    if (!attackCheck(state, enemy, target, attack).ok) {
+      enemyApproach(state, enemy, target);
+      // Agressif : une seconde course, en action bonus, vers l'adversaire.
+      if (enemy.traits?.includes("aggressive") && !attackCheck(state, enemy, target, attack).ok && enemy.pos) {
+        enemy.turnState.moved = Math.max(0, (enemy.turnState.moved ?? 0) - speedCells(enemy.speed ?? SPEED_DEFAULT));
+        enemyApproach(state, enemy, target);
+      }
+    }
     if (!attackCheck(state, enemy, target, attack).ok) {
       state.log.push(`${enemy.name} ne peut pas atteindre ${target.name}.`);
       return;
@@ -1030,16 +1215,19 @@ export interface PlayerOptions {
 
 /** Actions bonus utilisables par ce combattant maintenant. Rien si l'action bonus est déjà utilisée. */
 export function availableBonus(state: CombatState, c: Combatant): FeatureOption[] {
-  if (c.turnState.bonus || c.side !== "party" || !isConscious(c)) return [];
+  if (c.side !== "party" || !isConscious(c)) return [];
   const out: FeatureOption[] = [];
+  // Entaille : la seconde arme ne coûte pas l'action bonus, même si elle est déjà prise.
+  const bonusFree = !c.turnState.bonus;
   const missing = c.maxHp - c.hp;
   const enemiesAlive = state.combatants.some((x) => x.side === "enemies" && !x.dead);
-  for (const f of c.features) {
+  for (const f of bonusFree ? c.features : []) {
     if (!hasUses(f)) continue;
     const label = FEATURE_LABELS[f.id];
     if (f.id === "second-wind" && missing > 0) out.push({ id: f.id, label, detail: `${f.uses}/${f.max} · 1d10 + niveau PV` });
     else if (f.id === "lay-on-hands" && missing > 0) out.push({ id: f.id, label, detail: `réserve ${f.uses}/${f.max} PV`, amountMax: Math.min(f.uses, missing) });
     else if (f.id === "potion" && missing > 0) out.push({ id: f.id, label, detail: `${f.uses} dans le sac · 2d4 + 2 PV` });
+    else if (f.id === "bardic-inspiration" && !c.inspiration) out.push({ id: f.id, label, detail: `${f.uses}/${f.max} · dé d'inspiration d6` });
     else if (f.id === "rage" && !c.raging) out.push({ id: f.id, label, detail: `${f.uses}/${f.max}` });
     else if (f.id === "innate-sorcery" && !c.innateSorcery) out.push({ id: f.id, label, detail: `${f.uses}/${f.max}` });
     else if (f.id === "martial-arts" && c.turnState.attacked && enemiesAlive && c.attacks.some((a) => a.unarmed))
@@ -1047,7 +1235,7 @@ export function availableBonus(state: CombatState, c: Combatant): FeatureOption[
   }
   // Combat à deux armes : après une attaque avec une arme légère, une attaque avec une seconde arme légère.
   const off = c.turnState.offhand;
-  if (off && enemiesAlive) out.push({ id: "offhand", label: FEATURE_LABELS.offhand, detail: `${off.name}, sans modificateur aux dégâts`, needsTarget: true });
+  if (off && enemiesAlive && (bonusFree || c.turnState.offhandFree)) out.push({ id: "offhand", label: FEATURE_LABELS.offhand, detail: `${off.name}, sans modificateur aux dégâts`, needsTarget: true });
   return out;
 }
 
@@ -1061,7 +1249,7 @@ export function playerOptions(state: CombatState): PlayerOptions {
     bonus: availableBonus(state, cur),
     spells: spellOptionsFor(state, cur),
     canEnd: cur.turnState.action || cur.turnState.bonus || (cur.turnState.moved ?? 0) > 0,
-    ...(state.arena ? { movementCells: movementLeft(cur) } : {}),
+    ...(state.arena ? { movementCells: movementLeft(cur, state) } : {}),
   };
 }
 
@@ -1074,7 +1262,7 @@ export function afterPlayerAction(state: CombatState, rng: Rng) {
   if (state.status !== "ongoing") return;
   const cur = currentCombatant(state);
   // Sur le terrain, le tour ne se termine pas tout seul tant qu'il reste du déplacement : on peut reculer après avoir attaqué.
-  if (state.arena && movementLeft(cur) > 0) return;
+  if (state.arena && movementLeft(cur, state) > 0) return;
   if (cur.turnState.action && availableBonus(state, cur).length === 0 && !hasBonusSpell(state, cur)) endTurn(state, rng);
 }
 
@@ -1095,7 +1283,10 @@ export function playerAttack(state: CombatState, targetId: string, rng: Rng = Ma
   if (!check.ok) throw new Error(check.reason);
   cur.turnState.action = true;
   cur.turnState.attacked = true;
-  if (attack.light && attack.offhand) cur.turnState.offhand = attack.offhand;
+  if (attack.light && attack.offhand) {
+    cur.turnState.offhand = attack.offhand;
+    if (attack.mastery === "nick") cur.turnState.offhandFree = true; // Entaille : la seconde arme ne coûte pas l'action bonus
+  }
   resolveAttack(state, cur, target, attack, rng);
   afterPlayerAction(state, rng);
 }
@@ -1168,6 +1359,11 @@ export function useFeature(state: CombatState, id: FeatureId, rng: Rng = Math.ra
       });
       break;
     }
+    case "bardic-inspiration":
+      f.uses -= 1;
+      cur.inspiration = 6;
+      state.log.push(`${cur.name} se donne un dé d'inspiration bardique (d6) : il sera ajouté à un jet d'attaque ou de sauvegarde raté.`);
+      break;
     case "lay-on-hands": {
       const amount = choice.amount ?? 0;
       if (!Number.isInteger(amount) || amount < 1 || amount > (option.amountMax ?? 0)) throw new Error("Quantité de soins invalide.");
@@ -1193,8 +1389,9 @@ export function useFeature(state: CombatState, id: FeatureId, rng: Rng = Math.ra
       const strike: AttackDef = { name: off.name, toHit: off.toHit, damage: off.damage, damageType: off.damageType, ranged: false, ability: off.ability, light: true };
       const check = attackCheck(state, cur, target, strike);
       if (!check.ok) throw new Error(check.reason);
-      cur.turnState.bonus = true;
+      if (!cur.turnState.offhandFree) cur.turnState.bonus = true;
       cur.turnState.offhand = undefined;
+      cur.turnState.offhandFree = false;
       resolveAttack(state, cur, target, strike, rng);
       afterPlayerAction(state, rng);
       return;

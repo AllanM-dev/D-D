@@ -95,4 +95,6 @@ export interface ConditionRider {
   repeatSave?: boolean;
   /** Les cibles qui ont l'un de ces marqueurs (espèce) y échappent. */
   exceptTags?: string[];
+  /** La victime peut tenter de s'en libérer (test contre ce DD) en utilisant son action. */
+  escape?: { ability: Ability; dc: number };
 }

@@ -14,6 +14,20 @@ export interface WeaponDef {
   range?: [number, number];
 }
 
+/** Maîtrises d'armes (2024) : effet spécial d'une arme pour qui l'a « maîtrisée ». */
+export type Mastery = "cleave" | "graze" | "nick" | "push" | "sap" | "slow" | "topple" | "vex";
+
+/** Maîtrise de chaque arme (SRD 5.2, écrite de mémoire). */
+export const WEAPON_MASTERY: Record<string, Mastery> = {
+  club: "slow", dagger: "nick", handaxe: "vex", javelin: "slow", "light-hammer": "nick", mace: "sap", quarterstaff: "topple", sickle: "nick",
+  spear: "sap", dart: "vex", "light-crossbow": "slow", shortbow: "vex", battleaxe: "topple", flail: "sap", glaive: "graze", greataxe: "cleave",
+  greatsword: "graze", halberd: "cleave", longsword: "sap", maul: "topple", morningstar: "sap", rapier: "vex", scimitar: "nick", shortsword: "vex",
+  trident: "topple", warhammer: "push", whip: "slow", longbow: "slow",
+};
+
+/** Nombre d'armes dont la classe maîtrise l'effet (niveau 1). */
+export const MASTERY_COUNT: Record<string, number> = { barbarian: 2, fighter: 3, paladin: 2, ranger: 2, rogue: 2 };
+
 /** Armes du SRD 5.2 : celles des lots de départ et celles que l'on trouve ou achète. */
 export const WEAPONS: readonly WeaponDef[] = [
   { id: "greataxe", name: "Hache à deux mains", category: "martial", ranged: false, damage: { count: 1, sides: 12 }, damageType: "tranchant", properties: ["heavy", "two-handed"] },

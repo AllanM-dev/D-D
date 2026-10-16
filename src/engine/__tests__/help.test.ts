@@ -1,3 +1,4 @@
+import { MONSTERS } from "../../data/monsters";
 import { ITEMS } from "../../data/items";
 import { CONDITIONS } from "../../data/conditions";
 import { describe, expect, it } from "vitest";
@@ -57,7 +58,7 @@ describe("contenu de la page Aide", () => {
     }
   });
   it("liste toutes les entrées de chaque section d'aide", () => {
-    const counts: Record<HelpKind, number> = { classes: CLASSES.length, species: SPECIES.length, backgrounds: BACKGROUNDS.length, weapons: WEAPONS.length, armors: ARMORS.length, spells: SPELLS.length, conditions: CONDITIONS.length, items: ITEMS.length };
+    const counts: Record<HelpKind, number> = { classes: CLASSES.length, species: SPECIES.length, backgrounds: BACKGROUNDS.length, weapons: WEAPONS.length, armors: ARMORS.length, spells: SPELLS.length, conditions: CONDITIONS.length, items: ITEMS.length, monsters: MONSTERS.length };
     for (const k of Object.keys(HELP_KINDS) as HelpKind[]) {
       const entries = helpEntries(k);
       expect(entries.length, k).toBe(counts[k]);
@@ -74,7 +75,7 @@ describe("contenu de la page Aide", () => {
   it("ne déclare « appliqué » que ce que le moteur gère, et inversement", () => {
     const names: Record<string, string[]> = {
       "second-wind": ["Second souffle"], rage: ["Rage"], "lay-on-hands": ["Imposition des mains"],
-      "innate-sorcery": ["Magie innée"], "martial-arts": ["Arts martiaux"],
+      "innate-sorcery": ["Magie innée"], "martial-arts": ["Arts martiaux"], "bardic-inspiration": ["Inspiration bardique"],
     };
     // Tout ce que le moteur donne en combat est « appliqué » dans l'Aide…
     for (const c of CLASSES)
@@ -84,7 +85,7 @@ describe("contenu de la page Aide", () => {
     const wired = new Set(CLASSES.flatMap((c) => featuresFor(c.id).flatMap((f) => names[f.id].map((n) => `${c.id}/${n}`))));
     for (const [cid, feats] of Object.entries(FEATURE_STATUS))
       for (const [n, v] of Object.entries(feats))
-        if (v.status === "applied" && n !== "Défense sans armure") expect(wired.has(`${cid}/${n}`), `${cid}/${n}`).toBe(true);
+        if (v.status === "applied" && !["Défense sans armure", "Maîtrise des armes"].includes(n)) expect(wired.has(`${cid}/${n}`), `${cid}/${n}`).toBe(true);
   });
   it("chaque capacité appliquée ou partielle a une explication de ce que fait le jeu", () => {
     for (const feats of Object.values(FEATURE_STATUS))
