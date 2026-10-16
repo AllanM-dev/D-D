@@ -1,5 +1,7 @@
 import { CLASS_SPELLCASTING, SPELL_BY_ID, rangeMeters, type SpellDef } from "../data/spells";
 import { rollD20, rollDie, type Rng } from "./dice";
+import { areaCells } from "./areas";
+import { hasLineOfSight } from "./battlefield";
 import {
   ABILITY_FR, afterPlayerAction, applyCondition, applyDamage, rollSave, spellTargetCheck, assertPlayerTurn, endConcentration, enemyTarget, healCombatant, isConscious, pushRoll,
   resolveAttack, rollDamageDetailed, type AttackDef, type Combatant, type CombatState, type Spellcasting,
@@ -105,6 +107,17 @@ export function hasBonusSpell(state: CombatState, c: Combatant): boolean {
   return spellOptionsFor(state, c).some((o) => o.time === "bonus" && o.available);
 }
 
+/** Ennemis touchés par un sort de zone visant `aim` (la cible visée en fait toujours partie ; les murs arrêtent la zone). */
+export function areaTargets(state: CombatState, caster: Combatant, spell: SpellDef, aim: Combatant): Combatant[] {
+  if (!spell.area || !state.arena || !caster.pos || !aim.pos) return [aim];
+  const arena = state.arena;
+  const cells = new Set(areaCells(spell.area, caster.pos, aim.pos).map((c) => `${c.x},${c.y}`));
+  // Un carré posé sur la cible n'a pas besoin de ligne de vue depuis le lanceur ; un cône ou un cube, si.
+  const origin = spell.area.kind === "square" ? aim.pos : caster.pos;
+  return state.combatants.filter((c) =>
+    c.id === aim.id || (c.side === "enemies" && !c.dead && c.pos && cells.has(`${c.pos.x},${c.pos.y}`) && hasLineOfSight(arena, origin, c.pos)));
+}
+
 export interface CastChoice {
   targetId?: string;
 }
@@ -139,6 +152,8 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
   state.log.push(`${cur.name} lance ${spell.name}.`);
 
   const e = spell.effect;
+  const targets = spell.area ? areaTargets(state, cur, spell, target) : [target];
+  if (spell.area && targets.length > 1) state.log.push(`${spell.name} touche ${targets.length} créatures : ${targets.map((t) => t.name).join(", ")}.`);
   switch (e.kind) {
     case "attack": {
       const attack: AttackDef = {
@@ -160,42 +175,49 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
     }
     case "save": {
       const dc = sc.saveDc + (cur.innateSorcery ? 1 : 0); // Magie innée : +1 au DD des sorts
-      const { success } = rollSave(state, target, e.save, dc, rng);
-      if (success && !e.half) {
-        state.log.push(`${target.name} résiste à ${spell.name}.`);
-        break;
-      }
-      const sides = e.hurtSides && target.hp < target.maxHp ? e.hurtSides : e.dice[1];
-      const dmg = rollDamageDetailed({ count: e.dice[0], sides, bonus: 0 }, false, rng); // pas de critique sur un jet de sauvegarde
-      const amount = success ? Math.floor(dmg.total / 2) : dmg.total;
-      state.log.push(`${spell.name} : ${amount} dégâts (${e.damageType})${success ? ", moitié car le jet est réussi" : ""}.`);
-      applyDamage(state, target, amount, false);
-      pushRoll(state, {
-        kind: "damage", actorId: cur.id, actorName: cur.name, side: cur.side, title: `${spell.name} : dégâts (${e.damageType})`,
-        sides, dice: dmg.dice, modifier: 0, total: amount, outcome: "hit",
-        ...(success ? { rolled: dmg.total, note: "moitié : jet de sauvegarde réussi" } : {}),
-      });
-      if (!success && e.mocks && !target.dead) {
-        target.mocked = true;
-        state.log.push(`${target.name} est tourné en ridicule : désavantage à sa prochaine attaque.`);
+      // Un seul jet de dégâts pour toute la zone ; chaque créature fait son propre jet de sauvegarde.
+      let dmg: ReturnType<typeof rollDamageDetailed> | undefined;
+      let sides = e.dice[1];
+      for (const t of targets) {
+        const { success } = rollSave(state, t, e.save, dc, rng);
+        if (success && !e.half) {
+          state.log.push(`${t.name} résiste à ${spell.name}.`);
+          continue;
+        }
+        sides = e.hurtSides && t.hp < t.maxHp ? e.hurtSides : e.dice[1];
+        if (!dmg || targets.length === 1) dmg = rollDamageDetailed({ count: e.dice[0], sides, bonus: 0 }, false, rng); // pas de critique sur un jet de sauvegarde
+        const amount = success ? Math.floor(dmg.total / 2) : dmg.total;
+        state.log.push(`${spell.name} : ${t.name} subit ${amount} dégâts (${e.damageType})${success ? ", moitié car le jet est réussi" : ""}.`);
+        applyDamage(state, t, amount, false);
+        pushRoll(state, {
+          kind: "damage", actorId: cur.id, actorName: cur.name, side: cur.side, title: `${spell.name} : dégâts (${e.damageType})${targets.length > 1 ? ` sur ${t.name}` : ""}`,
+          sides, dice: dmg.dice, modifier: 0, total: amount, outcome: "hit",
+          ...(success ? { rolled: dmg.total, note: "moitié : jet de sauvegarde réussi" } : {}),
+        });
+        if (!success && e.mocks && !t.dead) {
+          t.mocked = true;
+          state.log.push(`${t.name} est tourné en ridicule : désavantage à sa prochaine attaque.`);
+        }
       }
       break;
     }
     case "control": {
       const dc = sc.saveDc + (cur.innateSorcery ? 1 : 0);
-      const { success } = rollSave(state, target, e.save, dc, rng);
-      if (success) {
-        state.log.push(`${target.name} résiste à ${spell.name}.`);
-        break;
-      }
-      for (const id of e.conditions) {
-        applyCondition(state, target, {
-          id, source: spell.name,
-          ...(spell.concentration ? { concentrationOf: cur.id } : {}),
-          // Le nouveau jet ne porte que sur l'état qui neutralise : à terre disparaît ensuite quand la cible se relève.
-          ...(e.repeatSave && id === "incapacitated" ? { save: { ability: e.save, dc } } : {}),
-          ...(e.escape ? { escape: { ability: "STR" as const, dc } } : {}),
-        });
+      for (const t of targets) {
+        const { success } = rollSave(state, t, e.save, dc, rng);
+        if (success) {
+          state.log.push(`${t.name} résiste à ${spell.name}.`);
+          continue;
+        }
+        for (const id of e.conditions) {
+          applyCondition(state, t, {
+            id, source: spell.name,
+            ...(spell.concentration ? { concentrationOf: cur.id } : {}),
+            // Le nouveau jet ne porte que sur l'état qui neutralise : à terre disparaît ensuite quand la cible se relève.
+            ...(e.repeatSave && id === "incapacitated" ? { save: { ability: e.save, dc } } : {}),
+            ...(e.escape ? { escape: { ability: "STR" as const, dc } } : {}),
+          });
+        }
       }
       break;
     }

@@ -143,6 +143,7 @@
                   {{ pickedSpell.name }} sur {{ e.name }}{{ pickedSpell.time === "bonus" ? " (action bonus)" : "" }}
                 </ion-button>
                 <p v-if="!spellStatus(e).ok" class="hint">{{ spellStatus(e).reason }}</p>
+                <p v-else-if="zoneNames(e)" class="hint zone">Zone : {{ zoneNames(e) }}</p>
               </template>
             </template>
             <ion-button v-else expand="block" color="tertiary" @click="cast(pickedSpell.id)">
@@ -219,7 +220,7 @@ import { SPELL_BY_ID, rangeMeters } from "../data/spells";
 import { MAP_BY_ID } from "../data/maps";
 import { buildSetup } from "../engine/arena";
 import { CELL_METERS, placeAt, type Cell } from "../engine/exploration";
-import { castSpell } from "../engine/spellcasting";
+import { areaTargets, castSpell } from "../engine/spellcasting";
 import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";
@@ -524,6 +525,13 @@ const availableSpells = computed(() => options.value?.spells.filter((o) => o.ava
 const pickedSpell = computed(() => availableSpells.value.find((o) => o.id === spellId.value) ?? availableSpells.value[0]);
 // Le sélecteur affiche toujours le sort réellement choisi (le premier possible tant que rien n'est choisi ou si le choix devient impossible).
 watch(availableSpells, (list) => { if (!list.some((o) => o.id === spellId.value)) spellId.value = list[0]?.id ?? ""; }, { immediate: true });
+/** Pour un sort de zone : qui sera touché si l'on vise cet ennemi. */
+const zoneNames = (e: Combatant) => {
+  const spell = pickedSpell.value ? SPELL_BY_ID[pickedSpell.value.id] : undefined;
+  if (!spell?.area || !state.value || !hero.value) return "";
+  const hit = areaTargets(state.value, hero.value, spell, e);
+  return `${hit.length} ennemi${hit.length > 1 ? "s" : ""} touché${hit.length > 1 ? "s" : ""} (${hit.map((t) => t.name).join(", ")})`;
+};
 const cast = (id: string, targetId?: string) => act((s) => castSpell(s, id, Math.random, { targetId }));
 const spellName = (id: string) => SPELL_BY_ID[id]?.name ?? id;
 const isMarked = (id: string) => !!state.value?.combatants.some((x) => x.mark?.targetId === id);
