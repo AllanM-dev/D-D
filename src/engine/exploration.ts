@@ -1,3 +1,5 @@
+import { ENCOUNTERS } from "../data/encounters";
+import { MONSTERS } from "../data/monsters";
 import { MAPS, MAP_BY_ID, OPAQUE, PASSABLE, TILE_CHARS, type MapDef, type MapEnemy, type MapExit, type MapSpot, type TileKind } from "../data/maps";
 
 /** Une case de la carte fait 1,5 m. */
@@ -21,6 +23,10 @@ export interface ExplorationState {
   others?: Record<string, string[]>;
   /** Ennemis vaincus (identifiants de la carte). */
   defeated: string[];
+  /** Ennemis qui ont quitté leur poste pour poursuivre le héros (position actuelle). */
+  foes?: Record<string, Cell>;
+  /** Nombre de pas faits sur la carte : cadence les ennemis plus lents ou plus rapides que le héros. */
+  ticks?: number;
 }
 
 export const key = (c: Cell) => `${c.x},${c.y}`;
@@ -174,7 +180,8 @@ export const mapOf = (st: ExplorationState): MapDef => {
 };
 
 /** Ennemis encore en vie sur la carte. */
-export const livingEnemies = (map: MapDef, st: ExplorationState): MapEnemy[] => map.enemies.filter((e) => !st.defeated.includes(e.id));
+export const livingEnemies = (map: MapDef, st: ExplorationState): MapEnemy[] =>
+  map.enemies.filter((e) => !st.defeated.includes(e.id)).map((e) => (st.foes?.[e.id] ? { ...e, ...st.foes[e.id] } : e));
 /** Lieux et personnages encore présents (selon les drapeaux de l'histoire). */
 export const liveSpots = (map: MapDef, flags: readonly string[] = []): MapSpot[] =>
   (map.spots ?? []).filter((s) => !s.hiddenWhen || !flags.includes(s.hiddenWhen));
@@ -207,6 +214,37 @@ export interface StepResult {
   ambush?: MapEnemy;
   /** Le pas mène à un passage vers une autre carte. */
   travel?: MapExit;
+  /** Ennemis qui ont bougé en réponse à ce pas (ils poursuivent le héros). */
+  chased: MapEnemy[];
+}
+
+/** Cases parcourues par un ennemi pendant ce pas du héros (1 case par pas à la vitesse du héros, 9 m). */
+export function foeMoves(enemy: MapEnemy, tick: number): number {
+  const enc = ENCOUNTERS.find((e) => e.id === enemy.encounterId);
+  const speed = enc ? (MONSTERS.find((m) => m.id === enc.monsters[0].monsterId)?.speed ?? 9) : 9;
+  const r = speed / 9;
+  return Math.floor((tick + 1) * r + 1e-9) - Math.floor(tick * r + 1e-9);
+}
+
+/** Les ennemis qui voient le héros s'approchent de lui. Renvoie ceux qui ont bougé. */
+function chase(map: MapDef, st: ExplorationState, flags: readonly string[]): MapEnemy[] {
+  const g = parseMap(map);
+  const hero: Cell = { x: st.x, y: st.y };
+  const moved = new Map<string, MapEnemy>();
+  const tick = st.ticks ?? 0;
+  for (const base of livingEnemies(map, st)) {
+    let cur = livingEnemies(map, st).find((e) => e.id === base.id)!;
+    for (let i = foeMoves(cur, tick); i > 0; i--) {
+      if (cellDistance(cur, hero) <= 1 || !visibleCells(g, cur).has(key(hero))) break;
+      const blocked = new Set([...livingEnemies(map, st).filter((e) => e.id !== cur.id), ...liveSpots(map, flags), ...lockedCells(map, flags)].map(key));
+      const path = findPath(g, cur, hero, blocked);
+      if (!path || path.length < 2) break;
+      st.foes = { ...(st.foes ?? {}), [cur.id]: path[0] };
+      cur = { ...cur, ...path[0] };
+      moved.set(cur.id, cur);
+    }
+  }
+  return [...moved.values()];
 }
 
 /** Un pas vers une case voisine libre. Lève une erreur si le pas est impossible. */
@@ -217,9 +255,15 @@ export function stepTo(st: ExplorationState, to: Cell, flags: readonly string[] 
   st.x = to.x;
   st.y = to.y;
   const spotted = reveal(map, st);
-  const ambush = livingEnemies(map, st).find((e) => cellDistance(e, st) <= 1);
+  let ambush = livingEnemies(map, st).find((e) => cellDistance(e, st) <= 1);
+  let chased: MapEnemy[] = [];
+  if (!ambush) {
+    chased = chase(map, st, flags);
+    st.ticks = (st.ticks ?? 0) + 1;
+    ambush = livingEnemies(map, st).find((e) => cellDistance(e, st) <= 1);
+  }
   const travel = ambush ? undefined : (map.exits ?? []).find((e) => same(e, st));
-  return { spotted, ambush, travel };
+  return { spotted, ambush, travel, chased };
 }
 
 export interface Plan {
@@ -284,6 +328,7 @@ export function retreatToStart(st: ExplorationState): ExplorationState {
   const home = MAPS[0];
   const back = st.mapId === home.id ? st : travelTo(st, { x: st.x, y: st.y, label: "", to: { map: home.id, x: home.start.x, y: home.start.y } });
   const next: ExplorationState = { ...back, x: home.start.x, y: home.start.y, explored: [...back.explored] };
+  next.foes = undefined; // les ennemis regagnent leur poste
   reveal(home, next);
   return next;
 }

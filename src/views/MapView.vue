@@ -56,6 +56,9 @@
       </ul>
 
       <p class="message" aria-live="polite">{{ message }}</p>
+      <ion-button v-if="pending?.enemy" expand="block" color="danger" fill="outline" @click="engageFromHere">
+        Attaquer d'ici ({{ formatMeters(cellMeters(Math.max(Math.abs(pending.target.x - ex.x), Math.abs(pending.target.y - ex.y)))) }}) : arc, sort…
+      </ion-button>
       <p class="hint">Touchez une case pour voir le trajet, touchez-la une seconde fois pour y aller (1 case = 1,5 m). Même chose pour un ennemi à combattre ou un « ! » pour parler ou agir. Touchez ailleurs pour changer de destination. Les zones sombres ne sont pas encore explorées.</p>
       <ion-button expand="block" fill="outline" :router-link="`/character/${character.id}`">Fiche et repos</ion-button>
     </ion-content>
@@ -151,7 +154,7 @@ function openSpot(spot: { story: string; scene: string; label: string }) {
 }
 
 /** Destination choisie au premier toucher, en attente de confirmation (second toucher au même endroit). */
-const pending = ref<{ target: Cell; path: Cell[] } | null>(null);
+const pending = ref<{ target: Cell; path: Cell[]; enemy?: { id: string; encounterId: string } } | null>(null);
 const routeCells = computed(() => new Set((pending.value?.path ?? []).map(key)));
 const onRoute = (x: number, y: number) => routeCells.value.has(`${x},${y}`);
 const isDest = (x: number, y: number) => pending.value?.target.x === x && pending.value?.target.y === y;
@@ -170,11 +173,19 @@ function tap(x: number, y: number) {
   const plan = planPath(ex.value, target, flags.value);
   if (!plan) { pending.value = null; message.value = "Vous ne pouvez pas aller là."; return; }
   if (!plan.enemy && !plan.spot && plan.path.length === 0) { pending.value = null; return; }
-  pending.value = { target, path: plan.path };
+  pending.value = { target, path: plan.path, enemy: plan.enemy ? { id: plan.enemy.id, encounterId: plan.enemy.encounterId } : undefined };
   const dist = formatMeters(cellMeters(plan.path.length));
   if (plan.enemy) message.value = `Combattre : ${monsterOf(map.value.enemies.find((e) => e.id === plan.enemy!.id)!.encounterId).name} (${dist}). Touchez à nouveau pour confirmer.`;
   else if (plan.spot) message.value = `${plan.spot.label} (${dist}). Touchez à nouveau pour confirmer.`;
   else message.value = `Aller ici : ${dist}. Touchez à nouveau pour confirmer.`;
+}
+
+/** Lance le combat sans s'approcher : on tire ou on lance un sort depuis sa position (la distance compte pour les armes et les sorts). */
+function engageFromHere() {
+  const e = pending.value?.enemy;
+  if (!e) return;
+  pending.value = null;
+  startFight(e.id, e.encounterId);
 }
 
 async function go(target: Cell) {
@@ -190,10 +201,17 @@ async function go(target: Cell) {
   cancel = false;
   message.value = "";
   let steps = 0;
+  let arrived = false;
   const next: ExplorationState = JSON.parse(JSON.stringify(ex.value));
-  for (const cell of plan.path) {
+  const chasers = new Set(Object.keys(next.foes ?? {})); // ceux qui poursuivent déjà ne font pas arrêter la marche
+  // Le trajet est recalculé à chaque pas : un ennemi qui approche peut changer la route, ou la cible elle-même.
+  for (let guard = 0; guard < 400; guard++) {
     if (cancel) break;
-    const res = stepTo(next, cell, flags.value);
+    const dest: Cell = enemy ? livingEnemies(map.value, next).find((e) => e.id === enemy.id) ?? target : target;
+    const cur = planPath(next, dest, flags.value);
+    if (!cur) { message.value = "Le chemin est coupé."; break; }
+    if (cur.path.length === 0) { arrived = true; break; }
+    const res = stepTo(next, cur.path[0], flags.value);
     steps += 1;
     walked.value += 1;
     store.setExploration(characterId.value, next);
@@ -213,11 +231,17 @@ async function go(target: Cell) {
       message.value = `Vous apercevez : ${res.spotted.map((e) => monsterOf(e.encounterId).name).join(", ")}.`;
       break;
     }
+    const fresh = res.chased.filter((e) => !chasers.has(e.id));
+    if (fresh.length) {
+      fresh.forEach((e) => chasers.add(e.id));
+      message.value = `${fresh.map((e) => monsterOf(e.encounterId).name).join(", ")} ${fresh.length > 1 ? "vous poursuivent" : "vous poursuit"} !`;
+      break;
+    }
     await sleep(STEP_MS);
   }
   walking = false;
   if (!message.value) message.value = steps ? `Vous avez marché ${formatMeters(cellMeters(steps))}.` : "";
-  if (!cancel && steps === plan.path.length) {
+  if (!cancel && arrived) {
     if (enemy) startFight(enemy.id, enemy.encounterId);
     else if (plan.spot) openSpot(plan.spot);
   }
