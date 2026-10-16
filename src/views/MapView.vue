@@ -190,10 +190,17 @@ async function go(target: Cell) {
   cancel = false;
   message.value = "";
   let steps = 0;
+  let arrived = false;
   const next: ExplorationState = JSON.parse(JSON.stringify(ex.value));
-  for (const cell of plan.path) {
+  const chasers = new Set(Object.keys(next.foes ?? {})); // ceux qui poursuivent déjà ne font pas arrêter la marche
+  // Le trajet est recalculé à chaque pas : un ennemi qui approche peut changer la route, ou la cible elle-même.
+  for (let guard = 0; guard < 400; guard++) {
     if (cancel) break;
-    const res = stepTo(next, cell, flags.value);
+    const dest: Cell = enemy ? livingEnemies(map.value, next).find((e) => e.id === enemy.id) ?? target : target;
+    const cur = planPath(next, dest, flags.value);
+    if (!cur) { message.value = "Le chemin est coupé."; break; }
+    if (cur.path.length === 0) { arrived = true; break; }
+    const res = stepTo(next, cur.path[0], flags.value);
     steps += 1;
     walked.value += 1;
     store.setExploration(characterId.value, next);
@@ -213,11 +220,17 @@ async function go(target: Cell) {
       message.value = `Vous apercevez : ${res.spotted.map((e) => monsterOf(e.encounterId).name).join(", ")}.`;
       break;
     }
+    const fresh = res.chased.filter((e) => !chasers.has(e.id));
+    if (fresh.length) {
+      fresh.forEach((e) => chasers.add(e.id));
+      message.value = `${fresh.map((e) => monsterOf(e.encounterId).name).join(", ")} ${fresh.length > 1 ? "vous poursuivent" : "vous poursuit"} !`;
+      break;
+    }
     await sleep(STEP_MS);
   }
   walking = false;
   if (!message.value) message.value = steps ? `Vous avez marché ${formatMeters(cellMeters(steps))}.` : "";
-  if (!cancel && steps === plan.path.length) {
+  if (!cancel && arrived) {
     if (enemy) startFight(enemy.id, enemy.encounterId);
     else if (plan.spot) openSpot(plan.spot);
   }

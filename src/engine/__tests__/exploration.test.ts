@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MAPS, MAP_BY_ID, type MapDef } from "../../data/maps";
 import { ENCOUNTERS } from "../../data/encounters";
 import {
-  cellDistance, cellMeters, defeatEnemy, findPath, key, livingEnemies, mapOf, parseMap, planPath, reachableFrom, retreatToStart,
+  cellDistance, cellMeters, defeatEnemy, findPath, foeMoves, key, livingEnemies, mapOf, parseMap, planPath, reachableFrom, retreatToStart,
   startExploration, stepTo, travelTo, validateMap, visibleCells, visibleEnemies, walkable,
 } from "../exploration";
 
@@ -109,9 +109,13 @@ describe("pas, ennemis et rencontres", () => {
   });
   it("arriver au contact déclenche la rencontre ; on ne traverse pas un ennemi", () => {
     const st = withArena();
-    for (let x = 1; x <= 4; x++) expect(stepTo(st, { x, y: 1 }).ambush).toBeUndefined();
-    expect(stepTo(st, { x: 5, y: 1 }).ambush?.id).toBe("w");
-    expect(() => stepTo(st, { x: 6, y: 1 })).toThrow();
+    // Le loup vient à la rencontre du héros : le contact arrive avant la case 5.
+    let ambush; let x = 0;
+    while (!ambush && x < 5) ambush = stepTo(st, { x: ++x, y: 1 }).ambush;
+    expect(ambush?.id).toBe("w");
+    expect(x).toBeLessThan(5);
+    const wolfAt = livingEnemies(arena, st)[0];
+    expect(() => stepTo(st, { x: wolfAt.x, y: wolfAt.y })).toThrow();
   });
   it("viser un ennemi donne un chemin jusqu'à la case voisine", () => {
     const st = withArena();
@@ -159,6 +163,7 @@ describe("passages entre cartes", () => {
   it("marcher sur le passage de la porte de la crypte propose le voyage (une fois ouverte)", () => {
     const st = startExploration(village);
     st.x = 17; st.y = 10;
+    st.defeated = village.enemies.map((e) => e.id); // les gardiens ne gênent pas ce test
     const res = stepTo(st, { x: 17, y: 11 }, ["crypte-ouverte"]);
     expect(res.travel?.to.map).toBe("crypte");
   });
@@ -190,5 +195,50 @@ describe("passages entre cartes", () => {
   });
   it("les passages mènent à des cases libres de cartes existantes", () => {
     for (const m of MAPS) expect(validateMap(m), m.id).toEqual([]);
+  });
+});
+
+describe("poursuite des ennemis", () => {
+  const open = (enemies: MapDef["enemies"]) => tiny(["............", "............", "............"], { start: { x: 1, y: 1 }, enemies });
+  const withMap = (m: MapDef) => {
+    const prev = MAP_BY_ID.tiny;
+    (MAP_BY_ID as Record<string, MapDef>).tiny = m;
+    return () => { if (prev) (MAP_BY_ID as Record<string, MapDef>).tiny = prev; else delete (MAP_BY_ID as Record<string, MapDef>).tiny; };
+  };
+
+  it("un ennemi qui voit le héros s'approche ; il le rejoint et déclenche la rencontre", () => {
+    const m = open([{ id: "w", encounterId: "goblin", x: 8, y: 1 }]);
+    const done = withMap(m);
+    const st = startExploration(m);
+    const res = stepTo(st, { x: 1, y: 0 });
+    expect(res.chased.map((e) => e.id)).toEqual(["w"]);
+    expect(st.foes?.w).toEqual({ x: 7, y: 1 });
+    expect(livingEnemies(m, st)[0].x).toBe(7);
+    let ambush = res.ambush;
+    for (let i = 0; i < 10 && !ambush; i++) ambush = stepTo(st, { x: 1, y: i % 2 ? 0 : 1 }).ambush;
+    expect(ambush?.id).toBe("w");
+    done();
+  });
+
+  it("un ennemi qui ne voit pas le héros reste en place (mur, ou trop loin)", () => {
+    const m = tiny(["....#....", "....#....", "....#...."], { start: { x: 0, y: 0 }, enemies: [{ id: "w", encounterId: "goblin", x: 8, y: 1 }] });
+    const done = withMap(m);
+    const st = startExploration(m);
+    expect(stepTo(st, { x: 1, y: 0 }).chased).toEqual([]);
+    expect(st.foes).toBeUndefined();
+    done();
+  });
+
+  it("la vitesse règle la cadence : un loup va plus vite qu'un zombie", () => {
+    const fast = { id: "x", encounterId: "wolf", x: 0, y: 0 };
+    const slow = { id: "y", encounterId: "zombie", x: 0, y: 0 };
+    const sum = (e: typeof fast) => [0, 1, 2, 3, 4, 5].reduce((a, t) => a + foeMoves(e, t), 0);
+    expect(sum(fast)).toBe(8);
+    expect(sum(slow)).toBe(4);
+  });
+
+  it("une défaite remet les ennemis à leur poste", () => {
+    const st = { ...startExploration(MAPS[0]), foes: { "wolf-1": { x: 9, y: 9 } } };
+    expect(retreatToStart(st).foes).toBeUndefined();
   });
 });
