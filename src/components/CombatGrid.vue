@@ -7,7 +7,7 @@
           :key="`${x},${y}`"
           class="tile"
           :class="[kind, { route: onRoute(x, y), dest: isDest(x, y) }]"
-          :style="{ width: TILE + 'px', height: TILE + 'px' }"
+          :style="{ width: TILE + 'px', height: TILE + 'px', backgroundImage: tileBackground(grid.tiles, x, y) }"
           @click="emit('tap', { x, y })"
         >
           <span v-if="at(x, y)" class="token" :class="[at(x, y)!.side, { active: at(x, y)!.id === activeId }]" :title="at(x, y)!.name">
@@ -25,6 +25,7 @@ import Illustration from "./Illustration.vue";
 import { gridOf, type Arena } from "../engine/battlefield";
 import type { Combatant } from "../engine/combat";
 import type { Cell } from "../engine/exploration";
+import { tileBackground } from "../ui/tileArt";
 import "../ui/tiles.css";
 
 const TILE = 32;

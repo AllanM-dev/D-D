@@ -23,7 +23,7 @@
               :key="`${x},${y}`"
               class="tile"
               :class="[kind, fog(x, y), { hero: ex.x === x && ex.y === y, locked: isLocked(x, y), route: onRoute(x, y), dest: isDest(x, y) }]"
-              :style="{ width: TILE + 'px', height: TILE + 'px' }"
+              :style="{ width: TILE + 'px', height: TILE + 'px', backgroundImage: tileBackground(grid.tiles, x, y) }"
               @click="tap(x, y)"
             >
               <Illustration v-if="ex.x === x && ex.y === y" :art="artKey('class', character.classDef.id)" :size="TILE - 4" :label="character.name" />
@@ -68,6 +68,7 @@ import {
 import { vitalsOf } from "../engine/rest";
 import { useCharacters } from "../stores/characters";
 import { formatMeters } from "../ui/format";
+import { tileBackground } from "../ui/tileArt";
 import "../ui/tiles.css";
 
 const TILE = 32;
@@ -219,7 +220,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .tile.unknown::after { background: #000; }
 .tile.route::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #ffd54a; opacity: 0.9; z-index: 2; pointer-events: none; }
 .tile.dest { outline: 2px dashed #fff; outline-offset: -3px; z-index: 1; }
-.tile.hero { outline: 2px solid #ffd54a; outline-offset: -2px; z-index: 1; }
+.tile.hero { outline: 2px solid #ffd54a; outline-offset: -2px; z-index: 1; box-shadow: 0 0 26px 12px #ffd37a55; }
 .spot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-weight: 800; box-shadow: 0 0 0 2px #3a2a00, 0 0 6px #ffd54a; }
 .tile.locked { box-shadow: inset 0 0 0 3px #c0392b; }
 .enemy { display: flex; filter: drop-shadow(0 0 3px #f44); }
