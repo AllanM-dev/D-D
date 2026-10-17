@@ -38,6 +38,7 @@
                 </span>
                 <span v-else class="spot" role="img" :aria-label="spotAt(x, y)!.label" :title="spotAt(x, y)!.label">!</span>
               </template>
+              <span v-else-if="doorHint(x, y)" class="door-hint" role="img" :aria-label="doorHint(x, y)!" :title="doorHint(x, y)!">!</span>
               <span v-else-if="enemyAt(x, y)" class="figure enemy" :title="enemyAt(x, y)!.name">
                 <span class="base" />
                 <Sprite :sprite="enemyAt(x, y)!.art" :size="TILE + 4" :label="enemyAt(x, y)!.name" />
@@ -48,7 +49,7 @@
       </div>
 
       <ul class="legend" aria-label="Légende de la carte">
-        <li><span class="spot sm">!</span> Lieu ou personnage à qui parler</li>
+        <li><span class="spot sm">!</span> Lieu ou personnage à qui parler (sur une porte : quelqu'un à l'intérieur)</li>
         <li><span class="swatch locked-sw"></span> Passage verrouillé</li>
         <li><span class="swatch enemy-sw"></span> Ennemi (socle rouge)</li>
         <li><span class="swatch hero-sw"></span> Vous (socle bleu)</li>
@@ -132,6 +133,12 @@ const visibleEnemyMap = computed(() => {
 });
 const enemyAt = (x: number, y: number) => visibleEnemyMap.value.get(`${x},${y}`);
 const flags = computed(() => character.value?.story?.flags ?? []);
+/** « ! » sur une porte vue dont le personnage, à l'intérieur, n'est pas encore visible. */
+const doorHint = (x: number, y: number) => {
+  if (fog(x, y) === "unknown") return "";
+  const sp = liveSpots(map.value, flags.value).find((s) => s.door?.x === x && s.door?.y === y);
+  return sp && !visible.value.has(`${sp.x},${sp.y}`) ? `${sp.label} : entrez par cette porte` : "";
+};
 const isNpc = (id: string) => NPC_SPRITES.includes(id);
 const spotAt = (x: number, y: number) =>
   liveSpots(map.value, flags.value).find((s) => s.x === x && s.y === y && visible.value.has(`${x},${y}`));
@@ -266,6 +273,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .hero-fig { --team: #4aa3ff; }
 .enemy { --team: #e0554f; }
 .npc-fig { --team: #ffd54a; }
+.door-hint { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-size: 11px; font-weight: 800; box-shadow: 0 0 0 1.5px #3a2a00; position: relative; top: 4px; }
 .badge { position: absolute; top: -3px; right: -1px; z-index: 2; display: grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-size: 10px; font-weight: 800; box-shadow: 0 0 0 1.5px #3a2a00; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 8px 0 0; padding: 0; font-size: 0.8rem; opacity: 0.85; }
 .legend li { display: flex; align-items: center; gap: 5px; }

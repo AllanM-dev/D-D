@@ -49,6 +49,7 @@
 - [ ] Équipement : objets magiques, poids porté, munitions comptées, maîtrises d'armes 2024, réparation
 - [x] Confort : sauvegarde exportable/importable (fichier JSON), légende de la carte
 - [x] Apparence de la carte (lot 1) : cases dessinées en SVG (variantes, ombres, rives, lisières, torches), lueur du héros
+- [x] Carte de Brumeval plus cohérente : personnages dans leurs bâtiments (mairie, auberge agrandie, forge), « ! » sur la porte, Léo au bord de la rivière
 - [x] Apparence (lot 2) : personnages 2D (héros par espèce et classe, 10 monstres, 4 PNJ), socles d'équipe, barres de PV en combat
 - [x] Ennemis qui poursuivent le héros sur la carte quand ils le voient (vitesse propre, embuscade au contact)
 - [x] Attaque à distance depuis la carte : bouton « Attaquer d'ici », arme à distance choisie d'office quand la cible est trop loin

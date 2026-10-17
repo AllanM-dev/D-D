@@ -71,7 +71,10 @@ export function validateMap(map: MapDef): string[] {
     seen.add(e.id);
     if (same(e, map.start)) errors.push(`${map.id} : ${e.id} sur le départ`);
   }
-  for (const sp of map.spots ?? []) if (!walkable(g, sp)) errors.push(`${map.id} : lieu ${sp.id} sur une case infranchissable`);
+  for (const sp of map.spots ?? []) {
+    if (!walkable(g, sp)) errors.push(`${map.id} : lieu ${sp.id} sur une case infranchissable`);
+    if (sp.door && (!inside(g, sp.door) || tileAt(g, sp.door) !== "door")) errors.push(`${map.id} : la porte de ${sp.id} n'est pas une porte`);
+  }
   for (const l of map.locks ?? []) if (!walkable(g, l)) errors.push(`${map.id} : verrou en ${l.x},${l.y} sur une case infranchissable`);
   for (const ex of map.exits ?? []) {
     if (!walkable(g, ex)) errors.push(`${map.id} : passage en ${ex.x},${ex.y} sur une case infranchissable`);

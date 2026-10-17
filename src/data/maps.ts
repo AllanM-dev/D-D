@@ -33,6 +33,8 @@ export interface MapSpot {
   id: string;
   x: number;
   y: number;
+  /** Porte du bâtiment où se trouve le personnage : un « ! » y signale qu'il y a quelqu'un à voir. */
+  door?: { x: number; y: number };
   label: string;
   story: string;
   scene: string;
@@ -72,7 +74,7 @@ export const MAPS: readonly MapDef[] = [
   {
     id: "brumeval",
     name: "Brumeval et ses environs",
-    description: "Un village de campagne, la route qui mène à la rivière, la forêt au nord et le cimetière au sud-est.",
+    description: "Un village de campagne : la mairie, l'auberge et la forge, la route qui mène à la rivière, la forêt au nord et, au sud-est, la crypte.",
     rows: [
       "TTTTTTTTTTTTTTTTTTTTTTTT",
       "TT.TT..T.T..T.TT.TTT~~.T",
@@ -84,8 +86,8 @@ export const MAPS: readonly MapDef[] = [
       "T..##D##.....:....TT~~.T",
       "T....::::#D##:::::::==.T",
       "T.T.T....#,,#....:..~~.T",
-      "T.T#D##..####....:..~~.T",
-      "T..#,,#.T....T.##D##~~.T",
+      "T.T#D##..#,,#....:..~~.T",
+      "T..#,,#.T####T.##D##~~.T",
       "T..#,,#........#,,,#~~.T",
       "T..####.......T#,,,#~~.T",
       "T.T............#####~~.T",
@@ -98,11 +100,11 @@ export const MAPS: readonly MapDef[] = [
       { id: "skeleton-1", encounterId: "skeleton", x: 17, y: 9, loot: { gold: 4, items: { gem: 1, "weapon:shortsword": 1 } } },
     ],
     spots: [
-      { id: "maire", x: 6, y: 8, label: "Odile, la maire", story: "brumeval", scene: "maire" },
-      { id: "aubergiste", x: 11, y: 7, label: "Thibaud, l'aubergiste", story: "brumeval", scene: "aubergiste" },
+      { id: "maire", x: 5, y: 5, door: { x: 5, y: 7 }, label: "Odile, la maire", story: "brumeval", scene: "maire" },
+      { id: "aubergiste", x: 11, y: 10, door: { x: 10, y: 8 }, label: "Thibaud, l'aubergiste", story: "brumeval", scene: "aubergiste" },
       { id: "crypte", x: 17, y: 11, label: "Porte de la crypte", story: "brumeval", scene: "crypte", hiddenWhen: "crypte-ouverte" },
-      { id: "leo", x: 14, y: 5, label: "Léo, fils du meunier", story: "brumeval", scene: "leo" },
-      { id: "forge", x: 7, y: 9, label: "Maëlle, la forgeronne", story: "brumeval", scene: "forge" },
+      { id: "leo", x: 19, y: 6, label: "Léo, fils du meunier", story: "brumeval", scene: "leo" },
+      { id: "forge", x: 5, y: 12, door: { x: 4, y: 10 }, label: "Maëlle, la forgeronne", story: "brumeval", scene: "forge" },
     ],
     locks: [{ x: 17, y: 11, flag: "crypte-ouverte" }],
     exits: [{ x: 17, y: 11, label: "Descendre dans la crypte", to: { map: "crypte", x: 3, y: 1 } }],

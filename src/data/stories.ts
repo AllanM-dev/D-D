@@ -73,7 +73,7 @@ const maire: Scene[] = [
     id: "maire",
     title: "Odile, la maire",
     text: [
-      "Odile vous accueille devant sa maison, un châle de laine sur les épaules. Son regard est cerné de fatigue.",
+      "Odile vous accueille dans la salle de la mairie, un châle de laine sur les épaules. Son regard est cerné de fatigue.",
       "« Voyageur, vous tombez bien ou très mal. Depuis trois nuits, des bruits montent de la vieille crypte, près de la route. Hier soir, le fils du meunier a juré avoir vu des silhouettes en sortir. »",
     ],
     textIf: [
@@ -129,7 +129,7 @@ const maire: Scene[] = [
   {
     id: "maire-cle",
     title: "Odile, la maire",
-    text: ["« L'aubergiste, Thibaud. Il tient l'auberge au bout de la place, près du chemin. Il est un peu bourru, mais il connaît chaque pierre du village. »"],
+    text: ["« L'aubergiste, Thibaud. Il tient l'auberge près du chemin, au centre du village. Il est un peu bourru, mais il connaît chaque pierre du village. »"],
     choices: [{ text: "Merci.", goto: "maire" }],
   },
   {

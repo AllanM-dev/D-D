@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MAPS, MAP_BY_ID } from "../../data/maps";
 import { STORIES, STORY_BY_ID, type Scene } from "../../data/stories";
-import { liveSpots, lockedCells, planPath, startExploration, stepTo, validateMap } from "../exploration";
+import { liveSpots, lockedCells, parseMap, planPath, startExploration, stepTo, validateMap } from "../exploration";
 import {
   applyEffects, availableChoices, enterScene, meets, onceFlag, resolveChoice, rollCheck, sceneText, unreachableScenes, validateStory,
 } from "../story";
@@ -224,19 +224,38 @@ describe("lieux et portes sur la carte", () => {
   });
   it("on ne marche pas sur un personnage ; viser un lieu mène à côté", () => {
     const st = startExploration(m);
-    const plan = planPath(st, { x: 6, y: 8 }, [])!;
+    const odile = m.spots!.find((s) => s.id === "maire")!;
+    const plan = planPath(st, odile, [])!;
     expect(plan.spot?.id).toBe("maire");
     const last = plan.path.at(-1)!;
-    expect(Math.max(Math.abs(last.x - 6), Math.abs(last.y - 8))).toBe(1);
-    expect(plan.path.some((c) => c.x === 6 && c.y === 8)).toBe(false);
+    expect(Math.max(Math.abs(last.x - odile.x), Math.abs(last.y - odile.y))).toBe(1);
+    expect(plan.path.some((c) => c.x === odile.x && c.y === odile.y)).toBe(false);
     st.x = last.x; st.y = last.y;
-    expect(planPath(st, { x: 6, y: 8 }, [])!.path).toEqual([]);
-    expect(() => stepTo(st, { x: 6, y: 8 }, [])).toThrow();
+    expect(planPath(st, odile, [])!.path).toEqual([]);
+    expect(() => stepTo(st, odile, [])).toThrow();
+  });
+  it("les personnages du village sont chez eux : mairie, auberge et forge ; ni sur une porte ni dans un mur", () => {
+    const g = parseMap(m);
+    const tile = (id: string) => { const s = m.spots!.find((x) => x.id === id)!; return g.tiles[s.y][s.x]; };
+    for (const id of ["maire", "aubergiste", "forge"]) expect(tile(id), id).toBe("floor");
+    // Un lieu peut être sur une porte (la porte de la crypte) mais jamais dans un mur, un arbre ou l'eau.
+    for (const s of m.spots!) expect(["wall", "tree", "water"], s.id).not.toContain(g.tiles[s.y][s.x]);
+    for (const e of m.enemies) expect(["wall", "tree", "water", "door"], e.id).not.toContain(g.tiles[e.y][e.x]);
   });
   it("sans la clé, on ne passe pas la porte ; avec le drapeau, oui", () => {
     const st = startExploration(m);
     st.x = 17; st.y = 10;
     expect(() => stepTo(st, { x: 17, y: 11 }, [])).toThrow();
     expect(() => stepTo({ ...st, explored: [...st.explored] }, { x: 17, y: 11 }, ["crypte-ouverte"])).not.toThrow();
+  });
+});
+
+describe("portes des personnages du village", () => {
+  it("chaque personnage d'intérieur a sa porte, qui est bien une porte", () => {
+    const m = MAP_BY_ID.brumeval;
+    for (const id of ["maire", "aubergiste", "forge"]) expect(m.spots!.find((s) => s.id === id)?.door, id).toBeTruthy();
+    expect(validateMap(m)).toEqual([]);
+    const bad = { ...m, spots: m.spots!.map((s) => (s.id === "maire" ? { ...s, door: { x: 9, y: 6 } } : s)) };
+    expect(validateMap(bad).join(" ")).toContain("la porte de maire n'est pas une porte");
   });
 });
