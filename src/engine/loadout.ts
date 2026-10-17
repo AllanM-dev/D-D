@@ -14,11 +14,11 @@ export const loadoutOf = (c: Pick<Character, "equipment">): Loadout => ({
 
 /** Armes dont la maîtrise est active : le choix du joueur, ou par défaut les premières armes portées. */
 export const masteriesOf = (c: Character): string[] =>
-  c.masteries ?? defaultMasteries(c.classDef.id, c.equipment.weapons.map((w) => w.id));
+  c.masteries ?? defaultMasteries(c.classDef.id, c.equipment.weapons.map((w) => w.id), c.order);
 
 const inputOf = (c: Character): EquipmentInput => ({
   classId: c.classDef.id, scores: c.scores, modifiers: c.modifiers, proficiencyBonus: c.proficiencyBonus, baseSpeed: c.species.speed,
-  fightingStyle: c.classDef.id === "fighter" ? c.fightingStyle : undefined, masteries: masteriesOf(c),
+  fightingStyle: c.classDef.id === "fighter" ? c.fightingStyle : undefined, masteries: masteriesOf(c), order: c.order, invocation: c.invocation,
 });
 
 /** Applique un équipement au personnage : CA, vitesse et attaques sont recalculées. */
@@ -91,7 +91,7 @@ export const canEquip = (c: Character, itemId: string) => {
 /** Choisit les armes dont on active la maîtrise (au plus le nombre permis par la classe). */
 export function setMasteries(c: Character, ids: string[]): LoadoutPatch & { masteries: string[] } {
   const max = MASTERY_COUNT[c.classDef.id] ?? 0;
-  const ok = new Set(masterableWeapons(c.classDef.id).map((w) => w.id));
+  const ok = new Set(masterableWeapons(c.classDef.id, c.order).map((w) => w.id));
   const unique = [...new Set(ids)];
   if (unique.length > max) throw new Error(`Au plus ${max} maîtrise${max > 1 ? "s" : ""} d'arme.`);
   if (unique.some((id) => !ok.has(id))) throw new Error("Maîtrise impossible pour cette arme.");

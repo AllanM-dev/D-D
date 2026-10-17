@@ -33,7 +33,8 @@
 - [ ] Sorts : grimoire du magicien, niveaux supérieurs, soins des alliés
 - [x] États (conditions) : empoisonné, effrayé, aveuglé, entravé, à terre, neutralisé, étourdi, paralysé ; infligés par le loup (à terre), la goule (paralysie) et les sorts Rayon empoisonné, Enchevêtrement, Fou rire de Tasha ; section Aide → États
 - [x] Capacités de classe (lot 2) : Attaque sournoise, Inspiration bardique (pour soi), maîtrises d'armes (8 effets) ; capacités de monstres : tactique de meute, robustesse des morts-vivants, agressif, toile et venin de l'araignée ; Bestiaire (10 monstres) dans l'Aide
-- [ ] États restants (charmé, assourdi, épuisement, agrippé, invisible, pétrifié), autres capacités de classe (Expertise, Ordre divin, Ordre primordial, Druidique, Adepte des rituels, Invocations occultes…), autres styles de combat
+- [x] Capacités de classe (lot 3) : Expertise du roublard, Ordre divin (Protecteur, Thaumaturge) et Ordre primordial (Gardien, Magicien des bois), invocations occultes (Armure d'ombres, Décharge agonisante, Lance occulte), styles Armes à deux mains et Deux armes, sort Bénédiction
+- [ ] États restants (charmé, assourdi, épuisement, agrippé, invisible, pétrifié), capacités sans effet de jeu (Druidique, Argot des voleurs, Adepte des rituels), autres invocations (Pactes), sorts sans effet en combat
 - [x] Bestiaire de départ (10 monstres, SRD 5.1) et 10 rencontres
 - [ ] Bestiaire complet, capacités spéciales des monstres, compagnons, propriétés d'armes (lourde, légère, maîtrises), munitions
 

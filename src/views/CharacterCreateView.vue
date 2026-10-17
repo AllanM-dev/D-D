@@ -163,13 +163,46 @@
         </p>
       </template>
 
+      <!-- Ordre divin (clerc) ou primordial (druide) -->
+      <template v-if="orderOptions.length">
+        <h3>{{ classDef?.id === "cleric" ? "Ordre divin" : "Ordre primordial" }}</h3>
+        <ion-segment v-model="draft.order">
+          <ion-segment-button v-for="o in orderOptions" :key="o.id" :value="o.id"><ion-label>{{ o.name }}</ion-label></ion-segment-button>
+        </ion-segment>
+        <p class="hint">{{ orderOptions.find((o) => o.id === draft.order)?.text }}</p>
+      </template>
+
+      <!-- Invocation occulte (occultiste) -->
+      <template v-if="classDef?.id === 'warlock'">
+        <h3>Invocation occulte</h3>
+        <ion-segment v-model="draft.invocation">
+          <ion-segment-button v-for="i in INVOCATIONS" :key="i.id" :value="i.id"><ion-label>{{ i.name }}</ion-label></ion-segment-button>
+        </ion-segment>
+        <p class="hint">{{ INVOCATIONS.find((i) => i.id === draft.invocation)?.text }}</p>
+      </template>
+
+      <!-- Expertise (roublard) -->
+      <template v-if="expertiseCount">
+        <h3>Expertise ({{ draft.expertise?.length ?? 0 }}/{{ expertiseCount }})</h3>
+        <p class="hint">Votre bonus de maîtrise est doublé pour ces compétences.</p>
+        <ion-list inset>
+          <ion-item v-for="id in ownSkills" :key="id">
+            <ion-checkbox
+              :checked="draft.expertise?.includes(id)"
+              :disabled="!draft.expertise?.includes(id) && (draft.expertise?.length ?? 0) >= expertiseCount"
+              @ion-change="toggleExpertise(id, $event.detail.checked)"
+            >{{ skillName(id) }}</ion-checkbox>
+          </ion-item>
+        </ion-list>
+      </template>
+
       <!-- Style de combat (guerrier) -->
       <template v-if="classDef?.id === 'fighter'">
         <h3>Style de combat</h3>
         <ion-segment v-model="draft.fightingStyle">
           <ion-segment-button v-for="st in FIGHTING_STYLES" :key="st.id" :value="st.id"><ion-label>{{ st.name }}</ion-label></ion-segment-button>
         </ion-segment>
-        <p class="hint">{{ FIGHTING_STYLES.find((st) => st.id === draft.fightingStyle)?.text }} Les autres styles viendront plus tard.</p>
+        <p class="hint">{{ FIGHTING_STYLES.find((st) => st.id === draft.fightingStyle)?.text }}</p>
       </template>
 
       <!-- Équipement de départ -->
@@ -252,6 +285,7 @@ import { keyAbilities } from "../engine/advice";
 import { computeEquipment, kitsFor } from "../engine/equipment";
 import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
+import { EXPERTISE_COUNT, INVOCATIONS, ORDERS, hasExtraCantrip } from "../data/class-choices";
 import { CLASS_SPELLCASTING, SPELL_BY_ID, defaultSpells, isPlayable, spellsFor } from "../data/spells";
 import { artKey } from "../data/illustrations";
 import { ARMORS, WEAPONS, type KitEntry } from "../data/equipment";
@@ -305,12 +339,32 @@ watch(() => draft.classId, (id) => {
   draft.classSkills = [];
   draft.kitId = id ? kitsFor(id)[0].id : undefined;
   draft.fightingStyle = id === "fighter" ? "defense" : undefined;
+  draft.order = id && ORDERS[id] ? ORDERS[id][0].id : undefined;
+  draft.invocation = id === "warlock" ? INVOCATIONS[0].id : undefined;
+  draft.expertise = id && EXPERTISE_COUNT[id] ? [] : undefined;
   draft.spells = id && CLASS_SPELLCASTING[id] ? defaultSpells(id) : undefined;
 });
 
 function pruneSkills() {
   draft.classSkills = draft.classSkills.filter((s) => classSkillOptions.value.includes(s));
 }
+
+// --- ordre, invocation, expertise
+const orderOptions = computed(() => (classDef.value ? ORDERS[classDef.value.id] ?? [] : []));
+const expertiseCount = computed(() => (classDef.value ? EXPERTISE_COUNT[classDef.value.id] ?? 0 : 0));
+const ownSkills = computed(() => [...(background.value?.skills ?? []), ...draft.classSkills]);
+function toggleExpertise(id: SkillId, checked: boolean) {
+  const list = draft.expertise ?? (draft.expertise = []);
+  if (checked && !list.includes(id)) list.push(id);
+  else if (!checked) draft.expertise = list.filter((x) => x !== id);
+}
+// Une compétence qui n'est plus maîtrisée ne peut plus avoir l'expertise.
+watch(ownSkills, (own) => { if (draft.expertise) draft.expertise = draft.expertise.filter((s) => own.includes(s)); });
+// Passer à un ordre sans sort mineur supplémentaire retire le dernier sort mineur choisi en trop.
+watch(() => draft.order, (o) => {
+  const cfg = spellCfg.value;
+  if (cfg && draft.spells && !hasExtraCantrip(o) && draft.spells.cantrips.length > cfg.cantrips) draft.spells.cantrips = draft.spells.cantrips.slice(0, cfg.cantrips);
+});
 
 function setBonusMode() {
   if (draft.bonus.mode === "2/1" && background.value) {
@@ -380,7 +434,7 @@ const spellGroups = computed(() => {
   const cls = classDef.value;
   if (!cfg || !cls) return [];
   return [
-    { level: 0 as const, title: "Sorts mineurs", count: cfg.cantrips, options: spellsFor(cls.id, 0), chosen: draft.spells?.cantrips ?? [] },
+    { level: 0 as const, title: "Sorts mineurs", count: cfg.cantrips + (hasExtraCantrip(draft.order) ? 1 : 0), options: spellsFor(cls.id, 0), chosen: draft.spells?.cantrips ?? [] },
     { level: 1 as const, title: "Sorts de niveau 1 préparés", count: cfg.prepared, options: spellsFor(cls.id, 1), chosen: draft.spells?.prepared ?? [] },
   ];
 });
@@ -417,7 +471,7 @@ const preview = computed(() => {
   if (!cls || !sp || ABILITIES.some((a) => final.value[a] <= 0)) return null;
   const scores = final.value;
   const modifiers = Object.fromEntries(ABILITIES.map((a) => [a, abilityModifier(scores[a])])) as Record<Ability, number>;
-  return computeEquipment({ classId: cls.id, scores, modifiers, proficiencyBonus: 2, baseSpeed: sp.speed, fightingStyle: draft.fightingStyle }, draft.kitId);
+  return computeEquipment({ classId: cls.id, scores, modifiers, proficiencyBonus: 2, baseSpeed: sp.speed, fightingStyle: draft.fightingStyle, order: draft.order, invocation: draft.invocation }, draft.kitId);
 });
 
 function create() {

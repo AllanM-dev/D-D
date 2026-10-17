@@ -217,11 +217,11 @@ import CombatGrid from "../components/CombatGrid.vue";
 import DiceRoll from "../components/DiceRoll.vue";
 import Illustration from "../components/Illustration.vue";
 import { artKey } from "../data/illustrations";
-import { SPELL_BY_ID, rangeMeters } from "../data/spells";
+import { SPELL_BY_ID } from "../data/spells";
 import { MAP_BY_ID } from "../data/maps";
 import { buildSetup } from "../engine/arena";
 import { CELL_METERS, placeAt, type Cell } from "../engine/exploration";
-import { areaTargets, castSpell } from "../engine/spellcasting";
+import { areaTargets, castSpell, spellRange } from "../engine/spellcasting";
 import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";
@@ -506,7 +506,7 @@ const strikeStatus = (e: Combatant, featureId: string) => {
   return state.value && h && strike ? attackCheck(state.value, h, e, strike) : NO_CHECK;
 };
 const spellStatus = (e: Combatant) =>
-  state.value && hero.value && pickedSpell.value ? spellTargetCheck(state.value, hero.value, e, rangeMeters(SPELL_BY_ID[pickedSpell.value.id])) : NO_CHECK;
+  state.value && hero.value && pickedSpell.value ? spellTargetCheck(state.value, hero.value, e, spellRange(SPELL_BY_ID[pickedSpell.value.id], hero.value)) : NO_CHECK;
 
 /** Premier toucher : trajet affiché ; second toucher au même endroit : déplacement. */
 function tapCell(cell: Cell) {

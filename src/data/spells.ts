@@ -16,6 +16,8 @@ export type SpellEffect =
   | { kind: "heal"; dice: [number, number] }
   | { kind: "mage-armor" }
   | { kind: "ac-bonus"; bonus: number }
+  /** Concentration : +1d4 aux jets d'attaque et de sauvegarde du lanceur. */
+  | { kind: "bless" }
   | { kind: "mark"; dice: [number, number]; damageType: string; weaponOnly: boolean }
   | { kind: "none" };
 
@@ -140,7 +142,7 @@ export const SPELLS: readonly SpellDef[] = [
   { id: "shield", name: "Bouclier", level: 1, school: "Abjuration", time: "reaction", range: "Soi-même", duration: "1 round", concentration: false, classes: [sorcerer, wizard],
     description: "Réaction quand vous êtes touché : +5 à votre CA jusqu'au début de votre prochain tour, et vous évitez Projectile magique.", effect: { kind: "reaction-shield" }, note: "Se lance en réaction quand une attaque ennemie vous touche : l'application vous demande si vous voulez le lancer (1 emplacement). L'immunité à Projectile magique est sans objet, aucun ennemi n'en lance." },
   { id: "bless", name: "Bénédiction", level: 1, school: "Enchantement", time: "action", range: "9 m", duration: "Concentration, 1 minute", concentration: true, classes: [cleric, paladin],
-    description: "Jusqu'à trois créatures ajoutent 1d4 à leurs jets d'attaque et de sauvegarde.", effect: { kind: "none" }, note: "Pas encore appliqué : il faudrait ajouter un d4 à chaque jet." },
+    description: "Jusqu'à trois créatures ajoutent 1d4 à leurs jets d'attaque et de sauvegarde.", effect: { kind: "bless" }, note: "Dans l'application, la bénédiction vous vise vous-même (pas d'allié) : +1d4 à vos jets d'attaque et de sauvegarde tant que vous restez concentré." },
   { id: "goodberry", name: "Baies nourricières", level: 1, school: "Transmutation", time: "action", range: "Contact", duration: "24 heures", concentration: false, classes: [druid, ranger],
     description: "Dix baies magiques : en manger une rend 1 PV et nourrit pour la journée.", effect: { kind: "none" }, note: "Pas encore appliqué : pas d'inventaire de consommables." },
   { id: "hellish-rebuke", name: "Représailles infernales", level: 1, school: "Évocation", time: "reaction", range: "18 m", duration: "Instantanée", concentration: false, classes: [warlock],

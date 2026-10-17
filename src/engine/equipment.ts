@@ -1,4 +1,4 @@
-import { ARMORS, CLASS_TRAINING, MASTERY_COUNT, STARTING_KITS, WEAPONS, WEAPON_MASTERY, type ArmorDef, type Kit, type WeaponDef } from "../data/equipment";
+import { ARMORS, CLASS_TRAINING, MASTERY_COUNT, STARTING_KITS, WEAPONS, WEAPON_MASTERY, type ArmorDef, type ArmorTraining, type Kit, type WeaponDef, type WeaponTraining } from "../data/equipment";
 import type { AbilityScores } from "./abilities";
 import type { FightingStyleId } from "../data/fighting-styles";
 import type { AttackDef } from "./combat";
@@ -39,6 +39,10 @@ export interface EquipmentInput {
   /** Vitesse de l'espèce en mètres, avant malus d'armure. */
   baseSpeed: number;
   fightingStyle?: FightingStyleId;
+  /** Ordre divin ou primordial (Protecteur, Gardien : maîtrises en plus). */
+  order?: string;
+  /** Invocation occulte (Armure d'ombres : CA 13 + Dex sans armure). */
+  invocation?: string;
   /** Armes dont l'effet de maîtrise est connu (identifiants d'armes). */
   masteries?: string[];
 }
@@ -67,9 +71,17 @@ export function getKit(classId: string, kitId?: string): Kit {
   return kit;
 }
 
+/** Maîtrises de la classe, plus celles de l'Ordre (Protecteur : armes martiales et armures lourdes ; Gardien : martiales et intermédiaires). */
+export function trainingOf(classId: string, order?: string): { weapons: WeaponTraining; armor: ArmorTraining[] } {
+  const base = CLASS_TRAINING[classId] ?? { weapons: "simple" as const, armor: [] };
+  if (order === "protector") return { weapons: "simple+martial", armor: [...new Set([...base.armor, "heavy" as const])] };
+  if (order === "warden") return { weapons: "simple+martial", armor: [...new Set([...base.armor, "medium" as const])] };
+  return base;
+}
+
 /** Maîtrise d'une arme selon la classe (le moine et le roublard ont des règles particulières). */
-export function isWeaponProficient(classId: string, w: WeaponDef): boolean {
-  const training = CLASS_TRAINING[classId]?.weapons;
+export function isWeaponProficient(classId: string, w: WeaponDef, order?: string): boolean {
+  const training = trainingOf(classId, order).weapons;
   if (w.category === "simple") return true;
   switch (training) {
     case "simple+martial": return true;
@@ -104,14 +116,14 @@ export interface DerivedStats {
 }
 
 /** Une classe sait-elle porter cette armure (ou ce bouclier) ? Sinon : désavantage aux attaques et aucun sort. */
-export function armorTrained(classId: string, kind: ArmorDef["kind"]): boolean {
-  return (CLASS_TRAINING[classId]?.armor ?? []).includes(kind);
+export function armorTrained(classId: string, kind: ArmorDef["kind"], order?: string): boolean {
+  return trainingOf(classId, order).armor.includes(kind);
 }
 
 /** Le personnage porte-t-il une armure ou un bouclier qu'il ne maîtrise pas ? */
-export function wearsUntrained(classId: string, loadout: Pick<Loadout, "armor" | "shield">): boolean {
+export function wearsUntrained(classId: string, loadout: Pick<Loadout, "armor" | "shield">, order?: string): boolean {
   const a = loadout.armor ? armorById(loadout.armor.id) : undefined;
-  return (!!a && !armorTrained(classId, a.kind)) || (loadout.shield && !armorTrained(classId, "shield"));
+  return (!!a && !armorTrained(classId, a.kind, order)) || (loadout.shield && !armorTrained(classId, "shield", order));
 }
 
 /** CA, vitesse et attaques d'un personnage pour un équipement donné (utilisé à la création et à chaque changement d'équipement). */
@@ -131,6 +143,8 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
     ac = 10 + mod.DEX + mod.CON; // Défense sans armure (le bouclier reste permis)
   } else if (classId === "monk" && !shield) {
     ac = 10 + mod.DEX + mod.WIS;
+  } else if (input.invocation === "armor-of-shadows") {
+    ac = 13 + mod.DEX; // Invocation Armure d'ombres : Armure du mage à volonté
   } else {
     ac = 10 + mod.DEX;
   }
@@ -151,7 +165,7 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
   const archery = input.fightingStyle === "archery" ? 2 : 0; // Style de combat : Archerie (armes à distance)
   for (const item of weapons.values()) {
     const w = weaponById(item.id);
-    const proficient = isWeaponProficient(classId, w);
+    const proficient = isWeaponProficient(classId, w, input.order);
     const ability = weaponAbility(classId, w, proficient, mod);
     // Arme polyvalente : une main si l'on porte un bouclier, deux mains sinon.
     const sides = w.properties.includes("versatile") && !shield && w.versatileSides ? w.versatileSides : w.damage.sides;
@@ -165,6 +179,8 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
     if (input.masteries?.includes(w.id) && WEAPON_MASTERY[w.id]) base.mastery = WEAPON_MASTERY[w.id];
     if (w.properties.includes("finesse") || w.ranged) base.sneak = true; // arme éligible à l'Attaque sournoise
     if (w.properties.includes("light") && !w.ranged) base.light = true;
+    // Style Armes à deux mains : 1 et 2 comptent comme 3 aux dés de dégâts d'une arme de mêlée tenue à deux mains.
+    if (input.fightingStyle === "great-weapon" && !w.ranged && (w.properties.includes("two-handed") || (w.properties.includes("versatile") && !shield))) base.gwf = true;
     if (w.properties.includes("two-handed") && shield) base.blocked = "Deux mains : impossible avec un bouclier";
     if (w.properties.includes("heavy") && scores[w.ranged ? "DEX" : "STR"] < 13) base.penalty = `arme lourde, ${w.ranged ? "Dextérité" : "Force"} inférieure à 13`;
     attacks.push(base);
@@ -180,7 +196,7 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
   const lights = attacks.filter((a) => a.light);
   for (const a of lights) {
     const other = lights.find((o) => o !== a && o.weaponId !== a.weaponId) ?? (weapons.get(a.weaponId!)!.qty >= 2 ? a : undefined);
-    if (other) a.offhand = { name: other.name, toHit: other.toHit, damage: { ...other.damage, bonus: Math.min(0, other.damage.bonus) }, damageType: other.damageType, ability: other.ability };
+    if (other) a.offhand = { name: other.name, toHit: other.toHit, damage: { ...other.damage, bonus: input.fightingStyle === "two-weapon" ? other.damage.bonus : Math.min(0, other.damage.bonus) }, damageType: other.damageType, ability: other.ability };
   }
   // Mains nues : toujours possible (dégâts 1 + Force), même sans arme en main.
   if (classId !== "monk") {
@@ -250,14 +266,14 @@ export function migrateCharacter<T extends { classDef: { id: string }; species: 
 }
 
 /** Armes dont un personnage de cette classe peut maîtriser l'effet : armes qu'il sait manier et qui ont une maîtrise. */
-export function masterableWeapons(classId: string): WeaponDef[] {
+export function masterableWeapons(classId: string, order?: string): WeaponDef[] {
   if (!MASTERY_COUNT[classId]) return [];
-  return WEAPONS.filter((w) => WEAPON_MASTERY[w.id] && isWeaponProficient(classId, w));
+  return WEAPONS.filter((w) => WEAPON_MASTERY[w.id] && isWeaponProficient(classId, w, order));
 }
 
 /** Maîtrises par défaut : les premières armes du lot de départ que la classe peut maîtriser. */
-export function defaultMasteries(classId: string, weaponIds: string[]): string[] {
+export function defaultMasteries(classId: string, weaponIds: string[], order?: string): string[] {
   const n = MASTERY_COUNT[classId] ?? 0;
-  const ok = new Set(masterableWeapons(classId).map((w) => w.id));
+  const ok = new Set(masterableWeapons(classId, order).map((w) => w.id));
   return [...new Set(weaponIds.filter((id) => ok.has(id)))].slice(0, n);
 }
