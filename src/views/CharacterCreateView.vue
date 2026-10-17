@@ -36,6 +36,11 @@
         </ion-item>
       </ion-list>
 
+      <figure v-if="previewSprite" class="preview">
+        <Sprite :sprite="previewSprite" :size="112" label="Aperçu de votre personnage" />
+        <figcaption>Votre personnage</figcaption>
+      </figure>
+
       <div v-if="portraits.length" class="portraits">
         <figure v-for="pt in portraits" :key="pt.art">
           <Illustration :art="pt.art" :size="60" :label="`${pt.kind} : ${pt.name}`" />
@@ -285,6 +290,8 @@ import { keyAbilities } from "../engine/advice";
 import { computeEquipment, kitsFor } from "../engine/equipment";
 import Illustration from "../components/Illustration.vue";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
+import Sprite from "../components/Sprite.vue";
+import { heroSpriteKey } from "../ui/sprites";
 import { EXPERTISE_COUNT, INVOCATIONS, ORDERS, hasExtraCantrip } from "../data/class-choices";
 import { CLASS_SPELLCASTING, SPELL_BY_ID, defaultSpells, isPlayable, spellsFor } from "../data/spells";
 import { artKey } from "../data/illustrations";
@@ -350,6 +357,8 @@ function pruneSkills() {
 }
 
 // --- ordre, invocation, expertise
+/** Aperçu du personnage : son dessin selon l'espèce et la classe choisies. */
+const previewSprite = computed(() => (draft.speciesId && draft.classId ? heroSpriteKey(draft.speciesId, draft.classId) : undefined));
 const orderOptions = computed(() => (classDef.value ? ORDERS[classDef.value.id] ?? [] : []));
 const expertiseCount = computed(() => (classDef.value ? EXPERTISE_COUNT[classDef.value.id] ?? 0 : 0));
 const ownSkills = computed(() => [...(background.value?.skills ?? []), ...draft.classSkills]);
@@ -483,6 +492,8 @@ function create() {
 
 <style scoped>
 ion-content { --padding-start: 16px; --padding-end: 16px; }
+.preview { margin: 8px auto; text-align: center; background: #4f7f3a; border-radius: 12px; padding: 8px 0 4px; width: 140px; }
+.preview figcaption { font-size: 0.8rem; color: #fff; opacity: 0.9; }
 .advice { background: var(--ion-color-step-100, #222); border-radius: 8px; padding: 12px; margin: 12px 0; }
 .advice p { margin: 6px 0 0; }
 .star { color: var(--ion-color-warning, #fc0); }

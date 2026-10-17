@@ -9,8 +9,7 @@
     </ion-header>
     <ion-content v-if="c" class="ion-padding">
       <div class="hero">
-        <Illustration :art="artKey('species', c.species.id)" :size="68" :label="`Espèce : ${c.species.name}`" />
-        <Illustration :art="artKey('class', c.classDef.id)" :size="68" :label="`Classe : ${c.classDef.name}`" />
+        <Sprite :sprite="heroSpriteKey(c.species.id, c.classDef.id)" :size="92" :label="`${c.name}, ${c.species.name} ${c.classDef.name}`" />
         <div class="who">
           <h2>{{ c.name }}</h2>
           <p>{{ c.species.name }} · {{ c.classDef.name }}<br />{{ c.background.name }} · niveau {{ c.level }}</p>
@@ -204,7 +203,8 @@ import {
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import Illustration from "../components/Illustration.vue";
+import Sprite from "../components/Sprite.vue";
+import { heroSpriteKey } from "../ui/sprites";
 import { INVOCATIONS, ORDERS } from "../data/class-choices";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
 import { SPELL_BY_ID, isPlayable } from "../data/spells";
@@ -218,7 +218,6 @@ import { canEquip, equipItem, masteriesOf, setMasteries, unequip, type Slot } fr
 import { hitDiceMax, longRest, shortRest, vitalsOf, type RestResult } from "../engine/rest";
 import { FEATURE_LABELS } from "../engine/combat";
 import { featuresFor } from "../engine/features";
-import { artKey } from "../data/illustrations";
 import { CLASS_FEATURE_TEXT, FEATURE_STATUS } from "../data/help";
 import { ABILITIES } from "../engine/rules";
 import { ABILITY_NAMES, fmtNumber, formatMeters, signed } from "../ui/format";

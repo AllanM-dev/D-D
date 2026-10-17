@@ -26,11 +26,7 @@
               :style="{ width: TILE + 'px', height: TILE + 'px', backgroundImage: tileBackground(grid.tiles, x, y) }"
               @click="tap(x, y)"
             >
-              <span v-if="ex.x === x && ex.y === y" class="figure hero-fig">
-                <span class="base" />
-                <Sprite :sprite="heroSpriteKey(character.species.id, character.classDef.id)" :size="TILE + 4" :label="character.name" />
-              </span>
-              <template v-else-if="spotAt(x, y)">
+              <template v-if="spotAt(x, y) && !(ex.x === x && ex.y === y)">
                 <span v-if="isNpc(spotAt(x, y)!.id)" class="figure npc-fig" :title="spotAt(x, y)!.label">
                   <span class="base" />
                   <Sprite :sprite="npcSpriteKey(spotAt(x, y)!.id)" :size="TILE + 4" :label="spotAt(x, y)!.label" />
@@ -39,12 +35,20 @@
                 <span v-else class="spot" role="img" :aria-label="spotAt(x, y)!.label" :title="spotAt(x, y)!.label">!</span>
               </template>
               <span v-else-if="doorHint(x, y)" class="door-hint" role="img" :aria-label="doorHint(x, y)!" :title="doorHint(x, y)!">!</span>
-              <span v-else-if="enemyAt(x, y)" class="figure enemy" :title="enemyAt(x, y)!.name">
-                <span class="base" />
-                <Sprite :sprite="enemyAt(x, y)!.art" :size="TILE + 4" :label="enemyAt(x, y)!.name" />
-              </span>
             </div>
           </template>
+          <!-- Personnages mobiles : ils glissent d'une case à l'autre (le héros qui marche, les ennemis qui approchent). -->
+          <div
+            v-for="a in actors"
+            :key="a.id"
+            class="actor"
+            :class="[a.kind, { moving: a.kind === 'hero' && heroMoving }]"
+            :style="{ width: TILE + 'px', height: TILE + 'px', transform: `translate(${a.x * TILE}px, ${a.y * TILE}px)` }"
+            :title="a.name"
+          >
+            <span class="base" />
+            <Sprite :sprite="a.sprite" :size="TILE + 4" :label="a.name" />
+          </div>
         </div>
       </div>
 
@@ -139,6 +143,17 @@ const doorHint = (x: number, y: number) => {
   const sp = liveSpots(map.value, flags.value).find((s) => s.door?.x === x && s.door?.y === y);
   return sp && !visible.value.has(`${sp.x},${sp.y}`) ? `${sp.label} : entrez par cette porte` : "";
 };
+const heroMoving = ref(false);
+const actors = computed(() => {
+  if (!ex.value || !character.value) return [];
+  const foes = livingEnemies(map.value, ex.value)
+    .filter((e) => visible.value.has(key(e)))
+    .map((e) => ({ id: e.id, kind: "enemy" as const, x: e.x, y: e.y, sprite: monsterOf(e.encounterId).art, name: monsterOf(e.encounterId).name }));
+  return [
+    ...foes,
+    { id: "hero", kind: "hero" as const, x: ex.value.x, y: ex.value.y, sprite: heroSpriteKey(character.value.species.id, character.value.classDef.id), name: character.value.name },
+  ];
+});
 const isNpc = (id: string) => NPC_SPRITES.includes(id);
 const spotAt = (x: number, y: number) =>
   liveSpots(map.value, flags.value).find((s) => s.x === x && s.y === y && visible.value.has(`${x},${y}`));
@@ -205,6 +220,7 @@ async function go(target: Cell) {
   if (plan.path.length === 0) return;
 
   walking = true;
+  heroMoving.value = true;
   cancel = false;
   message.value = "";
   let steps = 0;
@@ -225,6 +241,7 @@ async function go(target: Cell) {
     centerOnHero();
     if (res.ambush) {
       walking = false;
+      heroMoving.value = false;
       return startFight(res.ambush.id, res.ambush.encounterId);
     }
     if (res.travel) {
@@ -247,6 +264,7 @@ async function go(target: Cell) {
     await sleep(STEP_MS);
   }
   walking = false;
+  heroMoving.value = false;
   if (!message.value) message.value = steps ? `Vous avez marché ${formatMeters(cellMeters(steps))}.` : "";
   if (!cancel && arrived) {
     if (enemy) startFight(enemy.id, enemy.encounterId);
@@ -264,9 +282,19 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .tile.unknown::after { background: #000; }
 .tile.route::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #ffd54a; opacity: 0.9; z-index: 2; pointer-events: none; }
 .tile.dest { outline: 2px dashed #fff; outline-offset: -3px; z-index: 1; }
-.tile.hero { z-index: 1; box-shadow: 0 0 26px 12px #ffd37a55; }
+.tile.hero { z-index: 1; }
 .spot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ffd54a; color: #3a2a00; font-weight: 800; box-shadow: 0 0 0 2px #3a2a00, 0 0 6px #ffd54a; }
 .tile.locked { box-shadow: inset 0 0 0 3px #c0392b; }
+.grid { position: relative; }
+.actor { position: absolute; left: 0; top: 0; z-index: 3; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; transition: transform 140ms linear; }
+.actor :deep(.sprite) { position: relative; z-index: 1; margin-bottom: 1px; filter: drop-shadow(0 1px 1px #0008); animation: idle 2.4s ease-in-out infinite; }
+.actor.moving :deep(.sprite) { animation: step 0.28s ease-in-out infinite; }
+.actor.hero::before { content: ""; position: absolute; left: 50%; top: 50%; width: 160px; height: 160px; margin: -80px 0 0 -80px; border-radius: 50%; background: radial-gradient(circle, #ffd37a55 0, #ffd37a00 70%); }
+.actor.hero .base { box-shadow: 0 0 0 2px #4aa3ff; }
+.actor.enemy .base { box-shadow: 0 0 0 2px #e0554f; }
+@keyframes idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+@keyframes step { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-3px) rotate(2deg); } }
+@media (prefers-reduced-motion: reduce) { .actor { transition: none; } .actor :deep(.sprite) { animation: none !important; } }
 .figure { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 100%; }
 .figure :deep(.sprite) { position: relative; z-index: 1; margin-bottom: 1px; filter: drop-shadow(0 1px 1px #0008); }
 .base { position: absolute; left: 3px; right: 3px; bottom: 0; height: 9px; border-radius: 50%; background: #0006; box-shadow: 0 0 0 2px var(--team, #fff8); }
