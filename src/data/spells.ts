@@ -1,4 +1,5 @@
 import type { Ability } from "../engine/rules";
+import type { AreaShape } from "../engine/areas";
 import type { ConditionId } from "./conditions";
 
 /** Effet d'un sort tel que le moteur sait le jouer. `none` : pas d'effet en combat pour le moment. */
@@ -33,6 +34,8 @@ export interface SpellDef {
   /** Résumé en français (texte original, pas une citation du SRD). */
   description: string;
   effect: SpellEffect;
+  /** Zone d'effet : tous les ennemis dans la zone sont touchés (la cible choisie donne la direction ou le centre). */
+  area?: AreaShape;
   /** Ce que fait (ou ne fait pas) l'application, quand c'est plus simple que la règle. */
   note?: string;
 }
@@ -93,16 +96,18 @@ export const SPELLS: readonly SpellDef[] = [
     effect: { kind: "missiles", darts: 3, sides: 4, bonus: 1, damageType: "force" } },
   { id: "burning-hands", name: "Mains brûlantes", level: 1, school: "Évocation", time: "action", range: "Cône de 4,5 m", duration: "Instantanée", concentration: false, classes: [sorcerer, wizard],
     description: "Une nappe de flammes jaillit de vos mains. Jet de sauvegarde de Dextérité : 3d6 dégâts de feu, la moitié si la créature réussit.",
-    effect: { kind: "save", save: "DEX", dice: [3, 6], damageType: "feu", half: true }, note: "Une seule cible est touchée (les zones d'effet viendront avec les positions)." },
+    effect: { kind: "save", save: "DEX", dice: [3, 6], damageType: "feu", half: true }, area: { kind: "cone", size: 3 },
+    note: "Le cône part de vous vers la cible choisie (3 cases de long, ouvert à 90°) et touche tous les ennemis dedans ; les murs arrêtent les flammes. Les objets inflammables ne s'embrasent pas." },
   { id: "thunderwave", name: "Vague tonnante", level: 1, school: "Évocation", time: "action", range: "Cube de 4,5 m autour de vous", duration: "Instantanée", concentration: false, classes: [bard, druid, sorcerer, wizard],
     description: "Une onde de tonnerre. Jet de sauvegarde de Constitution : 2d8 dégâts de tonnerre, la moitié si la créature réussit ; en cas d'échec elle est aussi repoussée.",
-    effect: { kind: "save", save: "CON", dice: [2, 8], damageType: "tonnerre", half: true }, note: "Une seule cible est touchée et la poussée n'est pas appliquée." },
+    effect: { kind: "save", save: "CON", dice: [2, 8], damageType: "tonnerre", half: true }, area: { kind: "cube", size: 3 },
+    note: "Le cube de 3 × 3 cases part de vous vers la cible choisie et touche tous les ennemis dedans ; la poussée de 3 m n'est pas appliquée." },
   { id: "ray-of-sickness", name: "Rayon empoisonné", level: 1, school: "Nécromancie", time: "action", range: "18 m", duration: "Instantanée", concentration: false, classes: [sorcerer, wizard],
     description: "Un rayon verdâtre frappe une créature. Jet d'attaque de sort à distance : 2d8 dégâts de poison, et la cible est empoisonnée jusqu'à la fin de votre prochain tour.",
     effect: { kind: "attack", melee: false, dice: [2, 8], damageType: "poison", condition: "poisoned" } },
   { id: "entangle", name: "Enchevêtrement", level: 1, school: "Invocation", time: "action", range: "27 m", duration: "Concentration, 1 minute", concentration: true, classes: [druid, ranger],
     description: "Des herbes et des lianes jaillissent du sol. Jet de sauvegarde de Force : en cas d'échec, la créature est entravée tant que vous restez concentré ; elle peut tenter de se libérer par un test de Force.",
-    effect: { kind: "control", save: "STR", conditions: ["restrained"], escape: true }, note: "Une seule cible est touchée (zone de 6 m de côté dans les règles). L'ennemi entravé tente de se libérer à la place d'attaquer." },
+    effect: { kind: "control", save: "STR", conditions: ["restrained"], escape: true }, area: { kind: "square", size: 4 }, note: "Le carré de 4 × 4 cases (6 m) est centré sur la cible choisie et touche tous les ennemis dedans. Pas de terrain difficile. Un ennemi entravé tente de se libérer à la place d'attaquer." },
   { id: "hideous-laughter", name: "Fou rire de Tasha", level: 1, school: "Enchantement", time: "action", range: "9 m", duration: "Concentration, 1 minute", concentration: true, classes: [bard, wizard],
     description: "La cible est prise d'un fou rire incontrôlable. Jet de sauvegarde de Sagesse : en cas d'échec, elle tombe à terre et est neutralisée ; elle refait le jet à la fin de chacun de ses tours.",
     effect: { kind: "control", save: "WIS", conditions: ["prone", "incapacitated"], repeatSave: true }, note: "Le nouveau jet quand la cible subit des dégâts n'est pas appliqué." },

@@ -25,10 +25,11 @@
 - [x] PV et ressources conservés entre les combats ; repos court (dés de vie, Second souffle, Rage, Magie de pacte, Récupération arcanique) et repos long, depuis la fiche
 - [x] Réactions (lot 1) : Bouclier et Représailles infernales, proposés au joueur pendant le tour des ennemis
 - [x] Combat sur le terrain (lot 1) : positions sur la carte ou dans une clairière, déplacement en mètres, portées et ligne de vue, désavantages à longue portée et au contact, attaques d'opportunité des ennemis, Foncer, Se désengager, ennemis qui avancent à leur vitesse
-- [ ] Combat sur le terrain (suite) : sorts de zone à plusieurs cibles, attaques d'opportunité du héros, terrain difficile, couverts, tactiques de monstres ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
+- [x] Sorts de zone : Mains brûlantes (cône), Vague tonnante (cube), Enchevêtrement (carré) touchent tous les ennemis de la zone, murs et ligne de vue, aperçu des cibles
+- [ ] Combat sur le terrain (suite) : attaques d'opportunité du héros, terrain difficile, couverts, tactiques de monstres ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
 - [x] Sorts (lot 1) : 43 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
-- [ ] Sorts : grimoire du magicien, niveaux supérieurs, zones à plusieurs cibles, soins des alliés
+- [ ] Sorts : grimoire du magicien, niveaux supérieurs, soins des alliés
 - [x] États (conditions) : empoisonné, effrayé, aveuglé, entravé, à terre, neutralisé, étourdi, paralysé ; infligés par le loup (à terre), la goule (paralysie) et les sorts Rayon empoisonné, Enchevêtrement, Fou rire de Tasha ; section Aide → États
 - [x] Capacités de classe (lot 2) : Attaque sournoise, Inspiration bardique (pour soi), maîtrises d'armes (8 effets) ; capacités de monstres : tactique de meute, robustesse des morts-vivants, agressif, toile et venin de l'araignée ; Bestiaire (10 monstres) dans l'Aide
 - [ ] États restants (charmé, assourdi, épuisement, agrippé, invisible, pétrifié), autres capacités de classe (Expertise, Ordre divin, Ordre primordial, Druidique, Adepte des rituels, Invocations occultes…), autres styles de combat
