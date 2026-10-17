@@ -26,7 +26,8 @@
 - [x] Réactions (lot 1) : Bouclier et Représailles infernales, proposés au joueur pendant le tour des ennemis
 - [x] Combat sur le terrain (lot 1) : positions sur la carte ou dans une clairière, déplacement en mètres, portées et ligne de vue, désavantages à longue portée et au contact, attaques d'opportunité des ennemis, Foncer, Se désengager, ennemis qui avancent à leur vitesse
 - [x] Sorts de zone : Mains brûlantes (cône), Vague tonnante (cube), Enchevêtrement (carré) touchent tous les ennemis de la zone, murs et ligne de vue, aperçu des cibles
-- [ ] Combat sur le terrain (suite) : attaques d'opportunité du héros, terrain difficile, couverts, tactiques de monstres ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
+- [x] Tactiques de monstres : tir à distance (arc, arbalète, javelot, fronde), archer qui recule, lâches qui fuient et quittent le combat
+- [ ] Combat sur le terrain (suite) : attaques d'opportunité du héros, terrain difficile, couverts, chefs et moral de groupe ; repos : événements de repos interrompu, montée de niveau (dés de vie multiples)
 - [x] Attaques (critiques, avantage/désavantage), dégâts, jets contre la mort, victoire/défaite
 - [x] Sorts (lot 1) : 43 sorts mineurs et de niveau 1 jouables, emplacements, DD de sauvegarde, concentration, sorts à action bonus ; liste dans l'Aide
 - [ ] Sorts : grimoire du magicien, niveaux supérieurs, soins des alliés

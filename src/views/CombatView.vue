@@ -44,7 +44,8 @@
             </h2>
             <ion-progress-bar :value="c.maxHp ? c.hp / c.maxHp : 0" :color="c.side === 'party' ? 'success' : 'danger'" />
             <p>
-              <template v-if="c.dead">☠ Mort</template>
+              <template v-if="c.fled">🏃 En fuite</template>
+              <template v-else-if="c.dead">☠ Mort</template>
               <template v-else-if="c.hp === 0 && c.side === 'party'">
                 {{ c.stable ? "Inconscient, stable" : `À terre · jets de mort ${c.deathSaves.successes}✓ ${c.deathSaves.failures}✗` }}
               </template>
@@ -424,9 +425,14 @@ watch(() => state.value?.status, (st) => {
   // Butin de l'ennemi vaincu.
   lootText.value = "";
   if ((fromMap.value || fromStory.value) && st === "victory" && enemyParam.value) {
-    const loot = enemyLoot(enemyParam.value);
-    lootText.value = describeLoot(loot);
-    store.addLoot(character.value.id, loot);
+    // Tous les ennemis ont fui : personne n'a été vaincu, donc pas de butin.
+    const allFled = state.value!.combatants.filter((c) => c.side === "enemies").every((c) => c.fled);
+    if (allFled) lootText.value = "";
+    else {
+      const loot = enemyLoot(enemyParam.value);
+      lootText.value = describeLoot(loot);
+      store.addLoot(character.value.id, loot);
+    }
   }
   // L'ennemi vaincu laisse un drapeau dans l'histoire (`defeated:<id>`).
   if ((fromMap.value || fromStory.value) && st === "victory" && enemyParam.value) {

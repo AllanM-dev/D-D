@@ -90,7 +90,7 @@ const DIRS: Cell[] = [
 ];
 
 /** Cases voisines où l'on peut aller ; une diagonale ne peut pas couper le coin d'un obstacle. */
-function neighbors(g: Grid, c: Cell, blocked: Set<string>): Cell[] {
+export function neighbors(g: Grid, c: Cell, blocked: Set<string>): Cell[] {
   const out: Cell[] = [];
   for (const d of DIRS) {
     const n = { x: c.x + d.x, y: c.y + d.y };
