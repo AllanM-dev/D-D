@@ -1,3 +1,4 @@
+import { defaultClassChoices } from "../../data/class-choices";
 import { describe, expect, it } from "vitest";
 import { CLASSES } from "../../data/classes";
 import { CLASS_SPELLCASTING, SPELLS, SPELL_BY_ID, defaultSpells, isPlayable, spellsFor } from "../../data/spells";
@@ -62,7 +63,7 @@ describe("données des sorts", () => {
         name: "T", speciesId: "human", classId: c.id, backgroundId: "soldier", method: "standard",
         baseScores: { STR: 15, DEX: 14, CON: 13, INT: 12, WIS: 10, CHA: 8 }, bonus: { mode: "2/1", plus2: "STR", plus1: "CON" },
         classSkills: c.skillChoices.from.filter((s) => s !== "athletics" && s !== "intimidation").slice(0, c.skillChoices.count),
-        fightingStyle: "defense", spells: defaultSpells(c.id),
+        fightingStyle: "defense", spells: defaultSpells(c.id), ...defaultClassChoices(c.id, ["athletics", "intimidation"]),
       };
       expect(validateDraft(draft), c.id).toEqual([]);
       const built = buildCharacter(draft, "x");

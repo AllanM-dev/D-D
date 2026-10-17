@@ -24,7 +24,7 @@ export const CLASS_FEATURE_TEXT: Record<string, Record<string, string>> = {
     "Ordre primordial": "Tu choisis ton rôle : Gardien (armes martiales et armure intermédiaire) ou Magicien (un tour de magie de plus et un bonus aux jets d'Arcanes et de Nature).",
   },
   fighter: {
-    "Style de combat": "Tu obtiens un don de style de combat, par exemple Archerie (+2 aux attaques à distance) ou Défense (+1 de CA quand tu portes une armure).",
+    "Style de combat": "Tu obtiens un don de style de combat : Archerie (+2 aux attaques à distance), Défense (+1 de CA en armure), Armes à deux mains (un 1 ou un 2 aux dés de dégâts compte comme un 3) ou Deux armes (tu ajoutes ton modificateur à la seconde arme légère).",
     "Second souffle": "Action bonus : tu récupères 1d10 + ton niveau en PV. 2 utilisations ; une revient après un repos court, toutes après un repos long.",
     "Maîtrise des armes": "Tu débloques l'effet spécial de 3 types d'armes de ton choix.",
   },
@@ -53,7 +53,7 @@ export const CLASS_FEATURE_TEXT: Record<string, Record<string, string>> = {
     "Magie innée": "Action bonus : pendant 1 minute, le DD de tes sorts augmente de 1 et tu as l'avantage aux jets d'attaque de tes sorts. 2 utilisations, récupérées au repos long.",
   },
   warlock: {
-    "Invocations occultes": "Tu choisis une invocation : un petit pouvoir magique permanent qui personnalise ton occultiste.",
+    "Invocations occultes": "Tu choisis une invocation : un petit pouvoir magique permanent — Armure d'ombres, Décharge agonisante ou Lance occulte dans l'application.",
     "Magie de pacte": "Tu as peu d'emplacements de sorts, mais ils reviennent après un repos court et sont toujours lancés à leur niveau maximal. Ta caractéristique d'incantation est le Charisme.",
   },
   wizard: {
@@ -179,7 +179,7 @@ export const BASIC_RULES: RuleEntry[] = [
 
 /** Fonctionnement de l'application elle-même. À tenir à jour à chaque nouvelle fonctionnalité visible. */
 export const APP_GUIDE: RuleEntry[] = [
-  { title: "Créer un personnage", text: "Depuis l'accueil, « Créer un personnage » : donnez un nom, choisissez une espèce, une classe et un historique (le bouton ⓘ à côté des listes décrit chaque choix), répartissez vos caractéristiques, appliquez le bonus de l'historique, puis choisissez vos compétences de classe. Le bouton de création s'active quand tout est valide ; les messages en rouge indiquent ce qu'il reste à régler." },
+  { title: "Créer un personnage", text: "Depuis l'accueil, « Créer un personnage » : donnez un nom, choisissez une espèce, une classe et un historique (le bouton ⓘ à côté des listes décrit chaque choix), répartissez vos caractéristiques, appliquez le bonus de l'historique, puis choisissez vos compétences de classe. Selon la classe, d'autres choix apparaissent : style de combat (guerrier), Ordre divin (clerc) ou primordial (druide), invocation occulte (occultiste), expertise sur deux compétences (roublard) ; les sorts, eux, se choisissent pour les lanceurs de sorts. Le bouton de création s'active quand tout est valide ; les messages en rouge indiquent ce qu'il reste à régler." },
   { title: "Répartir les caractéristiques", text: "Trois méthodes : le tableau standard (15, 14, 13, 12, 10 et 8, chacun une seule fois), l'achat de points (27 points à dépenser, scores de 8 à 15, les hauts scores coûtent plus cher) ou le tirage (4d6 dont on retire le plus bas, six fois). Les deux caractéristiques marquées ★ sont les plus utiles à votre classe." },
   { title: "Le bonus de l'historique", text: "Votre historique ajoute +2 à une caractéristique et +1 à une autre, ou +1 à trois, parmi les trois qu'il propose. Ce bonus s'ajoute à la répartition choisie, avec un maximum de 20." },
   { title: "Équipement de départ", text: "Chaque classe reçoit un équipement de départ : armure, bouclier, armes, matériel et quelques pièces d'or. Le guerrier choisit entre deux lots. L'écran de création montre le contenu et la CA obtenue. Votre fiche liste ensuite l'armure portée, vos armes, vos objets et votre or. L'équipement de l'historique et l'option « or à la place » ne sont pas encore disponibles." },
@@ -265,16 +265,16 @@ export const FEATURE_STATUS: Record<string, Record<string, { status: FeatureStat
     "Incantation": { status: "partial", note: "Sorts mineurs et sorts de niveau 1 jouables (Moquerie cruelle, Soin des blessures, Mot de guérison, Vague tonnante…), avec emplacements, DD et concentration. Bouclier (réaction) et les niveaux supérieurs : Bouclier est proposé quand une attaque vous touche ; les niveaux supérieurs viendront plus tard." },
   },
   cleric: {
-    "Incantation": { status: "partial", note: "Flamme sacrée, Glas, Éclair guidé, Infliction de blessures, Soin des blessures, Mot de guérison et Bouclier de la foi sont jouables ; les autres sorts de la liste s'affichent mais n'ont pas encore d'effet en combat." },
-    "Ordre divin": { status: "todo", note: "Dépend des sorts et des maîtrises d'armure." },
+    "Incantation": { status: "partial", note: "Flamme sacrée, Glas, Éclair guidé, Infliction de blessures, Soin des blessures, Mot de guérison, Bouclier de la foi et Bénédiction sont jouables ; les autres sorts de la liste s'affichent mais n'ont pas encore d'effet en combat." },
+    "Ordre divin": { status: "applied", note: "Choisi à la création. Protecteur : armes martiales et armures lourdes (maîtrise prise en compte pour les attaques, la CA et le désavantage d'une armure non maîtrisée). Thaumaturge : un sort mineur de plus et un bonus de Sagesse (au moins +1) aux compétences Arcanes et Religion." },
   },
   druid: {
     "Incantation": { status: "partial", note: "Création de flammes, Fouet épineux, Vague tonnante, Soin des blessures et Mot de guérison sont jouables ; les autres sorts s'affichent mais n'ont pas encore d'effet en combat." },
     "Druidique": { status: "todo" },
-    "Ordre primordial": { status: "todo", note: "Dépend des sorts et des maîtrises d'armure." },
+    "Ordre primordial": { status: "applied", note: "Choisi à la création. Gardien : armes martiales et armures intermédiaires. Magicien des bois : un sort mineur de plus et un bonus de Sagesse (au moins +1) aux compétences Arcanes et Nature." },
   },
   fighter: {
-    "Style de combat": { status: "partial", note: "Défense (+1 CA en armure) et Archerie (+2 aux armes à distance) sont disponibles ; les autres styles viendront plus tard." },
+    "Style de combat": { status: "applied", note: "Quatre styles : Défense (+1 CA en armure), Archerie (+2 aux armes à distance), Armes à deux mains (1 et 2 comptent comme 3 aux dés de dégâts) et Deux armes (modificateur ajouté à la seconde arme)." },
     "Second souffle": { status: "applied", note: "Action bonus, 2 utilisations : vous récupérez 1d10 + niveau PV." },
     "Maîtrise des armes": { status: "applied", note: "Les huit effets (Enchaînement, Écorchure, Entaille, Poussée, Sape, Ralentissement, Renversement, Gêne) sont appliqués pour les armes que vous avez choisies sur la fiche (Maîtrises d'armes). Enchaînement et Poussée demandent le terrain de combat." },
   },
@@ -284,7 +284,7 @@ export const FEATURE_STATUS: Record<string, Record<string, { status: FeatureStat
   },
   paladin: {
     "Imposition des mains": { status: "applied", note: "Action bonus : vous vous soignez en dépensant des points de la réserve (5 au niveau 1). Soigner un allié viendra avec les compagnons." },
-    "Incantation": { status: "partial", note: "Soin des blessures et Bouclier de la foi sont jouables ; les autres sorts s'affichent mais n'ont pas encore d'effet en combat." },
+    "Incantation": { status: "partial", note: "Soin des blessures, Bouclier de la foi et Bénédiction sont jouables ; les autres sorts s'affichent mais n'ont pas encore d'effet en combat." },
     "Maîtrise des armes": { status: "applied", note: "Les huit effets (Enchaînement, Écorchure, Entaille, Poussée, Sape, Ralentissement, Renversement, Gêne) sont appliqués pour les armes que vous avez choisies sur la fiche (Maîtrises d'armes). Enchaînement et Poussée demandent le terrain de combat." },
   },
   ranger: {
@@ -293,7 +293,7 @@ export const FEATURE_STATUS: Record<string, Record<string, { status: FeatureStat
     "Maîtrise des armes": { status: "applied", note: "Les huit effets (Enchaînement, Écorchure, Entaille, Poussée, Sape, Ralentissement, Renversement, Gêne) sont appliqués pour les armes que vous avez choisies sur la fiche (Maîtrises d'armes). Enchaînement et Poussée demandent le terrain de combat." },
   },
   rogue: {
-    "Expertise": { status: "todo", note: "Pas encore appliquée à vos compétences." },
+    "Expertise": { status: "applied", note: "Choisie à la création : le bonus de maîtrise est doublé pour deux compétences que vous maîtrisez déjà (◉ sur la fiche)." },
     "Attaque sournoise": { status: "partial", note: "+1d6 de dégâts une fois par tour avec une arme à finesse ou à distance quand votre attaque a l'avantage (sans désavantage). La seconde condition des règles (un allié au contact de la cible) n'existe pas encore : il n'y a pas d'allié." },
     "Argot des voleurs": { status: "todo" },
     "Maîtrise des armes": { status: "applied", note: "Les huit effets (Enchaînement, Écorchure, Entaille, Poussée, Sape, Ralentissement, Renversement, Gêne) sont appliqués pour les armes que vous avez choisies sur la fiche (Maîtrises d'armes). Enchaînement et Poussée demandent le terrain de combat." },
@@ -303,7 +303,7 @@ export const FEATURE_STATUS: Record<string, Record<string, { status: FeatureStat
     "Magie innée": { status: "applied", note: "Action bonus, 2 utilisations, 1 minute : avantage aux attaques de sort et +1 au DD des sauvegardes contre vos sorts." },
   },
   warlock: {
-    "Invocations occultes": { status: "todo" },
+    "Invocations occultes": { status: "applied", note: "Une invocation au niveau 1 : Armure d'ombres (CA 13 + Dextérité sans armure), Décharge agonisante (Charisme aux dégâts de la Décharge occulte) ou Lance occulte (portée triplée). Les autres invocations (dont les Pactes) ne sont pas encore proposées." },
     "Magie de pacte": { status: "partial", note: "Un emplacement de niveau 1, rechargé après un repos court. Décharge occulte, Contact glacial, Glas et Maléfice sont jouables ; les autres sorts ne le sont pas encore." },
   },
   wizard: {

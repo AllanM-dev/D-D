@@ -17,6 +17,7 @@ export interface CastingInput {
   conSaveBonus: number;
   unarmored: boolean;
   spells: { cantrips: string[]; prepared: string[] };
+  invocation?: string;
 }
 
 /** Capacité d'incantation d'un personnage de niveau 1 : DD, bonus d'attaque, emplacements, sorts connus. */
@@ -35,7 +36,14 @@ export function castingFor(input: CastingInput): Spellcasting | undefined {
     free: cfg.free ? [{ spellId: cfg.free.spellId, uses: cfg.free.uses, max: cfg.free.uses }] : [],
     concentrationBonus: input.conSaveBonus,
     unarmored: input.unarmored,
+    invocation: input.invocation,
   };
+}
+
+/** Portée d'un sort pour ce lanceur : la Lance occulte triple celle de la Décharge occulte. */
+export function spellRange(spell: SpellDef, caster: Pick<Combatant, "spellcasting">): number | undefined {
+  const base = rangeMeters(spell);
+  return base !== undefined && spell.id === "eldritch-blast" && caster.spellcasting?.invocation === "eldritch-spear" ? base * 3 : base;
 }
 
 
@@ -66,7 +74,7 @@ function turnRestriction(c: Combatant, spell: SpellDef): string | undefined {
 
 function targetKind(spell: SpellDef): "enemy" | "self" {
   const k = spell.effect.kind;
-  return k === "heal" || k === "mage-armor" || k === "ac-bonus" ? "self" : "enemy";
+  return k === "heal" || k === "mage-armor" || k === "ac-bonus" || k === "bless" ? "self" : "enemy";
 }
 
 /** Sorts jouables de ce combattant, avec ce qui les empêche éventuellement. */
@@ -132,7 +140,7 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
   if (!option.available) throw new Error(option.reason ?? "Ce sort est impossible maintenant.");
   const target = option.target === "enemy" ? enemyTarget(state, choice.targetId ?? "") : cur;
   if (option.target === "enemy") {
-    const check = spellTargetCheck(state, cur, target, rangeMeters(spell));
+    const check = spellTargetCheck(state, cur, target, spellRange(spell, cur));
     if (!check.ok) throw new Error(check.reason);
   }
 
@@ -157,9 +165,10 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
   switch (e.kind) {
     case "attack": {
       const attack: AttackDef = {
-        name: spell.name, toHit: sc.attackBonus, damage: { count: e.dice[0], sides: e.dice[1], bonus: 0 },
+        // Décharge agonisante : le modificateur d'incantation s'ajoute aux dégâts de la Décharge occulte.
+        name: spell.name, toHit: sc.attackBonus, damage: { count: e.dice[0], sides: e.dice[1], bonus: spell.id === "eldritch-blast" && sc.invocation === "agonizing-blast" ? sc.modifier : 0 },
         damageType: e.damageType, ranged: !e.melee, ability: sc.ability, spell: true,
-        ...(rangeMeters(spell) !== undefined ? { range: [rangeMeters(spell)!, rangeMeters(spell)!] as [number, number] } : {}),
+        ...(spellRange(spell, cur) !== undefined ? { range: [spellRange(spell, cur)!, spellRange(spell, cur)!] as [number, number] } : {}),
       };
       const res = resolveAttack(state, cur, target, attack, rng);
       if (e.condition && res.hit && !target.dead) {
@@ -252,6 +261,11 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
       cur.ac += e.bonus;
       cur.acBonus = e.bonus;
       state.log.push(`${cur.name} : CA ${cur.ac}.`);
+      break;
+    }
+    case "bless": {
+      cur.blessed = true;
+      state.log.push(`${cur.name} est béni : +1d4 aux jets d'attaque et de sauvegarde.`);
       break;
     }
     case "mark": {

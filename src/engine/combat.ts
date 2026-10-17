@@ -30,6 +30,8 @@ export interface AttackDef {
   rider?: ConditionRider;
   /** Portée normale / maximale en mètres (armes à distance, armes de jet, sorts) ; sinon corps à corps (1,5 m). */
   range?: [number, number];
+  /** Style Armes à deux mains : un 1 ou un 2 sur un dé de dégâts compte comme un 3. */
+  gwf?: boolean;
   /** Frappe à mains nues (arts martiaux). */
   unarmed?: boolean;
   /** Identifiant de l'arme (données d'équipement), pour les armes. */
@@ -91,6 +93,8 @@ export interface Spellcasting {
   concentrationBonus: number;
   /** Ne porte pas d'armure (condition de l'Armure du mage). */
   unarmored: boolean;
+  /** Invocation occulte de l'occultiste (Décharge agonisante, Lance occulte). */
+  invocation?: string;
 }
 
 /** Marque sur une cible (Maléfice, Marque du chasseur) : dégâts supplémentaires à chaque coup. */
@@ -177,6 +181,8 @@ export interface Combatant {
   sneakDice?: number;
   /** Dé d'Inspiration bardique en réserve (faces) : ajouté à un jet d'attaque ou de sauvegarde raté s'il le réussit. */
   inspiration?: number;
+  /** Bénédiction : +1d4 aux jets d'attaque et de sauvegarde tant que la concentration dure. */
+  blessed?: boolean;
   /** Cible de la Gêne (maîtrise Vex) : avantage à la prochaine attaque contre elle. */
   vexTargetId?: string;
   vexUntilRound?: number;
@@ -292,9 +298,9 @@ export function getCombatant(state: CombatState, id: string): Combatant {
 export const currentCombatant = (state: CombatState) => getCombatant(state, state.order[state.turn]);
 
 /** Dégâts avec le détail des dés. Un critique double les dés, pas le bonus. */
-export function rollDamageDetailed(d: DamageDice, crit: boolean, rng: Rng): { dice: number[]; total: number } {
+export function rollDamageDetailed(d: DamageDice, crit: boolean, rng: Rng, minDie = 1): { dice: number[]; total: number } {
   const count = crit ? d.count * 2 : d.count;
-  const dice = Array.from({ length: count }, () => rollDie(d.sides, rng));
+  const dice = Array.from({ length: count }, () => Math.max(minDie, rollDie(d.sides, rng)));
   return { dice, total: Math.max(0, dice.reduce((a, b) => a + b, d.bonus)) };
 }
 
@@ -355,6 +361,7 @@ export function endConcentration(state: CombatState, c: Combatant, reason: strin
     c.acBonus = 0;
   }
   c.mark = undefined;
+  c.blessed = false;
   c.concentrating = undefined;
   // Les états liés à ce sort (Enchevêtrement, Fou rire…) prennent fin.
   for (const other of state.combatants) {
@@ -511,26 +518,28 @@ export function rollSave(state: CombatState, target: Combatant, ability: Ability
   const disadvantage = ability === "DEX" && hasCondition(target, "restrained");
   const mod = target.saveMods?.[ability] ?? 0;
   const roll = rollD20(mod, disadvantage ? "disadvantage" : "normal", rng);
-  let success = roll.total >= dc;
+  // Bénédiction : +1d4 aux jets de sauvegarde.
+  const bless = target.blessed && target.side === "party" ? rollDie(4, rng) : 0;
+  let success = roll.total + bless >= dc;
   // Inspiration bardique : le dé en réserve peut transformer un échec en réussite.
   let inspired = 0;
   if (!success && target.inspiration && target.side === "party") {
     const die = rollDie(target.inspiration, rng);
-    if (roll.total + die >= dc) {
+    if (roll.total + bless + die >= dc) {
       success = true;
       inspired = die;
       target.inspiration = undefined;
     }
   }
   state.log.push(
-    `${target.name} : sauvegarde de ${ABILITY_FR[ability]} ${roll.natural}${mod >= 0 ? "+" : ""}${mod} = ${roll.total} contre DD ${dc}${disadvantage ? " (désavantage : entravé)" : ""} — ${success ? "réussie" : "ratée"}.`,
+    `${target.name} : sauvegarde de ${ABILITY_FR[ability]} ${roll.natural}${mod >= 0 ? "+" : ""}${mod}${bless ? ` + ${bless} (Bénédiction)` : ""} = ${roll.total + bless} contre DD ${dc}${disadvantage ? " (désavantage : entravé)" : ""} — ${success ? "réussie" : "ratée"}.`,
   );
   pushRoll(state, {
     kind: "save", actorId: target.id, actorName: target.name, side: target.side, title: name,
-    sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: mod, total: roll.total + inspired, dc, outcome: success ? "success" : "failure",
-    ...(disadvantage || inspired ? { note: [disadvantage ? "Désavantage : entravé" : "", inspired ? `Inspiration bardique +${inspired}` : ""].filter(Boolean).join(" · ") } : {}),
+    sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: mod, total: roll.total + bless + inspired, dc, outcome: success ? "success" : "failure",
+    ...(disadvantage || inspired || bless ? { note: [disadvantage ? "Désavantage : entravé" : "", bless ? `Bénédiction +${bless}` : "", inspired ? `Inspiration bardique +${inspired}` : ""].filter(Boolean).join(" · ") } : {}),
   });
-  return { success, total: roll.total };
+  return { success, total: roll.total + bless };
 }
 
 /** Avantages et désavantages venant des états des deux combattants. */
@@ -599,19 +608,21 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
   const target = getCombatant(state, ctx.targetId);
   const { attack, roll, reasons, melee } = ctx;
   const unconscious = isDown(target);
-  let hit = roll.critical || (!roll.fumble && roll.total >= target.ac);
+  // Bénédiction : +1d4 au jet d'attaque.
+  const bless = attacker.blessed && attacker.side === "party" && !roll.fumble ? rollDie(4, rng) : 0;
+  let hit = roll.critical || (!roll.fumble && roll.total + bless >= target.ac);
   // Inspiration bardique : le dé en réserve est ajouté à un jet raté, s'il le fait réussir.
   let inspired = 0;
   if (!hit && !roll.fumble && attacker.inspiration && attacker.side === "party") {
     const die = rollDie(attacker.inspiration, rng);
-    if (roll.total + die >= target.ac) {
+    if (roll.total + bless + die >= target.ac) {
       hit = true;
       inspired = die;
       attacker.inspiration = undefined;
     }
   }
-  const shownTotal = roll.total + inspired;
-  const label = `${attacker.name} attaque ${target.name} (${attack.name}) : ${roll.natural}${attack.toHit >= 0 ? "+" : ""}${attack.toHit}${inspired ? ` + ${inspired} (inspiration bardique)` : ""} = ${shownTotal} contre CA ${target.ac}`;
+  const shownTotal = roll.total + bless + inspired;
+  const label = `${attacker.name} attaque ${target.name} (${attack.name}) : ${roll.natural}${attack.toHit >= 0 ? "+" : ""}${attack.toHit}${bless ? ` + ${bless} (Bénédiction)` : ""}${inspired ? ` + ${inspired} (inspiration bardique)` : ""} = ${shownTotal} contre CA ${target.ac}`;
   // Un coup au corps à corps contre une cible inconsciente est toujours un critique.
   const paralyzed = hasCondition(target, "paralyzed");
   const crit = hit && (roll.critical || ((unconscious || paralyzed) && melee));
@@ -620,7 +631,7 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
     title: `${attacker.name} attaque ${target.name} (${attack.name})`,
     sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: attack.toHit,
     total: shownTotal, dc: target.ac, outcome: roll.fumble ? "fumble" : !hit ? "miss" : crit ? "crit" : "hit",
-    ...(reasons.length || inspired ? { note: [...reasons, ...(inspired ? [`Inspiration bardique +${inspired}`] : [])].join(" · ") } : {}),
+    ...(reasons.length || inspired || bless ? { note: [...reasons, ...(bless ? [`Bénédiction +${bless}`] : []), ...(inspired ? [`Inspiration bardique +${inspired}`] : [])].join(" · ") } : {}),
   };
   if (!hit) {
     state.log.push(`${label} — raté.`);
@@ -641,7 +652,7 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
   // Rage : +2 aux dégâts des attaques de Force.
   const rageBonus = attacker.raging && attack.ability === "STR" ? RAGE_DAMAGE : 0;
   const damageDef = rageBonus ? { ...attack.damage, bonus: attack.damage.bonus + rageBonus } : attack.damage;
-  const { dice, total: rolled } = rollDamageDetailed(damageDef, crit, rng);
+  const { dice, total: rolled } = rollDamageDetailed(damageDef, crit, rng, attack.gwf ? 3 : 1);
   // Rage : résistance aux dégâts contondants, perforants et tranchants (moitié, arrondie à l'inférieur).
   const resisted = target.raging && RAGE_RESISTED.includes(attack.damageType);
   const damage = resisted ? Math.floor(rolled / 2) : rolled;

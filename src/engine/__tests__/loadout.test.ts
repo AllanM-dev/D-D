@@ -1,3 +1,4 @@
+import { defaultClassChoices } from "../../data/class-choices";
 import { describe, expect, it } from "vitest";
 import { ARMORS, PRICES, WEAPONS } from "../../data/equipment";
 import { defaultSpells } from "../../data/spells";
@@ -22,7 +23,7 @@ function make(classId: string, scores: Partial<Character["scores"]> = {}, kitId?
     name: "T", speciesId: "human", classId, backgroundId: "soldier", method: "standard",
     baseScores: { STR: 15, DEX: 14, CON: 13, INT: 12, WIS: 10, CHA: 8 }, bonus: { mode: "2/1", plus2: "STR", plus1: "CON" },
     classSkills: c.skillChoices.from.filter((s) => s !== "athletics" && s !== "intimidation").slice(0, c.skillChoices.count), fightingStyle: "defense", kitId,
-    spells: defaultSpells(classId),
+    spells: defaultSpells(classId), ...defaultClassChoices(classId, ["athletics", "intimidation"]),
   } as CharacterDraft;
   const built = buildCharacter(draft, "hero");
   if (!Object.keys(scores).length) return built;
