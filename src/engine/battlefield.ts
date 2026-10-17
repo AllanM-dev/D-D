@@ -1,5 +1,5 @@
 import { OPAQUE, TILE_CHARS, type TileKind } from "../data/maps";
-import { CELL_METERS, cellDistance, findPath, type Cell, type Grid } from "./exploration";
+import { CELL_METERS, cellDistance, findPath, neighbors, type Cell, type Grid } from "./exploration";
 
 /** Terrain d'un combat : les lignes d'une carte (voir `src/data/maps.ts`). */
 export interface Arena {
@@ -54,6 +54,28 @@ export function hasLineOfSight(arena: Arena, a: Cell, b: Cell): boolean {
 /** Chemin libre (les cases occupées bloquent) ; null s'il n'y en a pas. */
 export function pathBetween(arena: Arena, from: Cell, to: Cell, occupied: Set<string>): Cell[] | null {
   return findPath(gridOf(arena), from, to, occupied);
+}
+
+/** Cases que l'on peut atteindre en au plus `budget` pas (les cases occupées bloquent), avec le nombre de pas ; la case de départ est exclue. */
+export function reachableWithin(arena: Arena, from: Cell, budget: number, occupied: Set<string>): { cell: Cell; steps: number }[] {
+  const g = gridOf(arena);
+  const seen = new Map<string, number>([[`${from.x},${from.y}`, 0]]);
+  const out: { cell: Cell; steps: number }[] = [];
+  let frontier: Cell[] = [from];
+  for (let steps = 1; steps <= budget && frontier.length; steps++) {
+    const next: Cell[] = [];
+    for (const c of frontier) {
+      for (const n of neighbors(g, c, occupied)) {
+        const k = `${n.x},${n.y}`;
+        if (seen.has(k)) continue;
+        seen.set(k, steps);
+        out.push({ cell: n, steps });
+        next.push(n);
+      }
+    }
+    frontier = next;
+  }
+  return out;
 }
 
 /** Cases libres autour d'un point, de la plus proche à la plus lointaine (pour placer plusieurs ennemis). */
