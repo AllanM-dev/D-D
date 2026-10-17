@@ -90,7 +90,7 @@
       <ion-list inset>
         <ion-list-header><ion-label>Compétences</ion-label></ion-list-header>
         <ion-item v-for="s in c.skills" :key="s.id">
-          <ion-label>{{ s.proficient ? "● " : "○ " }}{{ s.name }} <small>({{ s.ability }})</small></ion-label>
+          <ion-label>{{ s.expert ? "◉ " : s.proficient ? "● " : "○ " }}{{ s.name }} <small>({{ s.ability }})</small></ion-label>
           <ion-note slot="end">{{ signed(s.bonus) }}</ion-note>
         </ion-item>
       </ion-list>
@@ -99,6 +99,15 @@
         <ion-list-header><ion-label>Capacités de classe</ion-label></ion-list-header>
         <ion-item v-if="style" lines="full">
           <ion-label class="ion-text-wrap">Style de combat : {{ style.name }}<p>{{ style.text }}</p></ion-label>
+        </ion-item>
+        <ion-item v-if="orderChoice" lines="full">
+          <ion-label class="ion-text-wrap">{{ c.classDef.id === "cleric" ? "Ordre divin" : "Ordre primordial" }} : {{ orderChoice.name }}<p>{{ orderChoice.text }}</p></ion-label>
+        </ion-item>
+        <ion-item v-if="invocationChoice" lines="full">
+          <ion-label class="ion-text-wrap">Invocation occulte : {{ invocationChoice.name }}<p>{{ invocationChoice.text }}</p></ion-label>
+        </ion-item>
+        <ion-item v-if="c.expertise?.length" lines="full">
+          <ion-label class="ion-text-wrap">Expertise : {{ expertiseNames }}<p>Bonus de maîtrise doublé (◉ dans la liste des compétences).</p></ion-label>
         </ion-item>
         <ion-item v-for="f in c.classDef.features" :key="f" lines="full">
           <ion-label class="ion-text-wrap">
@@ -196,6 +205,7 @@ import {
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import Illustration from "../components/Illustration.vue";
+import { INVOCATIONS, ORDERS } from "../data/class-choices";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
 import { SPELL_BY_ID, isPlayable } from "../data/spells";
 import { castingFor } from "../engine/spellcasting";
@@ -242,7 +252,7 @@ const bag = computed(() =>
   Object.entries(c.value?.inventory ?? {}).map(([id, n]) => ({ def: getItem(id)!, n })).filter((b) => b.def),
 );
 const bagReport = ref("");
-const untrained = computed(() => (c.value ? wearsUntrained(c.value.classDef.id, c.value.equipment) : false));
+const untrained = computed(() => (c.value ? wearsUntrained(c.value.classDef.id, c.value.equipment, c.value.order) : false));
 const armorSlow = computed(() => {
   const a = c.value?.equipment.armor && ARMORS.find((x) => x.id === c.value!.equipment.armor!.id);
   return !!a && !!a.minStr && c.value!.scores.STR < a.minStr;
@@ -262,7 +272,7 @@ function drink() {
   bagReport.value = `Potion de soin : ${r.dice.join(" + ")} + 2 = ${r.dice[0] + r.dice[1] + 2}, ${r.healed} PV regagnés (${r.vitals.hp}/${c.value!.maxHp}).`;
 }
 const masteryMax = computed(() => (c.value ? MASTERY_COUNT[c.value.classDef.id] ?? 0 : 0));
-const masterable = computed(() => (c.value ? masterableWeapons(c.value.classDef.id) : []));
+const masterable = computed(() => (c.value ? masterableWeapons(c.value.classDef.id, c.value.order) : []));
 const masteryList = computed(() => (c.value ? masteriesOf(c.value) : []));
 const masteryReport = ref("");
 function toggleMastery(id: string, on: boolean) {
@@ -286,6 +296,9 @@ function long() { apply(longRest(c.value!), "Repos long"); }
 const knownSpells = computed(() =>
   casting.value ? [...casting.value.cantrips, ...casting.value.prepared].map((id) => SPELL_BY_ID[id]).filter(Boolean) : [],
 );
+const orderChoice = computed(() => (c.value?.order ? ORDERS[c.value.classDef.id]?.find((o) => o.id === c.value!.order) : undefined));
+const expertiseNames = computed(() => (c.value?.expertise ?? []).map((id) => c.value!.skills.find((s) => s.id === id)?.name).join(", "));
+const invocationChoice = computed(() => INVOCATIONS.find((i) => i.id === c.value?.invocation));
 const style = computed(() => FIGHTING_STYLES.find((st) => st.id === c.value?.fightingStyle));
 const statusShort = (feature: string) => {
   const st = FEATURE_STATUS[c.value!.classDef.id]?.[feature]?.status;

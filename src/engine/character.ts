@@ -13,6 +13,7 @@ import type { ExplorationState } from "./exploration";
 import type { StoryProgress } from "./story";
 import type { Vitals } from "./rest";
 import { computeEquipment, defaultMasteries, getKit, type CharacterEquipment } from "./equipment";
+import { EXPERTISE_COUNT, ORDER_SKILLS, hasExtraCantrip, isInvocation, isOrder } from "../data/class-choices";
 import { ABILITIES, abilityModifier, proficiencyBonus, type Ability } from "./rules";
 
 /** Bonus de caractéristiques de l'historique (règles 2024). */
@@ -38,6 +39,12 @@ export interface CharacterDraft {
   fightingStyle?: FightingStyleId;
   /** Sorts choisis (classes qui lancent des sorts). */
   spells?: SpellChoice;
+  /** Ordre divin (clerc) ou primordial (druide). */
+  order?: string;
+  /** Invocation occulte (occultiste). */
+  invocation?: string;
+  /** Compétences en expertise (roublard). */
+  expertise?: SkillId[];
 }
 
 export interface SpellChoice {
@@ -53,6 +60,8 @@ export interface SkillEntry {
   ability: Ability;
   proficient: boolean;
   bonus: number;
+  /** Expertise : bonus de maîtrise doublé. */
+  expert?: boolean;
 }
 
 export interface Character {
@@ -78,6 +87,9 @@ export interface Character {
   attacks: AttackDef[];
   fightingStyle?: FightingStyleId;
   spells?: SpellChoice;
+  order?: string;
+  invocation?: string;
+  expertise?: SkillId[];
   /** PV et ressources actuels (voir `rest.ts`) ; absent = tout au maximum. */
   vitals?: Vitals;
   /** Position et exploration sur la carte (voir `exploration.ts`) ; absent = jamais exploré. */
@@ -89,6 +101,8 @@ export interface Character {
   /** Armes dont la maîtrise est active (identifiants d'armes) ; absent = choix par défaut d'après l'équipement. */
   masteries?: string[];
 }
+
+const ORDERS_BY_CLASS = new Set(["cleric", "druid"]);
 
 const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id);
 
@@ -131,10 +145,20 @@ export function validateDraft(d: CharacterDraft): string[] {
 
   if (cls?.id === "fighter" && !isFightingStyle(d.fightingStyle)) errors.push("Choisissez un style de combat.");
 
+  if (cls && ORDERS_BY_CLASS.has(cls.id) && !isOrder(cls.id, d.order)) errors.push(cls.id === "cleric" ? "Choisissez un Ordre divin." : "Choisissez un Ordre primordial.");
+  if (cls?.id === "warlock" && !isInvocation(d.invocation)) errors.push("Choisissez une invocation occulte.");
+  const expertiseCount = cls ? EXPERTISE_COUNT[cls.id] ?? 0 : 0;
+  if (cls && bg && expertiseCount) {
+    const own = new Set<SkillId>([...bg.skills, ...d.classSkills]);
+    const picked = new Set(d.expertise ?? []);
+    if (picked.size !== (d.expertise ?? []).length || picked.size !== expertiseCount) errors.push(`Choisissez ${expertiseCount} compétences pour l'expertise.`);
+    else if ((d.expertise ?? []).some((s) => !own.has(s))) errors.push("L'expertise porte sur des compétences que vous maîtrisez.");
+  }
+
   const casting = cls ? CLASS_SPELLCASTING[cls.id] : undefined;
   if (cls && casting) {
     for (const [level, count, label, chosen] of [
-      [0, casting.cantrips, "sorts mineurs", d.spells?.cantrips ?? []],
+      [0, casting.cantrips + (hasExtraCantrip(d.order) ? 1 : 0), "sorts mineurs", d.spells?.cantrips ?? []],
       [1, casting.prepared, "sorts de niveau 1", d.spells?.prepared ?? []],
     ] as const) {
       const allowed = new Set(spellsFor(cls.id, level).map((x) => x.id));
@@ -176,9 +200,17 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
   const prof = proficiencyBonus(1);
 
   const proficientSkills = new Set<SkillId>([...background.skills, ...d.classSkills]);
+  const expertise = EXPERTISE_COUNT[classDef.id] ? [...(d.expertise ?? [])] : [];
+  // Ordre « sort mineur en plus » (Thaumaturge, Magicien des bois) : bonus de Sagesse (au moins +1) à deux compétences de savoir.
+  const orderSkills = (hasExtraCantrip(d.order) ? ORDER_SKILLS[d.order!] : []) ?? [];
+  const orderBonus = Math.max(1, modifiers.WIS);
   const skills: SkillEntry[] = SKILLS.map((s) => {
     const proficient = proficientSkills.has(s.id);
-    return { id: s.id, name: s.name, ability: s.ability, proficient, bonus: modifiers[s.ability] + (proficient ? prof : 0) };
+    const expert = proficient && expertise.includes(s.id);
+    return {
+      id: s.id, name: s.name, ability: s.ability, proficient, ...(expert ? { expert: true } : {}),
+      bonus: modifiers[s.ability] + (proficient ? prof : 0) + (expert ? prof : 0) + (orderSkills.includes(s.id) ? orderBonus : 0),
+    };
   });
   const saves = Object.fromEntries(
     ABILITIES.map((a) => {
@@ -188,10 +220,12 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
   ) as Character["saves"];
 
   const kit = getKit(classDef.id, d.kitId);
-  const masteries = defaultMasteries(classDef.id, kit.entries.flatMap((e) => ("weapon" in e ? [e.weapon] : [])));
+  const order = ORDERS_BY_CLASS.has(classDef.id) ? d.order : undefined;
+  const masteries = defaultMasteries(classDef.id, kit.entries.flatMap((e) => ("weapon" in e ? [e.weapon] : [])), order);
   const eq = computeEquipment(
     { classId: classDef.id, scores, modifiers, proficiencyBonus: prof, baseSpeed: species.speed,
-      fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined, masteries },
+      fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined, masteries,
+      order: ORDERS_BY_CLASS.has(classDef.id) ? d.order : undefined, invocation: classDef.id === "warlock" ? d.invocation : undefined },
     d.kitId,
   );
 
@@ -206,6 +240,9 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
     equipment: eq.equipment,
     attacks: eq.attacks,
     fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined,
+    order,
+    invocation: classDef.id === "warlock" ? d.invocation : undefined,
+    expertise: expertise.length ? expertise : undefined,
     spells: CLASS_SPELLCASTING[classDef.id] && d.spells ? { cantrips: [...d.spells.cantrips], prepared: [...d.spells.prepared] } : undefined,
     passivePerception: 10 + skills.find((s) => s.id === "perception")!.bonus,
     saves, skills, originFeat: background.originFeat,

@@ -85,7 +85,7 @@ describe("contenu de la page Aide", () => {
     const wired = new Set(CLASSES.flatMap((c) => featuresFor(c.id).flatMap((f) => names[f.id].map((n) => `${c.id}/${n}`))));
     for (const [cid, feats] of Object.entries(FEATURE_STATUS))
       for (const [n, v] of Object.entries(feats))
-        if (v.status === "applied" && !["Défense sans armure", "Maîtrise des armes"].includes(n)) expect(wired.has(`${cid}/${n}`), `${cid}/${n}`).toBe(true);
+        if (v.status === "applied" && !["Défense sans armure", "Maîtrise des armes", "Ordre divin", "Ordre primordial", "Style de combat", "Expertise", "Invocations occultes"].includes(n)) expect(wired.has(`${cid}/${n}`), `${cid}/${n}`).toBe(true);
   });
   it("chaque capacité appliquée ou partielle a une explication de ce que fait le jeu", () => {
     for (const feats of Object.values(FEATURE_STATUS))

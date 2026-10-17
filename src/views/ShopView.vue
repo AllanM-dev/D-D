@@ -84,11 +84,11 @@ function warn(id: string): string {
   if (!c) return "";
   if (id.startsWith("weapon:")) {
     const w = WEAPONS.find((x) => x.id === id.slice(7))!;
-    return isWeaponProficient(c.classDef.id, w) ? "" : "Vous n'en avez pas la maîtrise (pas de bonus de maîtrise).";
+    return isWeaponProficient(c.classDef.id, w, c.order) ? "" : "Vous n'en avez pas la maîtrise (pas de bonus de maîtrise).";
   }
   if (id.startsWith("armor:")) {
     const a = ARMORS.find((x) => x.id === id.slice(6))!;
-    return armorTrained(c.classDef.id, a.kind) ? "" : "Non maîtrisée : désavantage aux attaques et aucun sort.";
+    return armorTrained(c.classDef.id, a.kind, c.order) ? "" : "Non maîtrisée : désavantage aux attaques et aucun sort.";
   }
   return "";
 }

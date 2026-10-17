@@ -1,3 +1,4 @@
+import { defaultClassChoices } from "../../data/class-choices";
 import { describe, expect, it } from "vitest";
 import { CLASSES } from "../../data/classes";
 import { MASTERY_COUNT, WEAPON_MASTERY, WEAPONS, type Mastery } from "../../data/equipment";
@@ -45,7 +46,7 @@ function make(classId: string, kitId?: string): Character {
     name: "T", speciesId: "human", classId, backgroundId: "soldier", method: "standard",
     baseScores: { STR: 15, DEX: 14, CON: 13, INT: 12, WIS: 10, CHA: 8 }, bonus: { mode: "2/1", plus2: "STR", plus1: "CON" },
     classSkills: c.skillChoices.from.filter((s) => s !== "athletics" && s !== "intimidation").slice(0, c.skillChoices.count),
-    fightingStyle: "defense", kitId, spells: defaultSpells(classId),
+    fightingStyle: "defense", kitId, spells: defaultSpells(classId), ...defaultClassChoices(classId, ["athletics", "intimidation"]),
   } as CharacterDraft, "hero");
 }
 

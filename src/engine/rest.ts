@@ -37,7 +37,7 @@ export const vitalsOf = (c: Character): Vitals => c.vitals ?? freshVitals(c);
 export function castingInput(c: Character) {
   return {
     classId: c.classDef.id, modifiers: c.modifiers, proficiencyBonus: c.proficiencyBonus, conSaveBonus: c.saves.CON.bonus,
-    unarmored: !c.equipment.armor, spells: c.spells ?? { cantrips: [], prepared: [] },
+    unarmored: !c.equipment.armor, spells: c.spells ?? { cantrips: [], prepared: [] }, invocation: c.invocation,
   };
 }
 
