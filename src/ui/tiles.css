@@ -10,4 +10,6 @@
 .tile.water { background-color: #2f6fb5; cursor: default; }
 .tile.stairs { background-color: #6d6d78; }
 .tile.bridge { background-color: #8b6a3a; }
+.tile.house { background-color: #a8472f; cursor: default; }
+.tile.planks { background-color: #9a6b3c; }
 .tile.wall, .tile.tree { cursor: default; }

@@ -85,7 +85,7 @@ export function freeCellsNear(arena: Arena, anchor: Cell, occupied: Set<string>,
   for (let y = 0; y < g.height; y++) {
     for (let x = 0; x < g.width; x++) {
       const t = g.tiles[y][x];
-      if (t === "tree" || t === "wall" || t === "water" || t === "door" || t === "stairs") continue;
+      if (t === "tree" || t === "wall" || t === "water" || t === "door" || t === "stairs" || t === "house") continue;
       const d = cellDistance(anchor, { x, y });
       if (d >= minDistance && !occupied.has(`${x},${y}`)) out.push({ c: { x, y }, d });
     }

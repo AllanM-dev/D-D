@@ -2,20 +2,20 @@ import type { Loot } from "./items";
 
 /** Cartes d'exploration : une case = 1,5 m. */
 
-export type TileKind = "grass" | "tree" | "wall" | "water" | "floor" | "door" | "path" | "bridge" | "stairs";
+export type TileKind = "grass" | "tree" | "wall" | "water" | "floor" | "door" | "path" | "bridge" | "stairs" | "house" | "planks";
 
 /** Caractère du plan → type de case. */
 export const TILE_CHARS: Record<string, TileKind> = {
-  ".": "grass", T: "tree", "#": "wall", "~": "water", ",": "floor", D: "door", ":": "path", "=": "bridge", ">": "stairs",
+  ".": "grass", T: "tree", "#": "wall", "~": "water", ",": "floor", D: "door", ":": "path", "=": "bridge", ">": "stairs", H: "house", ";": "planks",
 };
 
 /** On peut marcher dessus. */
 export const PASSABLE: Record<TileKind, boolean> = {
-  grass: true, tree: false, wall: false, water: false, floor: true, door: true, path: true, bridge: true, stairs: true,
+  grass: true, tree: false, wall: false, water: false, floor: true, door: true, path: true, bridge: true, stairs: true, house: false, planks: true,
 };
 /** Bloque la vue (les portes sont fermées tant qu'on n'est pas dessus). */
 export const OPAQUE: Record<TileKind, boolean> = {
-  grass: false, tree: true, wall: true, water: false, floor: false, door: true, path: false, bridge: false, stairs: false,
+  grass: false, tree: true, wall: true, water: false, floor: false, door: true, path: false, bridge: false, stairs: false, house: true, planks: false,
 };
 
 /** Ennemi posté sur la carte : le toucher lance la rencontre. */
@@ -80,16 +80,16 @@ export const MAPS: readonly MapDef[] = [
       "TT.TT..T.T..T.TT.TTT~~.T",
       "T.T...T.TT.T..T.TTTT~~.T",
       "T..........T..T.....~~.T",
-      "T.T#####............~~.T",
-      "T..#,,,#::::::.....T~~.T",
-      "T..#,,,#.....:......~~.T",
-      "T..##D##.....:....TT~~.T",
-      "T....::::#D##:::::::==.T",
-      "T.T.T....#,,#....:..~~.T",
-      "T.T#D##..#,,#....:..~~.T",
-      "T..#,,#.T####T.##D##~~.T",
-      "T..#,,#........#,,,#~~.T",
-      "T..####.......T#,,,#~~.T",
+      "T.THHHHH............~~.T",
+      "T..H;;;H::::::.....T~~.T",
+      "T..H;;;H.....:......~~.T",
+      "T..HHDHH.....:....TT~~.T",
+      "T....::::HDHH:::::::==.T",
+      "T.T.T....H;;H....:..~~.T",
+      "T.THDHH..H;;H....:..~~.T",
+      "T..H;;H.THHHHT.##D##~~.T",
+      "T..H;;H........#,,,#~~.T",
+      "T..HHHH.......T#,,,#~~.T",
       "T.T............#####~~.T",
       "TTTTTTTTTTTTTTTTTTTTTTTT",
     ],

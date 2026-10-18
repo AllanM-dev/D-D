@@ -37,7 +37,9 @@ export function edgesOf(kind: TileKind, nb: Neighbours): number {
     case "wall": return test((k) => k !== "wall");
     case "water": return test((k) => k !== "water" && k !== "bridge");
     case "path": return test((k) => k === "grass" || k === "tree");
-    case "floor": case "grass": return test((k) => k === "wall" || k === "tree");
+    case "floor": case "grass": case "planks": return test((k) => k === "wall" || k === "tree" || k === "house");
+    case "house": return test((k) => k !== "house");
+    case "door": return test((k) => k === "house");
     case "bridge": return test((k) => k === "water");
     default: return 0;
   }
@@ -164,8 +166,46 @@ function bridge(_v: number, e: number, r: () => number): string {
   return s;
 }
 
-function door(_v: number, _e: number, _r: () => number): string {
-  return `<rect width="32" height="32" fill="#45454d"/><path d="M4 32V12a12 12 0 0 1 24 0V32Z" fill="#4a2c12"/><path d="M6 32V12a10 10 0 0 1 20 0V32Z" fill="#7a4a22"/>`
+/** Toit d'une maison vu de dessus : tuiles, avant-toit ombré, façade crépie avec fenêtre sur le côté qui donne sur l'extérieur. */
+function house(v: number, e: number, r: () => number): string {
+  const roof = ["#a8472f", "#b04d33", "#a1422b", "#b3513a", "#9d3f28", "#ab4a31"][v];
+  const faceH = e & S ? 12 : 0;
+  const h = 32 - faceH;
+  let s = `<rect width="32" height="${h}" fill="${roof}"/>`;
+  for (let y = 0, row = 0; y < h; y += 6, row++) {
+    s += `<path d="M0 ${y + 5.5}H32" stroke="#6f2a1a" stroke-width="1"/>`;
+    for (let x = row % 2 ? 4 : 0; x < 32; x += 8) s += `<path d="M${x} ${y}v5.5" stroke="#6f2a1a" stroke-width=".8" opacity=".7"/>`;
+  }
+  for (let i = 0; i < 5; i++) s += `<rect x="${f(r() * 28)}" y="${f(r() * Math.max(1, h - 4))}" width="${f(3 + r() * 4)}" height="2.4" rx=".6" fill="${r() > 0.5 ? "#c4624a" : "#8a3320"}" opacity=".6"/>`;
+  if (e & N) s += `<rect width="32" height="3" fill="#d98a6a"/><rect y="3" width="32" height="1.5" fill="#6f2a1a" opacity=".5"/>`;
+  if (e & W) s += `<rect width="3" height="${h}" fill="#d98a6a" opacity=".7"/>`;
+  if (e & E) s += `<rect x="29" width="3" height="${h}" fill="#5a2012" opacity=".6"/>`;
+  if (e & S) {
+    s += `<rect y="${h}" width="32" height="${faceH}" fill="#e8dcc0"/><rect y="${h}" width="32" height="3" fill="#7a4a22"/><rect y="${h + 3}" width="32" height="2" fill="#000" opacity=".15"/>`;
+    s += `<rect y="29" width="32" height="3" fill="#8a7a5a"/><path d="M0 ${h}h32" stroke="#4a2c12" stroke-width="1"/>`;
+    if (v % 2 === 0) s += `<rect x="9" y="${h + 4}" width="14" height="10" rx="1" fill="#5aa0d8" stroke="#7a4a22" stroke-width="1.6"/><path d="M16 ${h + 4}v10M9 ${h + 9}h14" stroke="#7a4a22" stroke-width="1"/><path d="M10 ${h + 5}l5 0 -5 4Z" fill="#fff" opacity=".35"/>`;
+    else s += `<path d="M0 ${h + 3}L8 29M32 ${h + 3}L24 29M16 ${h + 3}V29" stroke="#7a4a22" stroke-width="1.6" opacity=".8"/>`;
+  }
+  return s;
+}
+
+/** Plancher en bois d'une maison. */
+function planks(v: number, e: number, r: () => number): string {
+  const tone = ["#9a6b3c", "#a0713f", "#946636", "#a4753f", "#98693a", "#9e6e3d"][v];
+  let s = `<rect width="32" height="32" fill="${tone}"/>`;
+  for (let y = 0; y < 32; y += 8) {
+    s += `<path d="M0 ${y}H32" stroke="#5c3a1c" stroke-width="1.2"/>`;
+    const sx = (y / 8 + v) % 2 ? 10 : 22;
+    s += `<path d="M${sx} ${y}v8" stroke="#5c3a1c" stroke-width="1"/><circle cx="${sx - 3}" cy="${y + 2.5}" r=".6" fill="#3d2610"/><circle cx="${sx + 3}" cy="${y + 5.5}" r=".6" fill="#3d2610"/>`;
+    s += `<path d="M${f(r() * 8)} ${y + 4}q8 -2 ${f(10 + r() * 8)} 0" stroke="#7d5428" stroke-width=".7" fill="none" opacity=".7"/>`;
+  }
+  if (v === 3) s += `<rect x="5" y="8" width="22" height="16" rx="2" fill="#a83a3a" opacity=".55"/><rect x="7" y="10" width="18" height="12" rx="1" fill="none" stroke="#e8c35a" stroke-width="1" opacity=".7"/>`;
+  return s + shade(e);
+}
+
+function door(_v: number, e: number, _r: () => number): string {
+  const frame = e & W && e & E ? "#e8dcc0" : "#45454d"; // porte de maison : encadrement crépi
+  return `<rect width="32" height="32" fill="${frame}"/><path d="M4 32V12a12 12 0 0 1 24 0V32Z" fill="#4a2c12"/><path d="M6 32V12a10 10 0 0 1 20 0V32Z" fill="#7a4a22"/>`
     + `<path d="M11 32V8M16 32V2M21 32V8" stroke="#4a2c12" stroke-width="1" opacity=".8"/>`
     + `<path d="M6 12H26M6 23H26" stroke="#2f2f33" stroke-width="2.4"/><circle cx="21.5" cy="18" r="1.8" fill="#e0b84a"/><circle cx="21.5" cy="18" r=".7" fill="#7a5a10"/>`;
 }
@@ -179,7 +219,7 @@ function stairs(_v: number, _e: number, _r: () => number): string {
   return s + `<path d="M16 8v15M11 18l5 6 5 -6" stroke="#2c2c34" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>`;
 }
 
-const DRAW: Record<TileKind, (v: number, e: number, r: () => number) => string> = { grass, path, floor, wall, tree, water, bridge, door, stairs };
+const DRAW: Record<TileKind, (v: number, e: number, r: () => number) => string> = { grass, path, floor, wall, tree, water, bridge, door, stairs, house, planks };
 
 const svgCache = new Map<string, string>();
 

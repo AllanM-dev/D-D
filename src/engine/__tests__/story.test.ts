@@ -237,7 +237,7 @@ describe("lieux et portes sur la carte", () => {
   it("les personnages du village sont chez eux : mairie, auberge et forge ; ni sur une porte ni dans un mur", () => {
     const g = parseMap(m);
     const tile = (id: string) => { const s = m.spots!.find((x) => x.id === id)!; return g.tiles[s.y][s.x]; };
-    for (const id of ["maire", "aubergiste", "forge"]) expect(tile(id), id).toBe("floor");
+    for (const id of ["maire", "aubergiste", "forge"]) expect(tile(id), id).toBe("planks");
     // Un lieu peut être sur une porte (la porte de la crypte) mais jamais dans un mur, un arbre ou l'eau.
     for (const s of m.spots!) expect(["wall", "tree", "water"], s.id).not.toContain(g.tiles[s.y][s.x]);
     for (const e of m.enemies) expect(["wall", "tree", "water", "door"], e.id).not.toContain(g.tiles[e.y][e.x]);
