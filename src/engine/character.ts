@@ -67,7 +67,7 @@ export interface SkillEntry {
 export interface Character {
   id: string;
   name: string;
-  level: 1;
+  level: number;
   species: SpeciesDef;
   classDef: ClassDef;
   background: BackgroundDef;
@@ -88,8 +88,15 @@ export interface Character {
   fightingStyle?: FightingStyleId;
   spells?: SpellChoice;
   order?: string;
+  /** Première invocation occulte (anciennes sauvegardes) ; voir `invocationsOf`. */
   invocation?: string;
+  /** Toutes les invocations occultes connues. */
+  invocations?: string[];
   expertise?: SkillId[];
+  /** Expérience (voir `levels.ts`) ; absent = pas encore comptée. */
+  xp?: number;
+  /** Le barde « Touche-à-tout » : la moitié du bonus de maîtrise aux compétences non maîtrisées. */
+  jackOfAllTrades?: boolean;
   /** PV et ressources actuels (voir `rest.ts`) ; absent = tout au maximum. */
   vitals?: Vitals;
   /** Position et exploration sur la carte (voir `exploration.ts`) ; absent = jamais exploré. */
@@ -225,7 +232,7 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
   const eq = computeEquipment(
     { classId: classDef.id, scores, modifiers, proficiencyBonus: prof, baseSpeed: species.speed,
       fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined, masteries,
-      order: ORDERS_BY_CLASS.has(classDef.id) ? d.order : undefined, invocation: classDef.id === "warlock" ? d.invocation : undefined },
+      order: ORDERS_BY_CLASS.has(classDef.id) ? d.order : undefined, invocations: classDef.id === "warlock" && d.invocation ? [d.invocation] : undefined },
     d.kitId,
   );
 
@@ -242,6 +249,8 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
     fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined,
     order,
     invocation: classDef.id === "warlock" ? d.invocation : undefined,
+    invocations: classDef.id === "warlock" && d.invocation ? [d.invocation] : undefined,
+    xp: 0,
     expertise: expertise.length ? expertise : undefined,
     spells: CLASS_SPELLCASTING[classDef.id] && d.spells ? { cantrips: [...d.spells.cantrips], prepared: [...d.spells.prepared] } : undefined,
     passivePerception: 10 + skills.find((s) => s.id === "perception")!.bonus,
@@ -261,3 +270,6 @@ export function migrateSpells<T extends { classDef: { id: string }; spells?: Spe
   if (CLASS_SPELLCASTING[out.classDef.id] && !out.spells) out = { ...out, spells: defaultSpells(out.classDef.id) };
   return out;
 }
+
+/** Invocations occultes connues d'un personnage (les anciennes sauvegardes n'en ont qu'une, dans `invocation`). */
+export const invocationsOf = (c: Pick<Character, "invocation" | "invocations">): string[] => c.invocations ?? (c.invocation ? [c.invocation] : []);

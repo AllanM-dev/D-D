@@ -75,9 +75,9 @@ describe("Ordre divin et Ordre primordial", () => {
 describe("Invocations occultes", () => {
   it("Armure d'ombres : CA 13 + Dextérité sans armure", () => {
     const c = hero("warlock", { invocation: "armor-of-shadows" });
-    const input = { classId: "warlock", scores: c.scores, modifiers: c.modifiers, proficiencyBonus: 2, baseSpeed: 9, invocation: "armor-of-shadows" };
+    const input = { classId: "warlock", scores: c.scores, modifiers: c.modifiers, proficiencyBonus: 2, baseSpeed: 9, invocations: ["armor-of-shadows"] };
     expect(deriveStats(input, { shield: false, weapons: [] }).armorClass).toBe(13 + c.modifiers.DEX);
-    expect(deriveStats({ ...input, invocation: "eldritch-spear" }, { shield: false, weapons: [] }).armorClass).toBe(10 + c.modifiers.DEX);
+    expect(deriveStats({ ...input, invocations: ["eldritch-spear"] }, { shield: false, weapons: [] }).armorClass).toBe(10 + c.modifiers.DEX);
   });
   it("Décharge agonisante : le Charisme s'ajoute aux dégâts de la Décharge occulte", () => {
     const fight = (invocation: string) => {

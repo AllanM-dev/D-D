@@ -480,7 +480,7 @@ const preview = computed(() => {
   if (!cls || !sp || ABILITIES.some((a) => final.value[a] <= 0)) return null;
   const scores = final.value;
   const modifiers = Object.fromEntries(ABILITIES.map((a) => [a, abilityModifier(scores[a])])) as Record<Ability, number>;
-  return computeEquipment({ classId: cls.id, scores, modifiers, proficiencyBonus: 2, baseSpeed: sp.speed, fightingStyle: draft.fightingStyle, order: draft.order, invocation: draft.invocation }, draft.kitId);
+  return computeEquipment({ classId: cls.id, scores, modifiers, proficiencyBonus: 2, baseSpeed: sp.speed, fightingStyle: draft.fightingStyle, order: draft.order, invocations: draft.invocation ? [draft.invocation] : undefined }, draft.kitId);
 });
 
 function create() {

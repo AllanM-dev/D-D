@@ -233,7 +233,7 @@ import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
   attackCheck, type TargetCheck, conditionName, currentCombatant, planMove, playerAttack, playerBreakFree, playerDash, playerDisengage, playerDodge, playerEndTurn, playerMove,
   playerOptions, resolveReaction, spellTargetCheck, startCombat, useFeature,
-  type Combatant, type CombatState, type FeatureId, type RollEvent,
+  type Combatant, type CombatState, type FeatureOptionId, type RollEvent,
 } from "../engine/combat";
 import { useCharacters } from "../stores/characters";
 import { ROLL_BUTTON_LABEL, formatMeters, signed } from "../ui/format";
@@ -522,7 +522,7 @@ function tapCell(cell: Cell) {
 
 // --- actions bonus
 const options = computed(() => (state.value ? playerOptions(state.value) : null));
-const bonus = (id: FeatureId) => act((s) => useFeature(s, id));
+const bonus = (id: FeatureOptionId) => act((s) => useFeature(s, id));
 
 // --- sorts
 const spellId = ref("");
@@ -541,7 +541,7 @@ const zoneNames = (e: Combatant) => {
 const cast = (id: string, targetId?: string) => act((s) => castSpell(s, id, Math.random, { targetId }));
 const spellName = (id: string) => SPELL_BY_ID[id]?.name ?? id;
 const isMarked = (id: string) => !!state.value?.combatants.some((x) => x.mark?.targetId === id);
-const bonusStrike = (id: FeatureId, targetId: string) => act((s) => useFeature(s, id, Math.random, { targetId }));
+const bonusStrike = (id: FeatureOptionId, targetId: string) => act((s) => useFeature(s, id, Math.random, { targetId }));
 /** Quantité de soins choisie (imposition des mains), toujours ramenée entre 1 et le maximum utile. */
 const layChoice = ref(5);
 const layAmount = (max: number) => Math.min(Math.max(1, layChoice.value), max);

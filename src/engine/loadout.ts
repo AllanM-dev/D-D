@@ -1,6 +1,6 @@
 import { ARMORS, WEAPONS } from "../data/equipment";
 import { armorItemId, weaponItemId } from "../data/items";
-import type { Character } from "./character";
+import { invocationsOf, type Character } from "./character";
 import { MASTERY_COUNT } from "../data/equipment";
 import { defaultMasteries, deriveStats, masterableWeapons, type EquipmentInput, type Loadout } from "./equipment";
 import { changeItems, inventoryOf, itemCount } from "./inventory";
@@ -18,7 +18,7 @@ export const masteriesOf = (c: Character): string[] =>
 
 const inputOf = (c: Character): EquipmentInput => ({
   classId: c.classDef.id, scores: c.scores, modifiers: c.modifiers, proficiencyBonus: c.proficiencyBonus, baseSpeed: c.species.speed,
-  fightingStyle: c.classDef.id === "fighter" ? c.fightingStyle : undefined, masteries: masteriesOf(c), order: c.order, invocation: c.invocation,
+  fightingStyle: c.fightingStyle, masteries: masteriesOf(c), order: c.order, invocations: invocationsOf(c), level: c.level,
 });
 
 /** Applique un équipement au personnage : CA, vitesse et attaques sont recalculées. */
@@ -28,6 +28,12 @@ function apply(c: Character, loadout: Loadout, inventory: Record<string, number>
     equipment: { ...c.equipment, armor: loadout.armor, shield: loadout.shield, weapons: loadout.weapons },
     attacks: stats.attacks, armorClass: stats.armorClass, speed: stats.speed, inventory,
   };
+}
+
+/** Recalcule CA, vitesse et attaques du personnage (après un changement de niveau, de style de combat…). */
+export function refreshStats(c: Character): Pick<Character, "attacks" | "armorClass" | "speed"> {
+  const { attacks, armorClass, speed } = apply(c, loadoutOf(c), inventoryOf(c));
+  return { attacks, armorClass, speed };
 }
 
 /** Équipe un objet du sac à dos (arme en main, armure endossée, bouclier au bras) ; l'ancienne armure retourne dans le sac. */

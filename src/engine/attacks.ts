@@ -27,6 +27,7 @@ export function characterToCombatant(c: Character): CombatantInit {
     art: artKey("class", c.classDef.id),
     sprite: `hero:${c.species.id}:${c.classDef.id}`,
     untrainedArmor: wearsUntrained(c.classDef.id, c.equipment, c.order),
+    dangerSense: c.classDef.id === "barbarian" && c.level >= 2 ? true : undefined,
     sneakDice: c.classDef.id === "rogue" ? 1 : undefined, // Attaque sournoise : 1d6 au niveau 1
     saveMods: Object.fromEntries(ABILITIES.map((a) => [a, c.saves[a].bonus])) as Record<Ability, number>,
     tags: [c.species.id],

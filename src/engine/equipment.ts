@@ -39,10 +39,12 @@ export interface EquipmentInput {
   /** Vitesse de l'espèce en mètres, avant malus d'armure. */
   baseSpeed: number;
   fightingStyle?: FightingStyleId;
+  /** Niveau du personnage (1 par défaut) : Déplacement sans armure du moine au niveau 2. */
+  level?: number;
   /** Ordre divin ou primordial (Protecteur, Gardien : maîtrises en plus). */
   order?: string;
   /** Invocation occulte (Armure d'ombres : CA 13 + Dex sans armure). */
-  invocation?: string;
+  invocations?: string[];
   /** Armes dont l'effet de maîtrise est connu (identifiants d'armes). */
   masteries?: string[];
 }
@@ -143,7 +145,7 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
     ac = 10 + mod.DEX + mod.CON; // Défense sans armure (le bouclier reste permis)
   } else if (classId === "monk" && !shield) {
     ac = 10 + mod.DEX + mod.WIS;
-  } else if (input.invocation === "armor-of-shadows") {
+  } else if (input.invocations?.includes("armor-of-shadows")) {
     ac = 13 + mod.DEX; // Invocation Armure d'ombres : Armure du mage à volonté
   } else {
     ac = 10 + mod.DEX;
@@ -152,7 +154,8 @@ export function deriveStats(input: EquipmentInput, loadout: Loadout): DerivedSta
   if (input.fightingStyle === "defense" && armor) ac += 1; // Style de combat : Défense
 
   // --- vitesse
-  const speed = armor?.minStr && scores.STR < armor.minStr ? Math.max(0, input.baseSpeed - HEAVY_ARMOR_SPEED_PENALTY) : input.baseSpeed;
+  let speed = armor?.minStr && scores.STR < armor.minStr ? Math.max(0, input.baseSpeed - HEAVY_ARMOR_SPEED_PENALTY) : input.baseSpeed;
+  if (classId === "monk" && (input.level ?? 1) >= 2 && !armor && !shield) speed += 3; // Déplacement sans armure
 
   // --- attaques
   const attacks: AttackDef[] = [];

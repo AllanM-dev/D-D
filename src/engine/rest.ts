@@ -1,4 +1,4 @@
-import type { Character } from "./character";
+import { invocationsOf, type Character } from "./character";
 import { getCombatant, type CombatState, type FeatureId } from "./combat";
 import { rollDie, type Rng } from "./dice";
 import { featuresFor } from "./features";
@@ -37,7 +37,7 @@ export const vitalsOf = (c: Character): Vitals => c.vitals ?? freshVitals(c);
 export function castingInput(c: Character) {
   return {
     classId: c.classDef.id, modifiers: c.modifiers, proficiencyBonus: c.proficiencyBonus, conSaveBonus: c.saves.CON.bonus,
-    unarmored: !c.equipment.armor, spells: c.spells ?? { cantrips: [], prepared: [] }, invocation: c.invocation,
+    unarmored: !c.equipment.armor, spells: c.spells ?? { cantrips: [], prepared: [] }, invocations: invocationsOf(c), level: c.level,
   };
 }
 
@@ -79,6 +79,14 @@ export function shortRest(c: Character, spend: number, rng: Rng = Math.random): 
   }
   const recovered: string[] = [];
   const max = new Map(featuresFor(c.classDef.id, c.level, c.modifiers).map((f) => [f.id, f.max]));
+  // Fougue et points de concentration reviennent entièrement après un repos court.
+  for (const id of ["action-surge", "focus"] as const) {
+    const cap = max.get(id);
+    if (cap !== undefined && (v.features[id] ?? cap) < cap) {
+      v.features[id] = cap;
+      recovered.push(id === "focus" ? "points de concentration" : "Fougue");
+    }
+  }
   for (const id of ["second-wind", "rage"] as const) {
     const cap = max.get(id);
     if (cap !== undefined && (v.features[id] ?? cap) < cap) {
