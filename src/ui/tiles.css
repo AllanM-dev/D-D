@@ -12,4 +12,6 @@
 .tile.bridge { background-color: #8b6a3a; }
 .tile.house { background-color: #a8472f; cursor: default; }
 .tile.planks { background-color: #9a6b3c; }
+.tile.fence, .tile.well, .tile.stall, .tile.crate, .tile.grave { background-color: #4f7f3a; cursor: default; }
+.tile.crop { background-color: #6a4a2a; }
 .tile.wall, .tile.tree { cursor: default; }

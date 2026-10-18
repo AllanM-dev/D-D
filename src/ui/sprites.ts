@@ -178,6 +178,35 @@ const NPCS: Record<string, () => string> = {
   forge: () => human({ skin: "#d8a074", top: "#8a8a92", trim: "#3a3a42", pants: "#4a3a2a", style: "bun", hair: "#2a1a12", wide: 1, extraFront: `<path d="M11 17 H21 L22 28 H10Z" fill="#6a4a2a" ${o()}/>`, held: hammer }),
 };
 
+const pitchfork = `<rect x="24.4" y="8" width="1.4" height="20" fill="#6b4a22" ${o()}/><path d="M22.8 9v-5M25.1 9v-6M27.4 9v-5M22.8 9h4.6" stroke="#9aa0ad" stroke-width="1.2" fill="none"/>`;
+const basket = `<path d="M22.4 20h6.4l-1 5h-4.4z" fill="#b8873a" ${o()}/><path d="M23 20q2.6 -4 5 0" fill="none" stroke="#6b4a22" stroke-width="1"/><circle cx="25" cy="19.4" r="1.2" fill="#d9413a"/><circle cx="27" cy="19.6" r="1.1" fill="#f0c040"/>`;
+const cane = `<rect x="24.4" y="14" width="1.4" height="15" rx=".6" fill="#6b4a22" ${o()}/>`;
+const smallShield = shield("#a83a3a", `<path d="M7.2 15.4v9.6" stroke="#e8d28a" stroke-width="1.2"/>`);
+
+const dog = () => `<ellipse cx="16" cy="28.4" rx="9" ry="1.6" fill="#000" opacity=".25"/>`
+  + `<path d="M25 18q5 -3 4 -8" fill="none" stroke="#9a6a3a" stroke-width="2.4" stroke-linecap="round"/>`
+  + `<path d="M9 20q0 -6 8 -6h6q4 0 4 5v5h-2.4v4h-2.4v-4h-9v4h-2.4v-4h-2.4z" fill="#b07a42" ${o()}/>`
+  + `<path d="M4 17l4 -4 3 3 1 5 -4 3 -4 -1z" fill="#c08850" ${o()}/><path d="M6 12l-1.6 4 3 -1z" fill="#6b4a22" ${o()}/><circle cx="6" cy="17" r="1" fill="${OUT}"/><circle cx="3.4" cy="19.4" r="1.2" fill="${OUT}"/>`
+  + `<path d="M10 18q5 -2 11 0" stroke="#8a5a2a" stroke-width="1.4" fill="none"/>`;
+const chicken = () => `<ellipse cx="16" cy="28" rx="7" ry="1.4" fill="#000" opacity=".25"/>`
+  + `<path d="M8 22q0 -8 8 -8t8 6q0 5 -6 6h-5q-5 0 -5 -4z" fill="#f4efe0" ${o()}/><path d="M23 18q4 -4 3 -8" fill="#f4efe0" stroke="${OUT}" stroke-width=".9"/>`
+  + `<circle cx="10.6" cy="13" r="3.8" fill="#f4efe0" ${o()}/><path d="M9 9q1.6 -2.6 3.2 -.4 1.6 -2.4 2.2 .6" fill="#d9413a" ${o()}/><path d="M6.4 13.6l-3 1.2 3 1.2z" fill="#e8a02a" ${o()}/><circle cx="9.6" cy="12.4" r=".8" fill="${OUT}"/><path d="M10 14.6q.6 3 0 3.6" stroke="#d9413a" stroke-width="1.4" fill="none"/>`
+  + `<path d="M13 28v-2.6M17 28v-2.6" stroke="#e8a02a" stroke-width="1.2"/>`;
+
+/** Villageois qui se promènent (décor vivant de la carte). */
+const FOLK: Record<string, () => string> = {
+  paysan: () => human({ skin: "#e0aa7e", top: "#8a7a4a", trim: "#5a4a2a", pants: "#4a3a2a", style: "cap", held: pitchfork }),
+  paysanne: () => human({ skin: "#e6b890", top: "#a84a6a", trim: "#f0ebe0", robe: true, style: "bun", hair: "#7a4a22", held: basket }),
+  marchande: () => human({ skin: "#d9a074", top: "#3a7a5a", trim: "#e8d28a", robe: true, style: "short", hair: "#c2452a", extraFront: `<path d="M11 17H21L22 28H10Z" fill="#f4efe0" ${o()}/>` }),
+  marchand: () => human({ skin: "#e0aa7e", top: "#7a3a2a", trim: "#d9b64a", style: "feather", beard: "#5a3a1e", wide: 1, extraFront: `<path d="M11 17H21L22 28H10Z" fill="#6a4a2a" ${o()}/>` }),
+  garde: () => human({ skin: "#e6b890", top: "#8f98a8", trim: "#5c6372", pants: "#4a5060", style: "helm", held: spear, offhand: smallShield }),
+  enfant: () => human({ skin: "#eec59a", top: "#d9a21f", trim: "#c9a84a", pants: "#4a5a7a", style: "short", hair: "#7a4a22", scale: 0.7 }),
+  enfante: () => human({ skin: "#eec59a", top: "#6a9ad0", trim: "#f0ebe0", robe: true, style: "bun", hair: "#c2452a", scale: 0.7 }),
+  vieux: () => human({ skin: "#e0b08a", top: "#6a5a7a", trim: "#9a8aaa", robe: true, style: "bald", beard: "#e0e0e8", face: "old", held: cane }),
+  chien: dog,
+  poule: chicken,
+};
+
 const cache = new Map<string, string>();
 
 function draw(key: string): string | null {
@@ -194,6 +223,7 @@ function draw(key: string): string | null {
     return MONSTERS[a]?.() ?? null;
   }
   if (kind === "npc") return NPCS[a]?.() ?? null;
+  if (kind === "folk") return FOLK[a]?.() ?? null;
   return null;
 }
 
@@ -204,7 +234,7 @@ export function spriteSvg(key: string | undefined): string | null {
   const body = draw(key);
   if (body === null) return null;
   // ombre au sol commune aux silhouettes debout
-  const shadow = key.startsWith("monster:") && /wolf|rat|spider/.test(key) ? "" : `<ellipse cx="16" cy="29.2" rx="9" ry="2" fill="#000" opacity=".28"/>`;
+  const shadow = (key.startsWith("monster:") && /wolf|rat|spider/.test(key)) || /^folk:(chien|poule)$/.test(key) ? "" : `<ellipse cx="16" cy="29.2" rx="9" ry="2" fill="#000" opacity=".28"/>`;
   const svg = shadow + body;
   cache.set(key, svg);
   return svg;
@@ -214,6 +244,8 @@ export const heroSpriteKey = (speciesId: string, classId: string) => `hero:${spe
 export const monsterSpriteKey = (id: string) => `monster:${id}`;
 export const npcSpriteKey = (id: string) => `npc:${id}`;
 export const NPC_SPRITES = Object.keys(NPCS);
+export const FOLK_SPRITES = Object.keys(FOLK);
+export const folkSpriteKey = (id: string) => `folk:${id}`;
 export const MONSTER_SPRITES = [...Object.keys(MONSTERS), "wolf", "giant-rat", "giant-spider"];
 export const SPECIES_SPRITES = Object.keys(SPECIES);
 export const CLASS_SPRITES = Object.keys(CLASSES);

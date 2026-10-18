@@ -40,6 +40,7 @@ export function edgesOf(kind: TileKind, nb: Neighbours): number {
     case "floor": case "grass": case "planks": return test((k) => k === "wall" || k === "tree" || k === "house");
     case "house": return test((k) => k !== "house");
     case "door": return test((k) => k === "house");
+    case "fence": return test((k) => k === "fence");
     case "bridge": return test((k) => k === "water");
     default: return 0;
   }
@@ -203,6 +204,70 @@ function planks(v: number, e: number, r: () => number): string {
   return s + shade(e);
 }
 
+/** Clôture de bois : un poteau, et des lisses vers les cases voisines qui en ont aussi. */
+function fence(_v: number, e: number, r: () => number): string {
+  let s = grass(1, 0, r);
+  const rail = (x1: number, y1: number, x2: number, y2: number) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#4a2c12" stroke-width="3.6" stroke-linecap="round"/><path d="M${x1} ${y1 - 0.8}L${x2} ${y2 - 0.8}" stroke="#a06a36" stroke-width="2" stroke-linecap="round"/>`;
+  s += `<ellipse cx="16" cy="24" rx="13" ry="3" fill="#000" opacity=".2"/>`;
+  if (e & W || !(e & (N | S))) s += rail(0, 16, 16, 16) + (e & W ? "" : "");
+  if (e & E || !(e & (N | S))) s += rail(16, 16, 32, 16);
+  if (e & N) s += rail(16, 0, 16, 16);
+  if (e & S) s += rail(16, 16, 16, 30);
+  if (!(e & (N | S | E | W))) s = grass(1, 0, r) + `<ellipse cx="16" cy="24" rx="8" ry="2.5" fill="#000" opacity=".2"/>` + rail(6, 16, 26, 16);
+  return s + `<rect x="13.5" y="8" width="5" height="18" rx="1.2" fill="#8a5a2a" stroke="#3a2210" stroke-width=".9"/><rect x="13.5" y="8" width="5" height="3" rx="1" fill="#b57a3c"/>`;
+}
+
+/** Puits de pierre vu de dessus, avec sa margelle, son eau sombre et sa manivelle. */
+function well(_v: number, _e: number, r: () => number): string {
+  return grass(3, 0, r) + `<ellipse cx="16" cy="19" rx="13" ry="5" fill="#000" opacity=".25"/>`
+    + `<circle cx="16" cy="16" r="12" fill="#8d8d96" stroke="#3a3a42" stroke-width="1.2"/><circle cx="16" cy="16" r="8.6" fill="#2a4a6a"/><circle cx="16" cy="16" r="6" fill="#16304a"/>`
+    + `<path d="M6 12l4 -3M26 12l-4 -3M7 22l3 2M25 22l-3 2" stroke="#6c6c75" stroke-width="1.4"/>`
+    + `<rect x="5" y="5" width="2.6" height="14" fill="#7a4a22"/><rect x="24.4" y="5" width="2.6" height="14" fill="#7a4a22"/><rect x="5" y="4" width="22" height="3" rx="1" fill="#9a6232" stroke="#3a2210" stroke-width=".8"/>`
+    + `<path d="M16 7v6" stroke="#d8c8a0" stroke-width="1"/><rect x="14" y="13" width="4" height="3.4" rx=".8" fill="#6a4a22"/>`;
+}
+
+/** Étal de marché sous un auvent rayé, avec des fruits et des légumes. */
+function stall(v: number, _e: number, r: () => number): string {
+  const c1 = ["#c0392b", "#2f7fb5", "#d9a21f", "#4a9a4a", "#8a4ab5", "#c0392b"][v];
+  let s = grass(2, 0, r).replace(/<rect width="32" height="32"[^>]*\/>/, `<rect width="32" height="32" fill="#b59a63"/>`);
+  s += `<ellipse cx="16" cy="27" rx="14" ry="3" fill="#000" opacity=".25"/>`;
+  s += `<rect x="3" y="13" width="26" height="12" rx="1.5" fill="#8a5a2a" stroke="#3a2210" stroke-width="1"/>`;
+  const fruit = ["#d9413a", "#f0c040", "#7ac24a", "#e8883a"];
+  for (let i = 0; i < 7; i++) s += `<circle cx="${f(6 + i * 3.4)}" cy="${f(16 + (i % 2) * 3)}" r="1.9" fill="${fruit[(i + v) % 4]}" stroke="#3a2210" stroke-width=".5"/>`;
+  for (let i = 0; i < 6; i++) s += `<path d="M${3 + i * 4.4} 3h4.4v9h-4.4z" fill="${i % 2 ? "#f4efe0" : c1}" stroke="#3a2210" stroke-width=".6"/>`;
+  s += `<path d="M3 12q2.2 2.4 4.4 0t4.4 0 4.4 0 4.4 0 4.4 0 4.4 0" fill="${c1}" stroke="#3a2210" stroke-width=".6"/>`;
+  return s + `<rect x="3" y="3" width="1.6" height="22" fill="#5c3a1c"/><rect x="27.4" y="3" width="1.6" height="22" fill="#5c3a1c"/>`;
+}
+
+/** Tonneaux et caisses empilés. */
+function crate(v: number, _e: number, r: () => number): string {
+  let s = grass(v, 0, r) + `<ellipse cx="16" cy="26" rx="13" ry="3.4" fill="#000" opacity=".28"/>`;
+  s += `<rect x="4" y="12" width="13" height="13" rx="1" fill="#a06a36" stroke="#3a2210" stroke-width="1"/><path d="M4 12l13 13M17 12L4 25" stroke="#6a4220" stroke-width="1.2"/>`;
+  s += `<ellipse cx="23.5" cy="21" rx="6" ry="7" fill="#8a5a2a" stroke="#3a2210" stroke-width="1"/><path d="M17.8 17.5q5.7 2 11.4 0M17.8 24.5q5.7 -2 11.4 0" stroke="#4a4a52" stroke-width="1.4" fill="none"/><ellipse cx="23.5" cy="15" rx="5.2" ry="1.7" fill="#b57a3c" stroke="#3a2210" stroke-width=".7"/>`;
+  if (v % 2) s += `<rect x="8" y="5" width="10" height="8" rx="1" fill="#b57a3c" stroke="#3a2210" stroke-width="1"/><path d="M8 9h10" stroke="#6a4220"/>`;
+  return s;
+}
+
+/** Tombe : stèle de pierre sur une terre sombre. */
+function grave(v: number, _e: number, r: () => number): string {
+  let s = `<rect width="32" height="32" fill="#3f5f36"/>` + grass(5, 0, r).replace(/<rect width="32" height="32"[^>]*\/>/, "");
+  s += `<ellipse cx="16" cy="26" rx="10" ry="3" fill="#000" opacity=".3"/><rect x="7" y="22" width="18" height="5" rx="2" fill="#4a3a2a" opacity=".8"/>`;
+  if (v % 3 === 0) s += `<path d="M16 5v18M10 11h12" stroke="#8d8d96" stroke-width="3.4" stroke-linecap="round"/><path d="M16 5v18M10 11h12" stroke="#b5b5be" stroke-width="1.3" stroke-linecap="round"/>`;
+  else s += `<path d="M9 24V12a7 7 0 0 1 14 0V24Z" fill="#8d8d96" stroke="#3a3a42" stroke-width="1.1"/><path d="M12 24V13a4 4 0 0 1 8 0V24" fill="none" stroke="#b5b5be" stroke-width="1" opacity=".6"/><path d="M13 14h6M13 17h6" stroke="#5a5a64" stroke-width="1"/>`;
+  return s;
+}
+
+/** Champ cultivé : rangées de pousses. */
+function crop(v: number, _e: number, r: () => number): string {
+  let s = `<rect width="32" height="32" fill="#6a4a2a"/>`;
+  const col = v % 2 ? ["#d9b43a", "#e8c84a"] : ["#6aa83a", "#7ac24a"];
+  for (let y = 4; y < 32; y += 8) {
+    s += `<path d="M0 ${y + 3}H32" stroke="#4a3018" stroke-width="2.4"/>`;
+    for (let x = 3; x < 32; x += 5) s += `<path d="M${x} ${y + 3}q-1.6 -4 -0.4 -6M${x} ${y + 3}q1.8 -4 3 -5.4M${x} ${y + 3}v-7" stroke="${col[(x + y) % 2]}" stroke-width="1.5" fill="none" stroke-linecap="round"/>`;
+  }
+  return s;
+}
+
 function door(_v: number, e: number, _r: () => number): string {
   const frame = e & W && e & E ? "#e8dcc0" : "#45454d"; // porte de maison : encadrement crépi
   return `<rect width="32" height="32" fill="${frame}"/><path d="M4 32V12a12 12 0 0 1 24 0V32Z" fill="#4a2c12"/><path d="M6 32V12a10 10 0 0 1 20 0V32Z" fill="#7a4a22"/>`
@@ -219,7 +284,7 @@ function stairs(_v: number, _e: number, _r: () => number): string {
   return s + `<path d="M16 8v15M11 18l5 6 5 -6" stroke="#2c2c34" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>`;
 }
 
-const DRAW: Record<TileKind, (v: number, e: number, r: () => number) => string> = { grass, path, floor, wall, tree, water, bridge, door, stairs, house, planks };
+const DRAW: Record<TileKind, (v: number, e: number, r: () => number) => string> = { grass, path, floor, wall, tree, water, bridge, door, stairs, house, planks, fence, well, stall, crate, grave, crop };
 
 const svgCache = new Map<string, string>();
 
