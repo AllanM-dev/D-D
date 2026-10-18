@@ -36,6 +36,11 @@ export const ITEMS: readonly ItemDef[] = [
     text: "Le cahier du gardien de la crypte, couvert de poussière. Il contient la prière du repos.",
     note: "Objet de quête : lu, il permet d'apaiser le gardien de la crypte.",
   },
+  {
+    id: "pendentif-gedeon", name: "Pendentif d'argent", kind: "key",
+    text: "Un pendentif d'argent terni, gravé d'une clé et d'une étoile : l'emblème des gardiens de la crypte de Brumeval.",
+    note: "Objet de quête : à rendre à Thibaud, l'aubergiste, qui le reconnaîtra.",
+  },
 ];
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));

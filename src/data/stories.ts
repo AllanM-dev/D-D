@@ -78,6 +78,10 @@ const maire: Scene[] = [
     ],
     textIf: [
       { requires: { flags: ["quete-acceptee"], notFlags: ["quete-terminee"] }, text: ["« La crypte, toujours la crypte. Revenez me voir quand vous saurez ce qui s'y passe. »"] },
+      { requires: { flags: ["quete-acceptee"], notFlags: ["indice-moulin", "quete-terminee"] }, text: ["« Josette, la meunière, de l'autre côté de la rivière, a perdu des outils et vu une ombre rôder. Parlez-lui. »"] },
+      { requires: { flags: ["quete-acceptee"], notFlags: ["indice-ferme", "quete-terminee"] }, text: ["« Hugues, le fermier, perd ses bêtes et ne dort plus. Il a sûrement des choses à raconter, mais il est fâché contre un loup. »"] },
+      { requires: { flags: ["quete-acceptee"], notFlags: ["defeated:bandit-1", "quete-terminee"] }, text: ["« Et le cimetière, au sud, sent la terre remuée… Je n'ose pas y aller seule. »"] },
+      { requires: { flags: ["pendentif-rendu"], notFlags: ["quete-terminee"] }, text: ["« Thibaud est passé me voir : il a retrouvé le pendentif de son père, il pleurait comme un enfant. »"] },
       { requires: { flags: ["defeated:ghoul-1"], notFlags: ["quete-terminee"] }, text: ["Elle remarque la poussière de tombe sur vos vêtements et pâlit. « Vous… vous avez vu ce qu'il y avait là-dessous ? »"] },
       { requires: { flags: ["quete-terminee"] }, text: ["« Brumeval dort enfin tranquille. Vous êtes ici chez vous, quand vous voulez. »"] },
     ],
@@ -95,6 +99,7 @@ const maire: Scene[] = [
     title: "Odile, la maire",
     text: [
       "Le visage d'Odile se détend un peu. « Merci. La crypte est fermée à clé depuis des années : c'est Thibaud, l'aubergiste, qui en a hérité de son père. Demandez-la-lui. Et prenez garde : si quelque chose rôde là-dedans, ce n'est pas un chat. »",
+      "« Mais n'y descendez pas à l'aveugle. Faites d'abord le tour du village : Josette, la meunière, de l'autre côté du pont, et Hugues, le fermier, ont vu ou perdu des choses étranges ; et on dit qu'on a vu une lanterne au cimetière, au sud. Revenez avec des réponses. »",
     ],
     choices: [{ text: "Je m'en occupe.", goto: "maire" }],
   },
@@ -140,6 +145,8 @@ const maire: Scene[] = [
     ],
     textIf: [
       { requires: { flags: ["goule-apaisee"] }, text: ["Vous lui dites que le gardien est mort en paix, qu'il s'agissait du père de Thibaud. Odile ferme les yeux. « Gédéon… Il nous aura protégés jusqu'au bout. Vous avez fait plus que nous vous demandions. »"] },
+      { requires: { flags: ["pillard-avoue"] }, text: ["« Et ce pillard… on l'a laissé filer ? Soit. Il paraît qu'il a quitté la région, la queue entre les jambes. »"] },
+      { requires: { flags: ["pendentif-rendu"] }, text: ["Elle sourit tristement. « Vous avez rendu à Thibaud ce qu'il avait perdu de plus cher. Cela ne se paie pas. »"] },
       { requires: { flags: ["recompense-haute"] }, text: ["« Cinquante pièces d'or, comme promis. C'est peu pour ce que vous avez fait. Brumeval n'oubliera pas. »"] },
       { requires: { notFlags: ["recompense-haute"] }, text: ["« Vingt pièces d'or. C'est peu pour ce que vous avez fait. Brumeval n'oubliera pas. »"] },
     ],
@@ -163,6 +170,7 @@ const aubergiste: Scene[] = [
     choices: [
       { text: "La maire m'envoie : je voudrais la clé de la crypte.", requires: { flags: ["quete-acceptee"], notFlags: ["cle-crypte"] }, goto: "aubergiste-cle" },
       { text: "Léo dit que votre père a disparu dans la crypte. C'est vrai ?", requires: { flags: ["pere-disparu"], notFlags: ["histoire-pere"] }, check: { skill: "insight", dc: 12, success: "aubergiste-pere", failure: "aubergiste-pere-ko" } },
+      { text: "Je crois avoir quelque chose qui appartient à votre père : un pendentif d'argent.", requires: { items: ["pendentif-gedeon"], notFlags: ["pendentif-rendu"] }, goto: "aubergiste-pendentif" },
       { text: "Observer la salle d'un œil attentif.", requires: { notFlags: ["indice-cave"] }, check: { skill: "perception", dc: 11, success: "aubergiste-indice", failure: "aubergiste-rien", onSuccess: { set: ["indice-cave"] } } },
       { text: "Écouter les rumeurs du village.", goto: "aubergiste-rumeurs" },
       { text: "Voir ce que Thibaud vend et achète.", shop: "auberge" },
@@ -190,6 +198,19 @@ const aubergiste: Scene[] = [
     title: "Thibaud, l'aubergiste",
     text: ["« Non. Ce n'est pas la première fois qu'un inconnu vient me réclamer cette clé en disant que le village est en danger. »"],
     choices: [{ text: "Réfléchir à une autre approche.", goto: "aubergiste" }],
+  },
+  {
+    id: "aubergiste-pendentif",
+    title: "Thibaud, l'aubergiste",
+    text: [
+      "Thibaud saisit le pendentif d'une main qui tremble. Il le retourne, passe le pouce sur la clé et l'étoile gravées. « C'est le sien. Il ne l'ôtait jamais. Où l'avez-vous trouvé ? »",
+      "Vous lui racontez le cimetière, la tombe éventrée et le pillard. Il ferme le poing sur le bijou, longtemps, sans rien dire.",
+    ],
+    textIf: [
+      { requires: { flags: ["defeated:ghoul-1"] }, text: ["« Alors même après… il a continué à veiller sur nous. »"] },
+      { requires: { flags: ["cle-crypte"], notFlags: ["defeated:ghoul-1"] }, text: ["« Si vous descendez, dites-lui que j'ai son pendentif. Dites-lui que je ne l'ai pas oublié. »"] },
+    ],
+    choices: [{ text: "Accepter la bourse qu'il vous presse dans la main.", requires: { items: ["pendentif-gedeon"] }, goto: "aubergiste", set: ["pendentif-rendu"], gold: 25, items: { "pendentif-gedeon": -1 } }],
   },
   {
     id: "aubergiste-indice",
@@ -221,10 +242,16 @@ const crypte: Scene[] = [
     text: [
       "Une lourde porte de chêne cerclée de fer, couverte de mousse, ferme l'entrée de la crypte. Une serrure massive y est scellée. Derrière, vous croyez entendre un raclement lent, comme des griffes sur la pierre.",
     ],
+    textIf: [
+      { requires: { notFlags: ["indice-moulin"] }, text: ["Vous hésitez. Odile vous a parlé de Josette, la meunière : elle sait peut-être qui rôde autour de la crypte."] },
+      { requires: { notFlags: ["indice-ferme"] }, text: ["Hugues, le fermier, a lui aussi des choses à dire ; il est de l'autre côté de la rivière."] },
+      { requires: { notFlags: ["defeated:bandit-1"] }, text: ["Et ce cimetière, au sud, d'où l'on aurait vu une lanterne… Descendre ici sans savoir serait imprudent."] },
+      { requires: { flags: ["indice-moulin", "indice-ferme", "defeated:bandit-1"] }, text: ["Vous savez ce qui est arrivé : un pillard a creusé sous la tombe, fendu le sceau, et réveillé ce qui dormait. Il est temps de descendre."] },
+    ],
     choices: [
-      { text: "Ouvrir avec la clé de Thibaud.", requires: { flags: ["cle-crypte"] }, goto: "crypte-ouverte", set: ["crypte-ouverte"] },
-      { text: "Crocheter la serrure.", requires: { notFlags: ["cle-crypte"] }, check: { skill: "sleight-of-hand", dc: 15, success: "crypte-ouverte", failure: "crypte-alerte", onSuccess: { set: ["crypte-ouverte"] } } },
-      { text: "Enfoncer la porte.", requires: { notFlags: ["cle-crypte"] }, check: { skill: "athletics", dc: 14, success: "crypte-ouverte", failure: "crypte-alerte", onSuccess: { set: ["crypte-ouverte"] } } },
+      { text: "Ouvrir avec la clé de Thibaud.", requires: { flags: ["cle-crypte", "indice-moulin", "indice-ferme", "defeated:bandit-1"] }, goto: "crypte-ouverte", set: ["crypte-ouverte"] },
+      { text: "Crocheter la serrure.", requires: { flags: ["indice-moulin", "indice-ferme", "defeated:bandit-1"], notFlags: ["cle-crypte"] }, check: { skill: "sleight-of-hand", dc: 15, success: "crypte-ouverte", failure: "crypte-alerte", onSuccess: { set: ["crypte-ouverte"] } } },
+      { text: "Enfoncer la porte.", requires: { flags: ["indice-moulin", "indice-ferme", "defeated:bandit-1"], notFlags: ["cle-crypte"] }, check: { skill: "athletics", dc: 14, success: "crypte-ouverte", failure: "crypte-alerte", onSuccess: { set: ["crypte-ouverte"] } } },
       { text: "Laisser la porte tranquille.", end: true },
     ],
   },
@@ -292,6 +319,143 @@ const village: Scene[] = [
     title: "Thibaud, l'aubergiste",
     text: ["Thibaud se ferme comme une huître. « Je ne sais pas de quoi vous parlez. Les enfants racontent n'importe quoi. »"],
     choices: [{ text: "Revenir au comptoir.", goto: "aubergiste" }],
+  },
+];
+
+const moulin: Scene[] = [
+  {
+    id: "meuniere",
+    title: "Josette, la meunière",
+    text: [
+      "Dans le moulin, la farine flotte comme un brouillard doré. Josette, la meunière, une femme robuste au tablier poudré de blanc, vous fait signe de parler bas : son mari dort sur un tas de sacs, épuisé par les nuits de veille.",
+    ],
+    textIf: [
+      { requires: { flags: ["indice-moulin"] }, text: ["« Je vous ai tout dit. Trouvez ce voleur avant qu'il ne s'en prenne à autre chose que ma pelle. »"] },
+      { requires: { flags: ["pillard-avoue"] }, text: ["« On dit que vous avez parlé au pillard. S'il repasse par chez moi, je lui apprendrai à voler une pelle ! »"] },
+    ],
+    choices: [
+      { text: "La maire m'envoie : avez-vous remarqué quelque chose d'étrange ?", requires: { flags: ["quete-acceptee"], notFlags: ["indice-moulin"] }, goto: "meuniere-recit" },
+      { text: "Demander des nouvelles du village.", goto: "meuniere-village" },
+      { text: "Je repasserai.", end: true },
+    ],
+  },
+  {
+    id: "meuniere-recit",
+    title: "Josette, la meunière",
+    text: [
+      "« Étrange ? Oui. Il y a trois nuits, on m'a volé ma pelle et la lanterne de la cour. Et hier à l'aube, j'ai vu une silhouette encapuchonnée traverser le pont avec un sac qui tintait, en direction du vieux cimetière. Pas un fantôme : il laissait des traces de bottes. »",
+    ],
+    choices: [
+      { text: "Examiner le sol de la cour.", check: { skill: "perception", dc: 12, success: "meuniere-traces", failure: "meuniere-rien" } },
+      { text: "Remercier Josette.", goto: "meuniere", set: ["indice-moulin"] },
+    ],
+  },
+  {
+    id: "meuniere-traces",
+    title: "Josette, la meunière",
+    text: ["Dans la boue séchée, des empreintes de bottes à gros clous, profondes : un homme chargé, qui traînait un peu la jambe gauche. Elles repartent vers le pont, puis vers le sud. Ce n'est pas une créature de la crypte, mais bien quelqu'un de vivant."],
+    choices: [{ text: "Remercier Josette.", goto: "meuniere", set: ["indice-moulin", "traces-bottes"] }],
+  },
+  {
+    id: "meuniere-rien",
+    title: "Josette, la meunière",
+    text: ["La cour est un champ de boue piétinée par les charrettes. Impossible d'y distinguer quoi que ce soit de précis."],
+    choices: [{ text: "Revenir vers Josette.", goto: "meuniere-recit" }],
+  },
+  {
+    id: "meuniere-village",
+    title: "Josette, la meunière",
+    text: ["« Le village ? Il a changé depuis que les nuits font peur. Le marché ferme plus tôt, et Berthe et Orso ne crient plus leurs prix qu'à contrecœur. Mais personne ne veut quitter Brumeval : c'est un bon endroit, quand les morts dorment. »"],
+    choices: [{ text: "Revenir vers Josette.", goto: "meuniere" }],
+  },
+];
+
+const ferme: Scene[] = [
+  {
+    id: "fermier",
+    title: "Hugues, le fermier",
+    text: [
+      "Hugues, large d'épaules, tord son chapeau de paille entre ses mains. La ferme est silencieuse : dans la cour, quelques poules gisent, la gorge ouverte.",
+    ],
+    textIf: [
+      { requires: { flags: ["indice-ferme"] }, text: ["« Merci encore pour le loup. Si vous trouvez celui qui creuse au cimetière, tapez fort de ma part. »"] },
+      { requires: { flags: ["loup-signale"], notFlags: ["defeated:wolf-1"] }, text: ["« Le loup rôde toujours, au nord-ouest, près de la lisière du bois. Revenez quand il ne pourra plus faire de mal. »"] },
+    ],
+    choices: [
+      { text: "Que s'est-il passé ici ?", requires: { notFlags: ["loup-signale"] }, goto: "fermier-loup" },
+      { text: "Le loup de la forêt ne fera plus de mal à vos bêtes.", requires: { flags: ["defeated:wolf-1", "loup-signale"], notFlags: ["indice-ferme"] }, goto: "fermier-merci", gold: 10, set: ["indice-ferme"] },
+      { text: "Je repasserai.", end: true },
+    ],
+  },
+  {
+    id: "fermier-loup",
+    title: "Hugues, le fermier",
+    text: [
+      "« Un loup, gros comme un veau, qui rôde à la lisière de la forêt, au nord-ouest du village. Il a pris mes poules, demain il prendra mes agneaux. Débarrassez-m'en, et je vous dirai ce que j'ai vu, la nuit dernière, depuis ma fenêtre. »",
+    ],
+    choices: [{ text: "Je m'en occupe.", goto: "fermier", set: ["loup-signale"] }],
+  },
+  {
+    id: "fermier-merci",
+    title: "Hugues, le fermier",
+    text: [
+      "Hugues vous serre la main avec une force de forgeron. « Dix pièces, c'est tout ce que j'ai de côté. Prenez-les. »",
+      "Puis il baisse la voix. « La nuit dernière, j'ai vu une lueur au vieux cimetière : une lanterne, et quelqu'un qui creusait. Pas un mort : il jurait comme un charretier. Allez voir du côté de la tombe du fond. »",
+    ],
+    choices: [{ text: "Merci, Hugues.", goto: "fermier" }],
+  },
+];
+
+const cimetiere: Scene[] = [
+  {
+    id: "tombe",
+    title: "La tombe éventrée",
+    text: [
+      "Au fond du cimetière, une tombe a été éventrée : la dalle gît de côté et un tunnel étroit s'enfonce dans la terre, en direction de la crypte. Des outils traînent sur le bord. Une odeur de terre fraîche et de tabac flotte dans l'air.",
+    ],
+    textIf: [
+      { requires: { notFlags: ["defeated:bandit-1"] }, text: ["Un homme est accroupi près d'un sac, de dos, en train de compter des pièces à la lueur d'une lanterne. À côté de lui, une pelle : la pelle du meunier, sans aucun doute."] },
+      { requires: { flags: ["defeated:bandit-1"] }, text: ["Le pillard n'est plus là pour vous surprendre. Le tunnel, lui, est toujours béant."] },
+    ],
+    choices: [
+      { text: "L'affronter.", requires: { notFlags: ["defeated:bandit-1"] }, fight: { encounterId: "pillard", enemy: "bandit-1", win: "tombe-victoire", lose: "tombe-defaite" } },
+      { text: "Le prendre au dépourvu et lui ordonner de se rendre.", requires: { notFlags: ["defeated:bandit-1"] }, check: { skill: "intimidation", dc: 14, success: "tombe-aveu", failure: "tombe-alerte", onSuccess: { defeat: ["bandit-1"], set: ["pillard-avoue"], items: { "pendentif-gedeon": 1 } } } },
+      { text: "Examiner le tunnel.", goto: "tombe-tunnel" },
+      { text: "S'éloigner.", end: true },
+    ],
+  },
+  {
+    id: "tombe-aveu",
+    title: "La tombe éventrée",
+    text: [
+      "Surpris, le pillard lâche son sac et lève les mains. « Je… je cherchais seulement de quoi manger ! J'ai creusé sous la tombe, et j'ai débouché dans un couloir de pierre. Il y avait un sceau fendu, des runes… J'y ai touché, et la nuit suivante, tout s'est mis à bouger là-dessous. »",
+      "Il vous tend un pendentif d'argent. « Je l'ai pris sur un squelette. Je n'en veux plus. Laissez-moi partir, je quitte la région ! » Il file entre les tombes sans se retourner.",
+    ],
+    choices: [{ text: "Garder le pendentif et le laisser fuir.", end: true }],
+  },
+  {
+    id: "tombe-alerte",
+    title: "La tombe éventrée",
+    text: ["Il se retourne d'un bond, une arbalète déjà à l'épaule. « Un curieux ! Il fallait rester au village ! »"],
+    choices: [{ text: "Se battre !", fight: { encounterId: "pillard", enemy: "bandit-1", win: "tombe-victoire", lose: "tombe-defaite" } }],
+  },
+  {
+    id: "tombe-victoire",
+    title: "La tombe éventrée",
+    text: ["Le pillard s'effondre. Dans sa besace, entre quelques pièces et un morceau de pain dur, un pendentif d'argent terni, gravé d'une clé et d'une étoile."],
+    choices: [{ text: "Ramasser ses affaires.", end: true }],
+  },
+  {
+    id: "tombe-defaite",
+    title: "La tombe éventrée",
+    text: ["Les coups pleuvent. Vous perdez connaissance… et vous reprenez vos esprits sur la place du village, une couverture sur les épaules, avec Odile qui se penche sur vous."],
+    choices: [{ text: "Se relever, courbaturé.", end: true }],
+  },
+  {
+    id: "tombe-tunnel",
+    title: "La tombe éventrée",
+    text: ["Le tunnel est étroit, étayé de planches pourries. À l'autre bout, un souffle froid, chargé de cire et de terre, monte vers vous : il mène sous le mur de la crypte. C'est ainsi que le pillard a atteint le sceau, et par ricochet réveillé ce qui reposait là."],
+    choices: [{ text: "Se redresser.", goto: "tombe", set: ["tunnel-vu"] }],
   },
 ];
 
@@ -418,7 +582,7 @@ export const STORIES: readonly StoryDef[] = [
   {
     id: "brumeval",
     title: "Les morts de Brumeval",
-    scenes: Object.fromEntries([...maire, ...aubergiste, ...crypte, ...village, ...forge, ...crypteInterieur].map((s) => [s.id, s])),
+    scenes: Object.fromEntries([...maire, ...aubergiste, ...crypte, ...village, ...forge, ...moulin, ...ferme, ...cimetiere, ...crypteInterieur].map((s) => [s.id, s])),
   },
 ];
 

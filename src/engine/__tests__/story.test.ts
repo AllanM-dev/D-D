@@ -126,6 +126,10 @@ describe("histoires", () => {
     expect(key.next).toBe("aubergiste-cle-ok");
     apply(pick("aubergiste-cle-ok", "Prendre", flags));
     expect(flags).toContain("cle-crypte");
+    // la porte résiste tant que l'enquête n'est pas faite
+    expect(availableChoices(scenes.crypte, flags).some((c) => c.choice.text.startsWith("Ouvrir"))).toBe(false);
+    expect(sceneText(scenes.crypte, flags).join(" ")).toContain("Josette");
+    flags = [...flags, "indice-moulin", "indice-ferme", "defeated:bandit-1"];
     apply(pick("crypte", "Ouvrir avec la clé", flags));
     expect(flags).toContain("crypte-ouverte");
     // le Maire ne propose pas encore le retour : la goule n'est pas vaincue
@@ -168,12 +172,34 @@ describe("aventure complète", () => {
     expect(pere.next).toBe("aubergiste-pere");
     apply(pick("aubergiste-pere", "Prendre la clé", flags));
     expect(flags).toEqual(expect.arrayContaining(["cle-crypte", "histoire-pere"]));
+    // l'enquête : meunière (traces), fermier (le loup d'abord), pillard du cimetière (il se rend)
+    expect(availableChoices(scenes.crypte, flags).some((c) => c.choice.text.startsWith("Ouvrir"))).toBe(false);
+    apply(pick("meuniere", "La maire m'envoie", flags));
+    const traces = pick("meuniere-recit", "Examiner", flags, 5, roll(10)); // 10 + 5 ≥ 12
+    expect(traces.next).toBe("meuniere-traces");
+    apply(pick("meuniere-traces", "Remercier", flags));
+    expect(flags).toEqual(expect.arrayContaining(["indice-moulin", "traces-bottes"]));
+    apply(pick("fermier", "Que s'est-il passé", flags));
+    apply(pick("fermier-loup", "Je m'en occupe", flags));
+    expect(flags).toContain("loup-signale");
+    expect(availableChoices(scenes.fermier, flags).some((c) => c.choice.text.startsWith("Le loup de la forêt"))).toBe(false);
+    flags = [...flags, "defeated:wolf-1"];
+    apply(pick("fermier", "Le loup de la forêt", flags));
+    expect(flags).toContain("indice-ferme");
+    expect(gold).toBe(10);
+    const aveu = pick("tombe", "Le prendre au dépourvu", flags, 5, roll(12)); // 12 + 5 ≥ 14
+    expect(aveu.next).toBe("tombe-aveu");
+    expect(aveu.defeated).toEqual(["bandit-1"]);
+    expect(aveu.items).toEqual({ "pendentif-gedeon": 1 });
+    apply(aveu);
+    expect(flags).toEqual(expect.arrayContaining(["defeated:bandit-1", "pillard-avoue"]));
     apply(pick("crypte", "Ouvrir avec la clé", flags));
+    expect(flags).toContain("crypte-ouverte");
     apply(pick("journal", "Lire", flags));
     apply(pick("journal-lecture", "Refermer", flags));
     expect(flags).toContain("journal-lu");
     apply(pick("coffre", "Prendre la bourse", flags));
-    expect(gold).toBe(30);
+    expect(gold).toBe(40);
     expect(flags).toContain("coffre-pris");
     const sceau = pick("sceau", "Réciter", flags); // sans test : la prière du journal suffit
     expect(sceau.check).toBeUndefined();
@@ -186,9 +212,30 @@ describe("aventure complète", () => {
     expect(flags).toEqual(expect.arrayContaining(["goule-apaisee", "defeated:ghoul-1"]));
     // l'autel n'est plus utile, la maire conclut avec le texte du gardien
     expect(sceneText(scenes["maire-fin"], flags).join(" ")).toContain("Gédéon");
+    // le pendentif : rendu à Thibaud (le choix n'existe qu'avec l'objet)
+    expect(availableChoices(scenes.aubergiste, flags, { gold: 0, items: {} }).some((c) => c.choice.text.startsWith("Je crois avoir"))).toBe(false);
+    const rendu = resolveChoice(scenes["aubergiste-pendentif"], 0, flags, bonus(0), roll(15), { gold: 0, items: { "pendentif-gedeon": 1 } });
+    expect(rendu.items).toEqual({ "pendentif-gedeon": -1 });
+    apply(rendu);
+    expect(flags).toContain("pendentif-rendu");
+    expect(gold).toBe(65);
     apply(pick("maire", "Je reviens", flags));
     expect(flags).toContain("quete-terminee");
-    expect(gold).toBe(50);
+    expect(gold).toBe(85);
+  });
+  it("le pillard peut être affronté, et un échec à l'intimidation déclenche le combat ; la tombe se fouille après sa défaite", () => {
+    expect(pick("tombe", "L'affronter", []).fight).toMatchObject({ encounterId: "pillard", enemy: "bandit-1" });
+    const ko = pick("tombe", "Le prendre au dépourvu", [], 0, roll(3));
+    expect(ko.next).toBe("tombe-alerte");
+    expect(ko.defeated).toEqual([]);
+    expect(pick("tombe-alerte", "Se battre", []).fight).toMatchObject({ encounterId: "pillard", enemy: "bandit-1" });
+    // une fois vaincu, plus de combat à la tombe
+    expect(availableChoices(scenes.tombe, ["defeated:bandit-1"]).map((c) => c.choice.text)).toEqual(["Examiner le tunnel.", "S'éloigner."]);
+  });
+  it("le fermier attend la mort du loup avant de parler du cimetière", () => {
+    expect(availableChoices(scenes.fermier, ["loup-signale"]).some((c) => c.choice.text.startsWith("Le loup de la forêt"))).toBe(false);
+    const done = availableChoices(scenes.fermier, ["loup-signale", "defeated:wolf-1"]).find((c) => c.choice.text.startsWith("Le loup de la forêt"));
+    expect(done).toBeTruthy();
   });
   it("sans le journal, la prière du repos n'est pas proposée ; l'échec du jet réveille la goule", () => {
     expect(availableChoices(scenes.autel, []).some((c) => c.choice.text.startsWith("Réciter"))).toBe(false);
