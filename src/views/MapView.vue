@@ -56,6 +56,7 @@
         <li><span class="spot sm">!</span> Lieu ou personnage à qui parler (sur une porte : quelqu'un à l'intérieur)</li>
         <li><span class="swatch locked-sw"></span> Passage verrouillé</li>
         <li><span class="swatch enemy-sw"></span> Ennemi (socle rouge)</li>
+        <li><span class="swatch folk-sw"></span> Habitant ou animal (socle gris) : touchez-le pour l'écouter</li>
         <li><span class="swatch hero-sw"></span> Vous (socle bleu)</li>
         <li><span class="swatch fog-sw"></span> Zone inexplorée</li>
       </ul>
@@ -72,14 +73,15 @@
 
 <script setup lang="ts">
 import {
-  IonBackButton, IonButton, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, onIonViewWillEnter, useIonRouter,
+  IonBackButton, IonButton, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, onIonViewWillEnter, onIonViewWillLeave, useIonRouter,
 } from "@ionic/vue";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import Sprite from "../components/Sprite.vue";
 import { ENCOUNTERS } from "../data/encounters";
 import { artKey } from "../data/illustrations";
-import { NPC_SPRITES, heroSpriteKey, npcSpriteKey } from "../ui/sprites";
+import { NPC_SPRITES, folkSpriteKey, heroSpriteKey, npcSpriteKey } from "../ui/sprites";
+import { folkLine, folkStep, startFolk, type FolkPos } from "../engine/folk";
 import { MAP_BY_ID } from "../data/maps";
 import { MONSTERS } from "../data/monsters";
 import {
@@ -144,12 +146,35 @@ const doorHint = (x: number, y: number) => {
   return sp && !visible.value.has(`${sp.x},${sp.y}`) ? `${sp.label} : entrez par cette porte` : "";
 };
 const heroMoving = ref(false);
+
+// --- habitants qui se promènent : décor vivant, ils ne gênent pas la marche
+const folkPos = ref<FolkPos[]>([]);
+const folkDef = (id: string) => (map.value.folk ?? []).find((f) => f.id === id);
+watch(() => map.value.id, () => { folkPos.value = startFolk(map.value); }, { immediate: true });
+let folkTimer: ReturnType<typeof setInterval> | undefined;
+function folkTick() {
+  if (!ex.value) return;
+  const avoid: Cell[] = [{ x: ex.value.x, y: ex.value.y }, ...liveSpots(map.value, flags.value), ...livingEnemies(map.value, ex.value)];
+  folkPos.value = folkStep(map.value, folkPos.value, avoid, Math.random);
+}
+const startFolkTimer = () => { if (!folkTimer && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) folkTimer = setInterval(folkTick, 1300); };
+const stopFolkTimer = () => { if (folkTimer) { clearInterval(folkTimer); folkTimer = undefined; } };
+onIonViewWillEnter(startFolkTimer);
+onIonViewWillLeave(stopFolkTimer);
+onBeforeUnmount(stopFolkTimer);
+startFolkTimer();
+/** Habitant visible sur cette case : le toucher le fait parler. */
+const folkAt = (x: number, y: number) => folkPos.value.find((f) => f.x === x && f.y === y && visible.value.has(`${x},${y}`));
 const actors = computed(() => {
   if (!ex.value || !character.value) return [];
   const foes = livingEnemies(map.value, ex.value)
     .filter((e) => visible.value.has(key(e)))
     .map((e) => ({ id: e.id, kind: "enemy" as const, x: e.x, y: e.y, sprite: monsterOf(e.encounterId).art, name: monsterOf(e.encounterId).name }));
+  const villagers = folkPos.value
+    .filter((f) => visible.value.has(key(f)))
+    .map((f) => { const d = folkDef(f.id)!; return { id: f.id, kind: "folk" as const, x: f.x, y: f.y, sprite: folkSpriteKey(d.sprite), name: d.name }; });
   return [
+    ...villagers,
     ...foes,
     { id: "hero", kind: "hero" as const, x: ex.value.x, y: ex.value.y, sprite: heroSpriteKey(character.value.species.id, character.value.classDef.id), name: character.value.name },
   ];
@@ -186,6 +211,13 @@ onIonViewWillEnter(() => { pending.value = null; });
 function tap(x: number, y: number) {
   if (!ex.value || !character.value) return;
   if (walking) { cancel = true; pending.value = null; return; }
+  const talker = folkAt(x, y);
+  if (talker) {
+    const d = folkDef(talker.id)!;
+    pending.value = null;
+    message.value = `${d.name} : ${folkLine(d, Math.random)}`;
+    return;
+  }
   const target: Cell = { x, y };
   if (pending.value && pending.value.target.x === x && pending.value.target.y === y) {
     pending.value = null;
@@ -292,6 +324,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .actor.hero::before { content: ""; position: absolute; left: 50%; top: 50%; width: 160px; height: 160px; margin: -80px 0 0 -80px; border-radius: 50%; background: radial-gradient(circle, #ffd37a55 0, #ffd37a00 70%); }
 .actor.hero .base { box-shadow: 0 0 0 2px #4aa3ff; }
 .actor.enemy .base { box-shadow: 0 0 0 2px #e0554f; }
+.actor.folk .base { box-shadow: 0 0 0 1.5px #9aa0a8; }
 @keyframes idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
 @keyframes step { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-3px) rotate(2deg); } }
 @media (prefers-reduced-motion: reduce) { .actor { transition: none; } .actor :deep(.sprite) { animation: none !important; } }
@@ -309,6 +342,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
 .locked-sw { background: #7a4a22; box-shadow: inset 0 0 0 3px #c0392b; }
 .enemy-sw { background: #f44; border-radius: 50%; }
+.folk-sw { background: #9aa0a8; border-radius: 50%; }
 .hero-sw { background: #4aa3ff; border-radius: 50%; }
 .fog-sw { background: #000; border: 1px solid #888; }
 .message { min-height: 1.4em; margin: 10px 0 0; }
