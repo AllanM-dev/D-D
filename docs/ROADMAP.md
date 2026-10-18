@@ -53,6 +53,7 @@
 - [x] Apparence (lot 2) : personnages 2D (héros par espèce et classe, 10 monstres, 4 PNJ), socles d'équipe, barres de PV en combat
 - [x] Ennemis qui poursuivent le héros sur la carte quand ils le voient (vitesse propre, embuscade au contact)
 - [x] Attaque à distance depuis la carte : bouton « Attaquer d'ici », arme à distance choisie d'office quand la cible est trop loin
+- [x] Première quête allongée : enquête au village avant la crypte (meunière, fermier et son loup, pillard du cimetière), pendentif à rendre à l'aubergiste
 - [x] Village agrandi (34 × 24 cases) et vivant : quartier du marché, moulin, fermes, cimetière, puits, clôtures ; 12 habitants et animaux qui se promènent et parlent
 - [x] Apparence (lot 3) : maisons du village à toit de tuiles et planchers de bois, animations (marche du héros, approche des ennemis, coup reçu, chute), aperçu du personnage à la création et sur la fiche
 - [ ] Confort : mode sombre/clair réglable, tailles de texte, sauvegarde dans le nuage

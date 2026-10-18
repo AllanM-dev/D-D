@@ -120,6 +120,7 @@ export const MAPS: readonly MapDef[] = [
     enemies: [
       { id: "wolf-1", encounterId: "wolf", x: 4, y: 2 },
       { id: "goblin-1", encounterId: "goblin", x: 15, y: 8, loot: { gold: 6, items: { "weapon:scimitar": 1 } } },
+      { id: "bandit-1", encounterId: "pillard", x: 18, y: 18, loot: { gold: 12, items: { "pendentif-gedeon": 1 } } },
       { id: "skeleton-1", encounterId: "skeleton", x: 17, y: 9, loot: { gold: 4, items: { gem: 1, "weapon:shortsword": 1 } } },
     ],
     spots: [
@@ -127,6 +128,9 @@ export const MAPS: readonly MapDef[] = [
       { id: "aubergiste", x: 11, y: 10, door: { x: 10, y: 8 }, label: "Thibaud, l'aubergiste", story: "brumeval", scene: "aubergiste" },
       { id: "crypte", x: 17, y: 11, label: "Porte de la crypte", story: "brumeval", scene: "crypte", hiddenWhen: "crypte-ouverte" },
       { id: "leo", x: 19, y: 6, label: "Léo, fils du meunier", story: "brumeval", scene: "leo" },
+      { id: "meuniere", x: 26, y: 3, door: { x: 26, y: 5 }, label: "Josette, la meunière", story: "brumeval", scene: "meuniere" },
+      { id: "fermier", x: 31, y: 14, door: { x: 30, y: 16 }, label: "Hugues, le fermier", story: "brumeval", scene: "fermier" },
+      { id: "tombe", x: 15, y: 18, label: "Tombe éventrée", story: "brumeval", scene: "tombe" },
       { id: "forge", x: 5, y: 12, door: { x: 4, y: 10 }, label: "Maëlle, la forgeronne", story: "brumeval", scene: "forge" },
     ],
     folk: [
@@ -138,10 +142,9 @@ export const MAPS: readonly MapDef[] = [
       { id: "garde-1", sprite: "garde", name: "Une garde du village", x: 19, y: 9, roam: { x0: 17, y0: 8, x1: 19, y1: 10 }, lines: ["« Halte-là… ah, vous êtes l'aventurier dont parle la maire. Soyez prudent près de la crypte. »", "« Je surveille le pont. Pas un loup ne passera tant que je serai là. »"] },
       { id: "marchande-1", sprite: "marchande", name: "Berthe, la marchande de légumes", x: 25, y: 9, roam: { x0: 23, y0: 8, x1: 29, y1: 9 }, lines: ["« Carottes fraîches, navets bien gras ! Rien pour un aventurier ? »", "« Mon étal tient bon depuis trente ans, ce n'est pas un squelette qui me fera fermer. »"] },
       { id: "marchand-1", sprite: "marchand", name: "Orso, le marchand de fruits", x: 27, y: 10, roam: { x0: 25, y0: 8, x1: 29, y1: 11 }, lines: ["« Pommes de la vallée ! Croquez-en une, c'est la maison qui offre… pour le premier qui parle. »", "« Les affaires sont mauvaises depuis que les gens ont peur de la nuit. »"] },
-      { id: "paysan-1", sprite: "paysan", name: "Hugues, le fermier", x: 26, y: 15, roam: { x0: 24, y0: 13, x1: 27, y1: 17 }, lines: ["« La récolte sera bonne, si les loups restent loin de mes poules. »", "« Mon grand-père disait que la crypte n'est pas faite pour les vivants. »"] },
+      { id: "paysan-1", sprite: "paysan", name: "Un ouvrier agricole", x: 26, y: 15, roam: { x0: 24, y0: 13, x1: 27, y1: 17 }, lines: ["« La récolte sera bonne, si les loups restent loin de mes poules. »", "« Mon grand-père disait que la crypte n'est pas faite pour les vivants. »"] },
       { id: "poule-1", sprite: "poule", name: "Une poule", x: 24, y: 19, roam: { x0: 23, y0: 19, x1: 32, y1: 22 }, lines: ["Cot cot cot !"] },
       { id: "poule-2", sprite: "poule", name: "Une poule", x: 30, y: 20, roam: { x0: 23, y0: 19, x1: 32, y1: 22 }, lines: ["La poule vous regarde d'un œil torve, puis picore le sol."] },
-      { id: "paysanne-2", sprite: "paysanne", name: "Josette, la meunière", x: 27, y: 6, roam: { x0: 24, y0: 6, x1: 30, y1: 7 }, lines: ["« Mon mari est au moulin, il moud jusqu'au soir. Léo est parti traîner près de la rivière, encore. »"] },
     ],
     locks: [{ x: 17, y: 11, flag: "crypte-ouverte" }],
     exits: [{ x: 17, y: 11, label: "Descendre dans la crypte", to: { map: "crypte", x: 3, y: 1 } }],
