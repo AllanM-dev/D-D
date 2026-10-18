@@ -46,6 +46,17 @@
           </ion-item>
         </ion-list>
 
+        <h3>Capacités de niveau 2</h3>
+        <ion-list inset>
+          <ion-item v-for="f in LEVEL2_FEATURES[cls.id] ?? []" :key="f.name" lines="full">
+            <ion-label class="ion-text-wrap">
+              <h2>{{ f.name }}</h2>
+              <p>{{ f.text }}</p>
+              <p class="status" :class="f.status"><strong>{{ FEATURE_STATUS_LABEL[f.status] }}.</strong> {{ f.note }}</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+
         <template v-if="cls.id === 'fighter'">
           <h3>Styles de combat disponibles</h3>
           <ion-list inset>
@@ -250,6 +261,7 @@ import { BACKGROUNDS } from "../data/backgrounds";
 import { CLASSES } from "../data/classes";
 import { ARMORS, CLASS_TRAINING, WEAPONS, WEAPON_MASTERY, type Kit } from "../data/equipment";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
+import { LEVEL2_FEATURES } from "../data/levels";
 import {
   ARMOR_KIND_TEXT, ARMOR_TRAINING_TEXT, BACKGROUND_TEXT, CLASS_FEATURE_TEXT, FEAT_TEXT, FEATURE_STATUS, FEATURE_STATUS_LABEL, SPECIES_TRAIT_TEXT,
   WEAPON_PROPERTY_TEXT, WEAPON_TRAINING_TEXT,

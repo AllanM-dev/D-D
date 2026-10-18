@@ -183,6 +183,8 @@
       <div v-else-if="finished" class="result" :class="state.status">
         <h2>{{ state.status === "victory" ? "Victoire !" : "Défaite…" }}</h2>
         <p v-if="lootText && state.status === 'victory'" class="loot">Butin : {{ lootText }}</p>
+        <p v-if="xpGained && state.status === 'victory'" class="loot">Expérience : +{{ xpGained }} points.</p>
+        <ion-button v-if="canLevel && state.status === 'victory'" expand="block" color="success" :router-link="`/levelup/${characterId}`">Monter au niveau {{ (character?.level ?? 1) + 1 }}</ion-button>
         <template v-if="fromStory">
           <p v-if="state.status === 'defeat'" class="hint">Vous perdez connaissance… (1 PV).</p>
           <ion-button expand="block" :router-link="continueStory">Continuer l'histoire</ion-button>
@@ -229,6 +231,7 @@ import { characterToCombatant } from "../engine/attacks";
 import { defeatEnemy, livingEnemies as mapEnemies, retreatToStart } from "../engine/exploration";
 import { applyEffects } from "../engine/story";
 import { changeItems, describeLoot, enemyLoot, inventoryOf, potionsLeft } from "../engine/inventory";
+import { canLevelUp } from "../engine/levelup";
 import { vitalsAfterCombat, vitalsOf } from "../engine/rest";
 import {
   attackCheck, type TargetCheck, conditionName, currentCombatant, planMove, playerAttack, playerBreakFree, playerDash, playerDisengage, playerDodge, playerEndTurn, playerMove,
@@ -424,6 +427,7 @@ watch(() => state.value?.status, (st) => {
   if (left !== undefined) store.setInventory(character.value.id, changeItems(inventoryOf(character.value), { "healing-potion": left - (character.value.inventory?.["healing-potion"] ?? 0) }));
   // Butin de l'ennemi vaincu.
   lootText.value = "";
+  xpGained.value = 0;
   if ((fromMap.value || fromStory.value) && st === "victory" && enemyParam.value) {
     // Tous les ennemis ont fui : personne n'a été vaincu, donc pas de butin.
     const allFled = state.value!.combatants.filter((c) => c.side === "enemies").every((c) => c.fled);
@@ -434,6 +438,11 @@ watch(() => state.value?.status, (st) => {
       store.addLoot(character.value.id, loot);
     }
   }
+  // Expérience : seulement pour les ennemis vaincus d'un combat de l'aventure (pas l'entraînement, pas les fuyards).
+  if ((fromMap.value || fromStory.value) && st === "victory") {
+    const gained = state.value!.combatants.filter((x) => x.side === "enemies" && x.dead && !x.fled).reduce((n, x) => n + (x.xp ?? 0), 0);
+    if (gained > 0) { xpGained.value = gained; store.addExperience(character.value.id, gained); }
+  }
   // L'ennemi vaincu laisse un drapeau dans l'histoire (`defeated:<id>`).
   if ((fromMap.value || fromStory.value) && st === "victory" && enemyParam.value) {
     store.setStory(character.value.id, { flags: applyEffects(character.value.story?.flags ?? [], { defeat: [enemyParam.value] }).flags, gold: 0 });
@@ -441,6 +450,8 @@ watch(() => state.value?.status, (st) => {
 });
 // Rencontre lancée depuis la carte : le combat démarre tout de suite.
 const lootText = ref("");
+const xpGained = ref(0);
+const canLevel = computed(() => !!character.value && canLevelUp(character.value));
 const fromMap = computed(() => route.query.from === "map");
 const fromStory = computed(() => route.query.from === "story");
 const continueStory = computed(() => {

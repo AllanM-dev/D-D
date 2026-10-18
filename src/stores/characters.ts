@@ -11,13 +11,14 @@ import type { Loot } from "../data/items";
 import type { LoadoutPatch } from "../engine/loadout";
 import { exportSave, mergeCharacters, parseSave } from "../engine/savefile";
 import { changeItems, inventoryOf } from "../engine/inventory";
+import { addXp, migrateXp } from "../engine/levelup";
 
 const KEY = "dd-mobile.characters";
 
 function load(): Character[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Character[]).map((c) => migrateMasteries(migrateSpells(migrateCharacter(c)))) : [];
+    return raw ? (JSON.parse(raw) as Character[]).map((c) => migrateXp(migrateMasteries(migrateSpells(migrateCharacter(c))))) : [];
   } catch {
     return [];
   }
@@ -44,13 +45,24 @@ export const useCharacters = defineStore("characters", () => {
     if (c) { c.exploration = JSON.parse(JSON.stringify(e)); persist(); }
   };
   /** Enregistre les drapeaux de l'histoire, l'or et les objets gagnés ou dépensés. */
-  const setStory = (id: string, a: Pick<Applied, "flags" | "gold"> & { items?: Record<string, number> }) => {
+  const setStory = (id: string, a: Pick<Applied, "flags" | "gold"> & { items?: Record<string, number>; xp?: number }) => {
     const c = list.value.find((x) => x.id === id);
     if (!c) return;
     c.story = { flags: [...a.flags] };
+    if (a.xp) c.xp = (c.xp ?? 0) + a.xp;
     if (a.gold) c.equipment.gold = Math.max(0, c.equipment.gold + a.gold);
     if (a.items && Object.keys(a.items).length) c.inventory = changeItems(inventoryOf(c), a.items);
     persist();
+  };
+  /** Ajoute de l'expérience (le niveau ne change qu'à la demande du joueur, voir `levelUpCharacter`). */
+  const addExperience = (id: string, amount: number) => {
+    const i = list.value.findIndex((c) => c.id === id);
+    if (i >= 0 && amount > 0) { list.value[i] = addXp(list.value[i], amount); persist(); }
+  };
+  /** Remplace un personnage par sa version de niveau supérieur. */
+  const replace = (c: Character) => {
+    const i = list.value.findIndex((x) => x.id === c.id);
+    if (i >= 0) { list.value[i] = c; persist(); }
   };
   /** Ajoute un butin (or et objets) au personnage. */
   const addLoot = (id: string, loot: Loot) => {
@@ -90,7 +102,7 @@ export const useCharacters = defineStore("characters", () => {
   };
   const get = (id: string) => list.value.find((c) => c.id === id);
 
-  return { list, add, remove, get, setVitals, setExploration, setStory, addLoot, setInventory, applyLoadout, exportAll, importAll };
+  return { list, add, remove, get, addExperience, replace, setVitals, setExploration, setStory, addLoot, setInventory, applyLoadout, exportAll, importAll };
 });
 
 export function newId(): string {

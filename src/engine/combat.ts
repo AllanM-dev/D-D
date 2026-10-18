@@ -183,6 +183,8 @@ export interface Combatant {
   innateSorcery: boolean;
   innateUntilRound: number;
   turnState: TurnState;
+  /** Expérience que vaut ce monstre s'il est vaincu. */
+  xp?: number;
   /** Clé d'illustration (`class:fighter`, `monster:goblin`…). */
   art?: string;
   /** Clé du personnage 2D affiché sur les cartes (`hero:elf:wizard`, `monster:goblin`). */
@@ -288,7 +290,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "sprite" | "dangerSense" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor" | "sneakDice" | "traits">>;
+  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "sprite" | "dangerSense" | "xp" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor" | "sneakDice" | "traits">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */

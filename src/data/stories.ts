@@ -22,6 +22,8 @@ export interface Effects {
   gold?: number;
   /** Objets gagnés (quantité positive) ou perdus (négative) : identifiant → quantité. */
   items?: Record<string, number>;
+  /** Points d'expérience gagnés. */
+  xp?: number;
   /** Ennemis de la carte qui disparaissent (identifiants de la carte) : ils laissent le drapeau `defeated:<id>`. */
   defeat?: string[];
 }
@@ -88,8 +90,8 @@ const maire: Scene[] = [
     choices: [
       { text: "J'accepte d'enquêter sur la crypte.", requires: { notFlags: ["quete-acceptee"] }, goto: "maire-accepte", set: ["quete-acceptee"] },
       { text: "Que pouvez-vous m'offrir pour ce service ?", requires: { notFlags: ["quete-acceptee", "recompense-negociee"] }, goto: "maire-prix" },
-      { text: "Je reviens de la crypte : la menace est écartée.", requires: { flags: ["defeated:ghoul-1", "recompense-haute"], notFlags: ["quete-terminee"] }, goto: "maire-fin", set: ["quete-terminee"], gold: 50 },
-      { text: "Je reviens de la crypte : la menace est écartée.", requires: { flags: ["defeated:ghoul-1"], notFlags: ["quete-terminee", "recompense-haute"] }, goto: "maire-fin", set: ["quete-terminee"], gold: 20 },
+      { text: "Je reviens de la crypte : la menace est écartée.", requires: { flags: ["defeated:ghoul-1", "recompense-haute"], notFlags: ["quete-terminee"] }, goto: "maire-fin", set: ["quete-terminee"], gold: 50, xp: 100 },
+      { text: "Je reviens de la crypte : la menace est écartée.", requires: { flags: ["defeated:ghoul-1"], notFlags: ["quete-terminee", "recompense-haute"] }, goto: "maire-fin", set: ["quete-terminee"], gold: 20, xp: 100 },
       { text: "Où trouver la clé de la crypte ?", requires: { flags: ["quete-acceptee"], notFlags: ["cle-crypte"] }, goto: "maire-cle" },
       { text: "Je vous laisse.", end: true },
     ],
@@ -210,7 +212,7 @@ const aubergiste: Scene[] = [
       { requires: { flags: ["defeated:ghoul-1"] }, text: ["« Alors même après… il a continué à veiller sur nous. »"] },
       { requires: { flags: ["cle-crypte"], notFlags: ["defeated:ghoul-1"] }, text: ["« Si vous descendez, dites-lui que j'ai son pendentif. Dites-lui que je ne l'ai pas oublié. »"] },
     ],
-    choices: [{ text: "Accepter la bourse qu'il vous presse dans la main.", requires: { items: ["pendentif-gedeon"] }, goto: "aubergiste", set: ["pendentif-rendu"], gold: 25, items: { "pendentif-gedeon": -1 } }],
+    choices: [{ text: "Accepter la bourse qu'il vous presse dans la main.", requires: { items: ["pendentif-gedeon"] }, goto: "aubergiste", set: ["pendentif-rendu"], gold: 25, xp: 25, items: { "pendentif-gedeon": -1 } }],
   },
   {
     id: "aubergiste-indice",
@@ -347,14 +349,14 @@ const moulin: Scene[] = [
     ],
     choices: [
       { text: "Examiner le sol de la cour.", check: { skill: "perception", dc: 12, success: "meuniere-traces", failure: "meuniere-rien" } },
-      { text: "Remercier Josette.", goto: "meuniere", set: ["indice-moulin"] },
+      { text: "Remercier Josette.", goto: "meuniere", set: ["indice-moulin"], xp: 25 },
     ],
   },
   {
     id: "meuniere-traces",
     title: "Josette, la meunière",
     text: ["Dans la boue séchée, des empreintes de bottes à gros clous, profondes : un homme chargé, qui traînait un peu la jambe gauche. Elles repartent vers le pont, puis vers le sud. Ce n'est pas une créature de la crypte, mais bien quelqu'un de vivant."],
-    choices: [{ text: "Remercier Josette.", goto: "meuniere", set: ["indice-moulin", "traces-bottes"] }],
+    choices: [{ text: "Remercier Josette.", goto: "meuniere", set: ["indice-moulin", "traces-bottes"], xp: 25 }],
   },
   {
     id: "meuniere-rien",
@@ -383,7 +385,7 @@ const ferme: Scene[] = [
     ],
     choices: [
       { text: "Que s'est-il passé ici ?", requires: { notFlags: ["loup-signale"] }, goto: "fermier-loup" },
-      { text: "Le loup de la forêt ne fera plus de mal à vos bêtes.", requires: { flags: ["defeated:wolf-1", "loup-signale"], notFlags: ["indice-ferme"] }, goto: "fermier-merci", gold: 10, set: ["indice-ferme"] },
+      { text: "Le loup de la forêt ne fera plus de mal à vos bêtes.", requires: { flags: ["defeated:wolf-1", "loup-signale"], notFlags: ["indice-ferme"] }, goto: "fermier-merci", gold: 10, xp: 25, set: ["indice-ferme"] },
       { text: "Je repasserai.", end: true },
     ],
   },
@@ -419,7 +421,7 @@ const cimetiere: Scene[] = [
     ],
     choices: [
       { text: "L'affronter.", requires: { notFlags: ["defeated:bandit-1"] }, fight: { encounterId: "pillard", enemy: "bandit-1", win: "tombe-victoire", lose: "tombe-defaite" } },
-      { text: "Le prendre au dépourvu et lui ordonner de se rendre.", requires: { notFlags: ["defeated:bandit-1"] }, check: { skill: "intimidation", dc: 14, success: "tombe-aveu", failure: "tombe-alerte", onSuccess: { defeat: ["bandit-1"], set: ["pillard-avoue"], items: { "pendentif-gedeon": 1 } } } },
+      { text: "Le prendre au dépourvu et lui ordonner de se rendre.", requires: { notFlags: ["defeated:bandit-1"] }, check: { skill: "intimidation", dc: 14, success: "tombe-aveu", failure: "tombe-alerte", onSuccess: { defeat: ["bandit-1"], set: ["pillard-avoue"], xp: 25, items: { "pendentif-gedeon": 1 } } } },
       { text: "Examiner le tunnel.", goto: "tombe-tunnel" },
       { text: "S'éloigner.", end: true },
     ],
@@ -524,7 +526,7 @@ const crypteInterieur: Scene[] = [
       "Elle ne vous a pas encore remarqué. Devant vous, un petit autel, couvert de cire fondue, semble attendre une prière.",
     ],
     choices: [
-      { text: "Réciter la prière du repos.", requires: { flags: ["journal-lu"] }, check: { skill: "religion", dc: 13, success: "autel-paix", failure: "autel-colere", onSuccess: { set: ["goule-apaisee"], defeat: ["ghoul-1"] } } },
+      { text: "Réciter la prière du repos.", requires: { flags: ["journal-lu"] }, check: { skill: "religion", dc: 13, success: "autel-paix", failure: "autel-colere", onSuccess: { set: ["goule-apaisee"], defeat: ["ghoul-1"], xp: 200 } } },
       { text: "Réveiller la créature et se battre.", fight: { encounterId: "ghoul", enemy: "ghoul-1", win: "autel-victoire", lose: "autel-defaite" } },
       { text: "Reculer silencieusement.", end: true },
     ],

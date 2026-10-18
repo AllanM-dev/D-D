@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MAPS, MAP_BY_ID } from "../../data/maps";
+import { ENCOUNTERS } from "../../data/encounters";
+import { MONSTERS } from "../../data/monsters";
 import { STORIES, STORY_BY_ID, type Scene } from "../../data/stories";
 import { liveSpots, lockedCells, parseMap, planPath, startExploration, stepTo, validateMap } from "../exploration";
 import {
@@ -304,5 +306,45 @@ describe("portes des personnages du village", () => {
     expect(validateMap(m)).toEqual([]);
     const bad = { ...m, spots: m.spots!.map((s) => (s.id === "maire" ? { ...s, door: { x: 9, y: 6 } } : s)) };
     expect(validateMap(bad).join(" ")).toContain("la porte de maire n'est pas une porte");
+  });
+});
+
+describe("expérience de l'histoire", () => {
+  const scenes = story.scenes;
+  const xpOfChoice = (scene: string, text: string, flags: string[] = [], r: Rng = roll(15), wallet = { gold: 0, items: { "pendentif-gedeon": 1 } }) => {
+    const i = scenes[scene].choices.findIndex((c) => c.text.startsWith(text));
+    expect(i, `${scene} / ${text}`).toBeGreaterThanOrEqual(0);
+    return resolveChoice(scenes[scene], i, flags, bonus(5), r, wallet).xp;
+  };
+  it("chaque étape de la quête rapporte de l'expérience, une seule fois", () => {
+    expect(xpOfChoice("meuniere-recit", "Remercier")).toBe(25);
+    expect(xpOfChoice("meuniere-traces", "Remercier")).toBe(25);
+    expect(xpOfChoice("fermier", "Le loup de la forêt", ["defeated:wolf-1", "loup-signale"])).toBe(25);
+    expect(xpOfChoice("aubergiste-pendentif", "Accepter", ["pendentif-gedeon"])).toBe(25);
+    expect(xpOfChoice("maire", "Je reviens", ["defeated:ghoul-1", "recompense-haute"])).toBe(100);
+    const last = scenes.maire.choices.map((c) => c.text.startsWith("Je reviens")).lastIndexOf(true);
+    expect(resolveChoice(scenes.maire, last, ["defeated:ghoul-1"], bonus(0), roll(15)).xp).toBe(100);
+    // ces choix ne se reproposent pas une fois les drapeaux posés
+    expect(availableChoices(scenes["meuniere-recit"], ["indice-moulin"]).length).toBeGreaterThan(0);
+    expect(availableChoices(scenes.meuniere, ["quete-acceptee", "indice-moulin"]).some((c) => c.choice.text.startsWith("La maire m'envoie"))).toBe(false);
+    expect(availableChoices(scenes.fermier, ["defeated:wolf-1", "loup-signale", "indice-ferme"]).some((c) => c.choice.text.startsWith("Le loup de la forêt"))).toBe(false);
+  });
+  it("apaiser la goule par la prière vaut autant que la vaincre ; faire céder le pillard rapporte aussi", () => {
+    const prayer = resolveChoice(scenes.autel, 0, ["journal-lu"], bonus(5), roll(10));
+    expect(prayer.xp).toBe(200);
+    const ghoul = MONSTERS.find((m) => m.id === "ghoul")!;
+    expect(ghoul.xp).toBe(200);
+    const aveu = resolveChoice(scenes.tombe, scenes.tombe.choices.findIndex((c) => c.text.startsWith("Le prendre")), [], bonus(5), roll(12));
+    expect(aveu.xp).toBe(25);
+    const echec = resolveChoice(scenes.tombe, scenes.tombe.choices.findIndex((c) => c.text.startsWith("Le prendre")), [], bonus(0), roll(2));
+    expect(echec.xp).toBe(0);
+  });
+  it("l'expérience totale de l'aventure permet de passer au niveau 2", () => {
+    const monsters = ["wolf-1", "goblin-1", "skeleton-1", "bandit-1", "rat-1", "zombie-1", "ghoul-1"].reduce((n, id) => {
+      const e = MAPS.flatMap((m) => m.enemies).find((x) => x.id === id)!;
+      const enc = ENCOUNTERS.find((x) => x.id === e.encounterId)!;
+      return n + enc.monsters.reduce((s, q) => s + q.count * MONSTERS.find((m) => m.id === q.monsterId)!.xp, 0);
+    }, 0);
+    expect(monsters + 25 + 25 + 25 + 25 + 100).toBeGreaterThanOrEqual(300);
   });
 });
