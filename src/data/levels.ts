@@ -30,7 +30,7 @@ export interface LevelFeature {
 /** Capacités de classe du niveau 2, par classe. */
 export const LEVEL2_FEATURES: Record<string, LevelFeature[]> = {
   barbarian: [
-    { name: "Attaque téméraire", text: "Avant votre première attaque du tour, vous pouvez frapper sans vous protéger : avantage à vos attaques de Force au corps à corps, mais aussi avantage aux attaques contre vous jusqu'à votre prochain tour.", status: "applied", note: "Proposée avant d'attaquer, sans coûter d'action." },
+    { name: "Attaque téméraire", text: "Avant votre première attaque du tour, vous pouvez frapper sans vous protéger : avantage à vos attaques de Force au corps à corps, mais aussi avantage aux attaques contre vous jusqu'à votre prochain tour.", status: "applied", note: "Proposée avant d'attaquer, sans coûter d'action ni d'action bonus." },
     { name: "Sens du danger", text: "Vous avez l'avantage aux jets de sauvegarde de Dextérité contre les pièges et les effets que vous voyez.", status: "applied", note: "Avantage à tous vos jets de sauvegarde de Dextérité tant que vous n'êtes pas neutralisé." },
   ],
   bard: [
@@ -45,7 +45,7 @@ export const LEVEL2_FEATURES: Record<string, LevelFeature[]> = {
     { name: "Compagnon sauvage", text: "Vous dépensez une utilisation de Forme sauvage pour lancer l'appel d'un familier.", status: "todo", note: "Pas encore jouable (pas de compagnon)." },
   ],
   fighter: [
-    { name: "Fougue", text: "Une fois par repos court, vous accomplissez une action de plus pendant votre tour.", status: "applied", note: "Proposée quand votre action est dépensée ; se recharge au repos court." },
+    { name: "Fougue", text: "Une fois par repos court, vous accomplissez une action de plus pendant votre tour.", status: "applied", note: "Proposée quand votre action est dépensée, sans coûter votre action bonus ; se recharge au repos court." },
     { name: "Esprit tactique", text: "Vous pouvez dépenser Second souffle pour ajouter 1d10 à un test de caractéristique raté.", status: "todo", note: "Pas encore appliqué (peu de tests de caractéristique en combat)." },
   ],
   monk: [

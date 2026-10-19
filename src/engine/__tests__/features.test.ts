@@ -4,7 +4,7 @@ import { computeEquipment, type EquipmentInput } from "../equipment";
 import { characterToCombatant } from "../attacks";
 import { buildCharacter } from "../character";
 import {
-  availableBonus, currentCombatant, getCombatant, healCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions,
+  BONUS_OPTION_IDS, FEATURE_LABELS, availableBonus, currentCombatant, getCombatant, healCombatant, playerAttack, playerDodge, playerEndTurn, playerOptions,
   processTurns, resolveAttack, startCombat, useFeature, type AttackDef, type CombatState, type CombatantInit, type FeatureUse,
 } from "../combat";
 import { featuresFor } from "../features";
@@ -41,6 +41,14 @@ describe("capacités par classe", () => {
   });
   it("chaque classe a une réponse (liste, éventuellement vide)", () => {
     for (const c of CLASSES) expect(Array.isArray(featuresFor(c.id))).toBe(true);
+  });
+  it("chaque option nommée a une fiche (sauf les réserves, qui ouvrent plusieurs options), et chaque fiche un nom", () => {
+    const reserves = ["cunning-action", "focus", "sorcery-points"];
+    expect([...BONUS_OPTION_IDS, ...reserves].sort()).toEqual(Object.keys(FEATURE_LABELS).sort());
+  });
+  it("chaque capacité donnée à une classe (niveaux 1 et 2) ouvre au moins une option", () => {
+    const opened = new Set<string>(["cunning-action", "focus", "sorcery-points", ...BONUS_OPTION_IDS]); // réserves : voir ci-dessus
+    for (const c of CLASSES) for (const f of featuresFor(c.id, 2, { CHA: 2 })) expect(opened.has(f.id), f.id).toBe(true);
   });
 });
 

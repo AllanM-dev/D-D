@@ -42,6 +42,9 @@ describe("Fougue (guerrier)", () => {
     useFeature(s, "action-surge", () => 0.5);
     expect(getCombatant(s, "h").turnState.action).toBe(false);
     expect(getCombatant(s, "h").features.find((f) => f.id === "action-surge")!.uses).toBe(0);
+    expect(getCombatant(s, "h").turnState.bonus).toBe(false); // l'action bonus reste libre
+    getCombatant(s, "h").hp -= 5;
+    expect(ids(s)).toContain("second-wind");
     playerAttack(s, "f", () => 0.5, 0); // une seconde action
     expect(ids(s)).not.toContain("action-surge");
   });
@@ -55,6 +58,8 @@ describe("Attaque téméraire et Sens du danger (barbare)", () => {
     useFeature(s, "reckless", () => 0.5);
     expect(me.reckless).toBe(true);
     expect(me.turnState.action).toBe(false); // ne coûte pas d'action
+    expect(me.turnState.bonus).toBe(false); // ni l'action bonus : la Rage reste possible
+    expect(ids(s)).toContain("rage");
     const foe = getCombatant(s, "f");
     const melee = me.attacks.find((a) => a.ability === "STR" && !a.ranged)!;
     const r = resolveAttack(s, me, foe, melee, () => 0.5);
