@@ -37,12 +37,14 @@ Avant de proposer une PR, relire l'Aide : chaque phrase est-elle encore vraie ? 
 ## Architecture
 - `src/engine/` : règles pures (dés, personnage, équipement, combat), sans dépendance à l'interface, testées avec Vitest. Le hasard est injecté (`Rng`).
 - `src/data/` : données (classes, espèces, historiques, armes, armures, équipements de départ, monstres, rencontres, textes d'aide), sans logique.
+- Sauvegardes : toute migration d'un ancien personnage passe par `migrate()` (`src/engine/migrate.ts`), utilisée au chargement et à l'import ; les copies profondes passent par `clone()` (`src/engine/clone.ts`).
 - `src/views/`, `src/components/`, `src/stores/` : interface Ionic et état Pinia ; elles appellent le moteur et ne réimplémentent jamais une règle.
 
 ## Vérifier son travail
 ```bash
 npm test && npm run typecheck && npm run build
 ```
+Le workflow `.github/workflows/ci.yml` lance les mêmes vérifications sur chaque PR : une PR rouge ne se fusionne pas.
 Pour tout changement d'interface, le tester aussi dans un navigateur au format mobile (390×844), parcours complet : un test vert ne prouve pas que l'écran fonctionne.
 
 ## Livraison

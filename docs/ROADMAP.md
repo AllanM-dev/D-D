@@ -3,7 +3,7 @@
 ## Jalon 0 — Fondations
 - [x] Scaffold Vue 3 + Ionic + Capacitor
 - [x] Moteur : dés, modificateurs, bonus de maîtrise, jets d20 (avantage/désavantage)
-- [ ] CI (typecheck + tests sur chaque PR)
+- [x] CI (typecheck + tests sur chaque PR)
 
 ## Jalon 1 — Personnage
 - [x] Création niveau 1 : espèce, classe, historique, caractéristiques (tableau standard, achat de points, tirage 4d6), bonus d'historique 2024, compétences

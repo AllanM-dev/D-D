@@ -1,9 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { Character } from "../engine/character";
-import { migrateSpells } from "../engine/character";
-import { migrateCharacter } from "../engine/equipment";
-import { migrateMasteries } from "../engine/loadout";
+import { migrate } from "../engine/migrate";
+import { clone } from "../engine/clone";
 import type { ExplorationState } from "../engine/exploration";
 import type { Vitals } from "../engine/rest";
 import type { Applied } from "../engine/story";
@@ -11,14 +10,14 @@ import type { Loot } from "../data/items";
 import type { LoadoutPatch } from "../engine/loadout";
 import { exportSave, mergeCharacters, parseSave } from "../engine/savefile";
 import { changeItems, inventoryOf } from "../engine/inventory";
-import { addXp, migrateXp } from "../engine/levelup";
+import { addXp } from "../engine/levelup";
 
 const KEY = "dd-mobile.characters";
 
 function load(): Character[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Character[]).map((c) => migrateXp(migrateMasteries(migrateSpells(migrateCharacter(c))))) : [];
+    return raw ? (JSON.parse(raw) as Character[]).map(migrate) : [];
   } catch {
     return [];
   }
@@ -42,7 +41,7 @@ export const useCharacters = defineStore("characters", () => {
   };
   const setExploration = (id: string, e: ExplorationState) => {
     const c = list.value.find((x) => x.id === id);
-    if (c) { c.exploration = JSON.parse(JSON.stringify(e)); persist(); }
+    if (c) { c.exploration = clone(e); persist(); }
   };
   /** Enregistre les drapeaux de l'histoire, l'or et les objets gagnés ou dépensés. */
   const setStory = (id: string, a: Pick<Applied, "flags" | "gold"> & { items?: Record<string, number>; xp?: number }) => {
@@ -76,7 +75,7 @@ export const useCharacters = defineStore("characters", () => {
   const applyLoadout = (id: string, patch: LoadoutPatch) => {
     const c = list.value.find((x) => x.id === id);
     if (!c) return;
-    if ((patch as LoadoutPatch & { masteries?: string[] }).masteries) c.masteries = (patch as LoadoutPatch & { masteries?: string[] }).masteries;
+    if (patch.masteries) c.masteries = patch.masteries;
     c.equipment = patch.equipment;
     c.attacks = patch.attacks;
     c.armorClass = patch.armorClass;
@@ -95,7 +94,7 @@ export const useCharacters = defineStore("characters", () => {
   const importAll = (text: string): { added: number; replaced: number } | { error: string } => {
     const r = parseSave(text);
     if ("error" in r) return r;
-    const m = mergeCharacters(list.value, r.characters.map((c) => migrateMasteries(migrateSpells(migrateCharacter(c)))));
+    const m = mergeCharacters(list.value, r.characters.map(migrate));
     list.value = m.list;
     persist();
     return { added: m.added, replaced: m.replaced };

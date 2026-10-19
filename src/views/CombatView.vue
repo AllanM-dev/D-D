@@ -215,6 +215,7 @@ import {
   IonPage, IonProgressBar, IonSelect, IonSelectOption, IonTitle, IonToggle, IonToolbar,
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
+import { clone } from "../engine/clone";
 import CombatGrid from "../components/CombatGrid.vue";
 import DiceRoll from "../components/DiceRoll.vue";
 import Illustration from "../components/Illustration.vue";
@@ -367,7 +368,7 @@ async function act(run: (s: CombatState) => void) {
   moveMessage.value = "";
   const before = s.rolls.length;
   // Fige l'affichage sur l'état d'avant l'action : les PV ne bougent qu'au fil des jets.
-  shown.value = { combatants: JSON.parse(JSON.stringify(s.combatants)), logLen: s.log.length, round: s.round };
+  shown.value = { combatants: clone(s.combatants), logLen: s.log.length, round: s.round };
   run(s);
   await play(s.rolls.slice(before));
 }
@@ -398,7 +399,7 @@ async function start(e: EncounterDef) {
   const s = startCombat([party], enemies, Math.random, setup.arena);
   state.value = s;
   // Affichage de départ : tout le monde à pleins PV et à sa place de départ (les ennemis qui jouent en premier avancent après leur jet).
-  const fresh: Combatant[] = JSON.parse(JSON.stringify(s.combatants));
+  const fresh: Combatant[] = clone(s.combatants);
   const startHp = vitalsOf(c).hp;
   for (const f of fresh) {
     const start = f.side === "party" ? setup.hero : setup.enemies[enemies.findIndex((en) => en.id === f.id)];

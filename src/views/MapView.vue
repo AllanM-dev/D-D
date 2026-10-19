@@ -77,6 +77,7 @@ import {
 } from "@ionic/vue";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { clone } from "../engine/clone";
 import Sprite from "../components/Sprite.vue";
 import { ENCOUNTERS } from "../data/encounters";
 import { artKey } from "../data/illustrations";
@@ -257,7 +258,7 @@ async function go(target: Cell) {
   message.value = "";
   let steps = 0;
   let arrived = false;
-  const next: ExplorationState = JSON.parse(JSON.stringify(ex.value));
+  const next: ExplorationState = clone(ex.value);
   const chasers = new Set(Object.keys(next.foes ?? {})); // ceux qui poursuivent déjà ne font pas arrêter la marche
   // Le trajet est recalculé à chaque pas : un ennemi qui approche peut changer la route, ou la cible elle-même.
   for (let guard = 0; guard < 400; guard++) {

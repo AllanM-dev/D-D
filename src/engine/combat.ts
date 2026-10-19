@@ -1,3 +1,4 @@
+import { clone } from "./clone";
 import { rollD20, rollDie, type AdvantageMode, type Rng } from "./dice";
 import { SPELL_BY_ID } from "../data/spells";
 import { hasBonusSpell, spellOptionsFor, type SpellOption } from "./spellcasting";
@@ -307,7 +308,7 @@ export function makeCombatant(init: CombatantInit): Combatant {
     features: (init.features ?? []).map((f) => ({ ...f })),
     raging: false, ragingUntilRound: 0, innateSorcery: false, innateUntilRound: 0,
     turnState: { action: false, bonus: false, attacked: false, spells: [] },
-    spellcasting: init.spellcasting ? JSON.parse(JSON.stringify(init.spellcasting)) : undefined,
+    spellcasting: init.spellcasting ? clone(init.spellcasting) : undefined,
     acBonus: 0, guided: false, guidedUntilRound: 0, mocked: false, conditions: [], shielded: 0,
   };
 }
@@ -334,7 +335,7 @@ export function rollDamageDetailed(d: DamageDice, crit: boolean, rng: Rng, minDi
 export const rollDamage = (d: DamageDice, crit: boolean, rng: Rng): number => rollDamageDetailed(d, crit, rng).total;
 
 /** Copie indépendante (fonctionne aussi sur un objet réactif Vue, contrairement à structuredClone). */
-export const snapshot = (combatants: Combatant[]): Combatant[] => JSON.parse(JSON.stringify(combatants));
+export const snapshot = (combatants: Combatant[]): Combatant[] => clone(combatants);
 
 export type RollInit = Omit<RollEvent, "id" | "after" | "logLen" | "round" | "keptIndex"> & { keptIndex?: number };
 

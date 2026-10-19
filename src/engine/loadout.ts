@@ -6,7 +6,7 @@ import { defaultMasteries, deriveStats, masterableWeapons, type EquipmentInput, 
 import { changeItems, inventoryOf, itemCount } from "./inventory";
 
 /** Ce que change un changement d'équipement sur le personnage. */
-export type LoadoutPatch = Pick<Character, "equipment" | "attacks" | "armorClass" | "speed"> & { inventory: Record<string, number> };
+export type LoadoutPatch = Pick<Character, "equipment" | "attacks" | "armorClass" | "speed"> & { inventory: Record<string, number>; masteries?: string[] };
 
 export const loadoutOf = (c: Pick<Character, "equipment">): Loadout => ({
   armor: c.equipment.armor, shield: c.equipment.shield, weapons: c.equipment.weapons.map((w) => ({ ...w })),
