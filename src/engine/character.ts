@@ -13,7 +13,8 @@ import type { ExplorationState } from "./exploration";
 import type { StoryProgress } from "./story";
 import type { Vitals } from "./rest";
 import { computeEquipment, defaultMasteries, getKit, type CharacterEquipment } from "./equipment";
-import { EXPERTISE_COUNT, ORDER_SKILLS, hasExtraCantrip, isInvocation, isOrder } from "../data/class-choices";
+import { EXPERTISE_COUNT, hasExtraCantrip, isInvocation, isOrder } from "../data/class-choices";
+import { recompute } from "./derive";
 import { ABILITIES, abilityModifier, proficiencyBonus, type Ability } from "./rules";
 
 /** Bonus de caractéristiques de l'historique (règles 2024). */
@@ -95,8 +96,6 @@ export interface Character {
   expertise?: SkillId[];
   /** Expérience (voir `levels.ts`) ; absent = pas encore comptée. */
   xp?: number;
-  /** Le barde « Touche-à-tout » : la moitié du bonus de maîtrise aux compétences non maîtrisées. */
-  jackOfAllTrades?: boolean;
   /** PV et ressources actuels (voir `rest.ts`) ; absent = tout au maximum. */
   vitals?: Vitals;
   /** Position et exploration sur la carte (voir `exploration.ts`) ; absent = jamais exploré. */
@@ -206,56 +205,35 @@ export function buildCharacter(d: CharacterDraft, id: string): Character {
   const modifiers = Object.fromEntries(ABILITIES.map((a) => [a, abilityModifier(scores[a])])) as AbilityScores;
   const prof = proficiencyBonus(1);
 
+  // Les choix du joueur ; les valeurs calculées (bonus, CA, PV, attaques…) sont remplies par `recompute`.
   const proficientSkills = new Set<SkillId>([...background.skills, ...d.classSkills]);
   const expertise = EXPERTISE_COUNT[classDef.id] ? [...(d.expertise ?? [])] : [];
-  // Ordre « sort mineur en plus » (Thaumaturge, Magicien des bois) : bonus de Sagesse (au moins +1) à deux compétences de savoir.
-  const orderSkills = (hasExtraCantrip(d.order) ? ORDER_SKILLS[d.order!] : []) ?? [];
-  const orderBonus = Math.max(1, modifiers.WIS);
-  const skills: SkillEntry[] = SKILLS.map((s) => {
-    const proficient = proficientSkills.has(s.id);
-    const expert = proficient && expertise.includes(s.id);
-    return {
-      id: s.id, name: s.name, ability: s.ability, proficient, ...(expert ? { expert: true } : {}),
-      bonus: modifiers[s.ability] + (proficient ? prof : 0) + (expert ? prof : 0) + (orderSkills.includes(s.id) ? orderBonus : 0),
-    };
-  });
-  const saves = Object.fromEntries(
-    ABILITIES.map((a) => {
-      const proficient = classDef.savingThrows.includes(a);
-      return [a, { proficient, bonus: modifiers[a] + (proficient ? prof : 0) }];
-    }),
-  ) as Character["saves"];
-
+  const skills: SkillEntry[] = SKILLS.map((s) => ({ id: s.id, name: s.name, ability: s.ability, proficient: proficientSkills.has(s.id), bonus: 0 }));
   const kit = getKit(classDef.id, d.kitId);
   const order = ORDERS_BY_CLASS.has(classDef.id) ? d.order : undefined;
   const masteries = defaultMasteries(classDef.id, kit.entries.flatMap((e) => ("weapon" in e ? [e.weapon] : [])), order);
+  const fightingStyle = classDef.id === "fighter" ? d.fightingStyle : undefined;
+  const invocations = classDef.id === "warlock" && d.invocation ? [d.invocation] : undefined;
   const eq = computeEquipment(
-    { classId: classDef.id, scores, modifiers, proficiencyBonus: prof, baseSpeed: species.speed,
-      fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined, masteries,
-      order: ORDERS_BY_CLASS.has(classDef.id) ? d.order : undefined, invocations: classDef.id === "warlock" && d.invocation ? [d.invocation] : undefined },
+    { classId: classDef.id, scores, modifiers, proficiencyBonus: prof, baseSpeed: species.speed, fightingStyle, masteries, order, invocations },
     d.kitId,
   );
 
-  return {
+  return recompute({
     id, name: d.name.trim(), level: 1, species, classDef, background, scores, modifiers,
-    proficiencyBonus: prof,
-    maxHp: Math.max(1, classDef.hitDie + modifiers.CON), // niveau 1 : dé de vie max + mod. CON
-    armorClass: eq.armorClass,
+    proficiencyBonus: prof, maxHp: 0, armorClass: 0, initiative: 0, speed: 0, passivePerception: 0,
+    saves: {} as Character["saves"], skills, originFeat: background.originFeat,
     masteries: masteries.length ? masteries : undefined,
-    initiative: modifiers.DEX,
-    speed: eq.speed,
     equipment: eq.equipment,
-    attacks: eq.attacks,
-    fightingStyle: classDef.id === "fighter" ? d.fightingStyle : undefined,
+    attacks: [],
+    fightingStyle,
     order,
     invocation: classDef.id === "warlock" ? d.invocation : undefined,
-    invocations: classDef.id === "warlock" && d.invocation ? [d.invocation] : undefined,
+    invocations,
     xp: 0,
     expertise: expertise.length ? expertise : undefined,
     spells: CLASS_SPELLCASTING[classDef.id] && d.spells ? { cantrips: [...d.spells.cantrips], prepared: [...d.spells.prepared] } : undefined,
-    passivePerception: 10 + skills.find((s) => s.id === "perception")!.bonus,
-    saves, skills, originFeat: background.originFeat,
-  };
+  });
 }
 
 /**
