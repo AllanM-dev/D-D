@@ -279,6 +279,7 @@ import {
 } from "@ionic/vue";
 import { informationCircleOutline } from "ionicons/icons";
 import { computed, reactive, ref, watch } from "vue";
+import { clone } from "../engine/clone";
 import { BACKGROUNDS } from "../data/backgrounds";
 import { CLASSES } from "../data/classes";
 import { SKILLS, type SkillId } from "../data/skills";
@@ -484,7 +485,7 @@ const preview = computed(() => {
 });
 
 function create() {
-  const c = buildCharacter(JSON.parse(JSON.stringify(draft)) as CharacterDraft, newId());
+  const c = buildCharacter(clone(draft) as CharacterDraft, newId());
   store.add(c);
   router.replace(`/character/${c.id}`);
 }

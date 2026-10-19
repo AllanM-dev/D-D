@@ -1,3 +1,4 @@
+import { clone } from "./clone";
 import { invocationsOf, type Character } from "./character";
 import { getCombatant, type CombatState, type FeatureId } from "./combat";
 import { rollDie, type Rng } from "./dice";
@@ -64,7 +65,7 @@ export interface RestResult {
 
 /** Repos court : dépense des dés de vie pour se soigner et récupère quelques ressources. */
 export function shortRest(c: Character, spend: number, rng: Rng = Math.random): RestResult {
-  const v = JSON.parse(JSON.stringify(vitalsOf(c))) as Vitals;
+  const v = clone(vitalsOf(c)) as Vitals;
   const count = Math.max(0, Math.min(Math.floor(spend), v.hitDice));
   const rolls: HitDieRoll[] = [];
   let healed = 0;

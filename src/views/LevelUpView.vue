@@ -79,6 +79,7 @@
 import { IonBackButton, IonButton, IonButtons, IonCheckbox, IonContent, IonHeader, IonItem, IonLabel, IonList, IonNote, IonPage, IonSegment, IonSegmentButton, IonTitle, IonToolbar, useIonRouter } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { clone } from "../engine/clone";
 import Sprite from "../components/Sprite.vue";
 import { FIGHTING_STYLES, type FightingStyleId } from "../data/fighting-styles";
 import { LEVEL2_FEATURES, MAX_LEVEL, xpForNext } from "../data/levels";
@@ -126,7 +127,7 @@ const errors = computed(() => (c.value ? validateLevelUp(c.value, choices.value)
 
 function confirm() {
   if (!c.value || errors.value.length) return;
-  store.replace(levelUp(JSON.parse(JSON.stringify(c.value)), choices.value).character);
+  store.replace(levelUp(clone(c.value), choices.value).character);
   router.replace(`/character/${id.value}`);
 }
 </script>
