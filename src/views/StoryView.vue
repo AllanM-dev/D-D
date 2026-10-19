@@ -114,7 +114,8 @@ const afterRoll = () => { const r = roll.value; roll.value = null; if (r) procee
 /** Enregistre les effets du choix puis passe à la suite : scène, combat ou retour à la carte. */
 function proceed(o: ChoiceOutcome) {
   if (o.check) notice.value = `${skillName(o.check.skill)} : ${o.check.total} contre DD ${o.check.dc} — ${o.check.success ? "réussi" : "raté"}.`;
-  store.setStory(characterId.value, { flags: o.flags, gold: o.gold, items: o.items });
+  if (o.xp > 0) notice.value = `${notice.value ? notice.value + " " : ""}+${o.xp} points d'expérience.`;
+  store.setStory(characterId.value, { flags: o.flags, gold: o.gold, items: o.items, xp: o.xp });
   const id = characterId.value;
   const ex = character.value?.exploration;
   if (ex && o.defeated.length) store.setExploration(id, o.defeated.reduce(defeatEnemy, ex));

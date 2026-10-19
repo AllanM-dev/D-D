@@ -16,6 +16,13 @@
         </div>
       </div>
 
+      <div class="xp">
+        <div class="xpline"><span>Niveau {{ c.level }}</span><span>{{ xpOf(c) }}{{ nextXp ? ` / ${nextXp}` : "" }} points d'expérience</span></div>
+        <ion-progress-bar v-if="nextXp" :value="Math.min(1, xpOf(c) / nextXp)" color="success" />
+        <p v-else class="hint">Niveau maximum jouable pour l'instant ({{ MAX_LEVEL }}).</p>
+        <ion-button v-if="canLevelUp(c)" expand="block" color="success" :router-link="`/levelup/${c.id}`">Monter au niveau {{ c.level + 1 }}</ion-button>
+      </div>
+
       <div class="stats">
         <div><strong>{{ vitals.hp }}/{{ c.maxHp }}</strong><small>PV</small></div>
         <div><strong>{{ c.armorClass }}</strong><small>CA</small></div>
@@ -108,6 +115,13 @@
         <ion-item v-if="c.expertise?.length" lines="full">
           <ion-label class="ion-text-wrap">Expertise : {{ expertiseNames }}<p>Bonus de maîtrise doublé (◉ dans la liste des compétences).</p></ion-label>
         </ion-item>
+        <ion-item v-for="f in level2" :key="f.name" lines="full">
+          <ion-label class="ion-text-wrap">
+            {{ f.name }} <small>(niveau 2)</small>
+            <p>{{ f.note }}</p>
+          </ion-label>
+          <ion-note slot="end">{{ f.status === "applied" ? "appliqué" : f.status === "partial" ? "partiel" : "pas encore" }}</ion-note>
+        </ion-item>
         <ion-item v-for="f in c.classDef.features" :key="f" lines="full">
           <ion-label class="ion-text-wrap">
             {{ f }}
@@ -199,13 +213,15 @@
 <script setup lang="ts">
 import {
   IonBackButton, IonButton, IonCheckbox, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader,
-  IonMenuButton, IonNote, IonPage, IonTitle, IonToolbar, useIonRouter,
+  IonMenuButton, IonNote, IonPage, IonProgressBar, IonTitle, IonToolbar, useIonRouter,
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import Sprite from "../components/Sprite.vue";
 import { heroSpriteKey } from "../ui/sprites";
 import { INVOCATIONS, ORDERS } from "../data/class-choices";
+import { LEVEL2_FEATURES, MAX_LEVEL, xpForNext } from "../data/levels";
+import { canLevelUp, xpOf } from "../engine/levelup";
 import { FIGHTING_STYLES } from "../data/fighting-styles";
 import { SPELL_BY_ID, isPlayable } from "../data/spells";
 import { castingFor } from "../engine/spellcasting";
@@ -215,7 +231,7 @@ import { MASTERY_TEXT } from "../data/help";
 import { masterableWeapons, wearsUntrained } from "../engine/equipment";
 import { canDrink, drinkPotion } from "../engine/inventory";
 import { canEquip, equipItem, masteriesOf, setMasteries, unequip, type Slot } from "../engine/loadout";
-import { hitDiceMax, longRest, shortRest, vitalsOf, type RestResult } from "../engine/rest";
+import { castingInput, hitDiceMax, longRest, shortRest, vitalsOf, type RestResult } from "../engine/rest";
 import { FEATURE_LABELS } from "../engine/combat";
 import { featuresFor } from "../engine/features";
 import { CLASS_FEATURE_TEXT, FEATURE_STATUS } from "../data/help";
@@ -229,10 +245,7 @@ const route = useRoute();
 const c = computed(() => store.get(String(route.params.id)));
 const casting = computed(() =>
   c.value
-    ? castingFor({
-        classId: c.value.classDef.id, modifiers: c.value.modifiers, proficiencyBonus: c.value.proficiencyBonus,
-        conSaveBonus: c.value.saves.CON.bonus, unarmored: !c.value.equipment.armor, spells: c.value.spells ?? { cantrips: [], prepared: [] },
-      })
+    ? castingFor(castingInput(c.value))
     : undefined,
 );
 const vitals = computed(() => vitalsOf(c.value!));
@@ -298,6 +311,8 @@ const knownSpells = computed(() =>
 const orderChoice = computed(() => (c.value?.order ? ORDERS[c.value.classDef.id]?.find((o) => o.id === c.value!.order) : undefined));
 const expertiseNames = computed(() => (c.value?.expertise ?? []).map((id) => c.value!.skills.find((s) => s.id === id)?.name).join(", "));
 const invocationChoice = computed(() => INVOCATIONS.find((i) => i.id === c.value?.invocation));
+const nextXp = computed(() => (c.value ? xpForNext(c.value.level) : undefined));
+const level2 = computed(() => (c.value && c.value.level >= 2 ? LEVEL2_FEATURES[c.value.classDef.id] ?? [] : []));
 const style = computed(() => FIGHTING_STYLES.find((st) => st.id === c.value?.fightingStyle));
 const statusShort = (feature: string) => {
   const st = FEATURE_STATUS[c.value!.classDef.id]?.[feature]?.status;
@@ -318,6 +333,9 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .hero .who { min-width: 0; }
 .hero h2 { margin: 0; }
 .hero p { margin: 2px 0 0; opacity: 0.8; font-size: 0.9rem; }
+.xp { margin: 8px 0 12px; }
+.xpline { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; }
+.xp .hint { opacity: 0.7; font-size: 0.85rem; margin: 4px 0; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin: 12px 0; }
 .stats div { background: var(--ion-color-step-100, #222); border-radius: 8px; padding: 8px; }
 .stats strong { display: block; font-size: 1.4rem; }

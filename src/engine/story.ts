@@ -57,12 +57,15 @@ export interface Applied {
   defeated: string[];
   /** Objets gagnés ou perdus. */
   items: Record<string, number>;
+  /** Points d'expérience gagnés. */
+  xp: number;
 }
 
 /** Applique des effets à une liste de drapeaux. */
 export function applyEffects(flags: readonly string[], ...effects: (Effects | undefined)[]): Applied {
   let out = [...flags];
   let gold = 0;
+  let xp = 0;
   const defeated: string[] = [];
   const items: Record<string, number> = {};
   for (const e of effects) {
@@ -72,8 +75,9 @@ export function applyEffects(flags: readonly string[], ...effects: (Effects | un
     for (const f of e.set ?? []) if (!out.includes(f)) out.push(f);
     out = out.filter((f) => !(e.unset ?? []).includes(f));
     gold += e.gold ?? 0;
+    xp += e.xp ?? 0;
   }
-  return { flags: out, gold, defeated, items };
+  return { flags: out, gold, defeated, items, xp };
 }
 
 /** Pose les drapeaux d'arrivée d'une scène. */
@@ -102,6 +106,8 @@ export function rollCheck(skill: SkillId, dc: number, bonus: number, rng: Rng = 
 export interface ChoiceOutcome {
   flags: string[];
   gold: number;
+  /** Points d'expérience gagnés. */
+  xp: number;
   /** Ennemis de la carte à faire disparaître. */
   defeated: string[];
   /** Objets gagnés ou perdus. */
@@ -124,7 +130,7 @@ export function resolveChoice(
 ): ChoiceOutcome {
   const choice = scene.choices[index];
   if (!choice || !availableChoices(scene, flags, wallet).some((c) => c.index === index)) throw new Error("Choix impossible.");
-  const base: Effects = { set: [...(choice.set ?? []), ...(choice.once ? [onceFlag(scene.id, index)] : [])], unset: choice.unset, gold: choice.gold, defeat: choice.defeat, items: choice.items };
+  const base: Effects = { set: [...(choice.set ?? []), ...(choice.once ? [onceFlag(scene.id, index)] : [])], unset: choice.unset, gold: choice.gold, xp: choice.xp, defeat: choice.defeat, items: choice.items };
   if (choice.check) {
     const c = choice.check;
     const check = rollCheck(c.skill, c.dc, skillBonus(c.skill), rng);

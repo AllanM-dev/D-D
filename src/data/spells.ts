@@ -18,6 +18,8 @@ export type SpellEffect =
   | { kind: "ac-bonus"; bonus: number }
   /** Concentration : +1d4 aux jets d'attaque et de sauvegarde du lanceur. */
   | { kind: "bless" }
+  /** Châtiment divin : dégâts supplémentaires à la créature qui vient d'être touchée au corps à corps. */
+  | { kind: "smite"; dice: [number, number]; damageType: string }
   | { kind: "mark"; dice: [number, number]; damageType: string; weaponOnly: boolean }
   | { kind: "none" };
 
@@ -138,6 +140,10 @@ export const SPELLS: readonly SpellDef[] = [
     description: "Vous marquez une créature : vos attaques d'arme qui la touchent lui infligent 1d6 dégâts de force supplémentaires, tant que vous restez concentré.",
     effect: { kind: "mark", dice: [1, 6], damageType: "force", weaponOnly: true }, note: "Le changement de cible n'est pas appliqué." },
 
+  { id: "divine-smite", name: "Châtiment divin", level: 1, school: "Évocation", time: "bonus", range: "Soi-même", duration: "Instantanée", concentration: false, classes: [paladin],
+    description: "Juste après avoir touché une créature avec une arme de mêlée, vous libérez une force sacrée : 2d8 dégâts radiants supplémentaires.",
+    effect: { kind: "smite", dice: [2, 8], damageType: "radiant" }, note: "Se lance en action bonus après un coup d'arme au corps à corps (même tour). Le dé de dégâts supplémentaire contre les morts-vivants et les fiélons, et les emplacements de niveau supérieur, ne sont pas appliqués." },
+
   // ----- Sorts de niveau 1 sans effet en combat pour le moment
   { id: "shield", name: "Bouclier", level: 1, school: "Abjuration", time: "reaction", range: "Soi-même", duration: "1 round", concentration: false, classes: [sorcerer, wizard],
     description: "Réaction quand vous êtes touché : +5 à votre CA jusqu'au début de votre prochain tour, et vous évitez Projectile magique.", effect: { kind: "reaction-shield" }, note: "Se lance en réaction quand une attaque ennemie vous touche : l'application vous demande si vous voulez le lancer (1 emplacement). L'immunité à Projectile magique est sans objet, aucun ennemi n'en lance." },
@@ -190,19 +196,28 @@ export interface ClassSpellcasting {
   alwaysPrepared?: string[];
   /** Lancers gratuits par repos long (Ennemi juré du rôdeur). */
   free?: { spellId: string; uses: number };
+  /** Sorts préparés et emplacements de niveau 1 au niveau 2. */
+  level2: { prepared: number; slots: number };
 }
 
 /** Lanceurs de sorts au niveau 1 (règles 2024 : paladin et rôdeur lancent des sorts dès le niveau 1). */
 export const CLASS_SPELLCASTING: Record<string, ClassSpellcasting> = {
-  bard: { ability: "CHA", cantrips: 2, prepared: 4, slots: 2 },
-  cleric: { ability: "WIS", cantrips: 3, prepared: 4, slots: 2 },
-  druid: { ability: "WIS", cantrips: 2, prepared: 4, slots: 2 },
-  paladin: { ability: "CHA", cantrips: 0, prepared: 2, slots: 2 },
-  ranger: { ability: "WIS", cantrips: 0, prepared: 2, slots: 2, alwaysPrepared: ["hunters-mark"], free: { spellId: "hunters-mark", uses: 2 } },
-  sorcerer: { ability: "CHA", cantrips: 4, prepared: 2, slots: 2 },
-  warlock: { ability: "CHA", cantrips: 2, prepared: 2, slots: 1 },
-  wizard: { ability: "INT", cantrips: 3, prepared: 4, slots: 2 },
+  bard: { ability: "CHA", cantrips: 2, prepared: 4, slots: 2, level2: { prepared: 5, slots: 3 } },
+  cleric: { ability: "WIS", cantrips: 3, prepared: 4, slots: 2, level2: { prepared: 5, slots: 3 } },
+  druid: { ability: "WIS", cantrips: 2, prepared: 4, slots: 2, level2: { prepared: 5, slots: 3 } },
+  paladin: { ability: "CHA", cantrips: 0, prepared: 2, slots: 2, level2: { prepared: 3, slots: 2 } },
+  ranger: { ability: "WIS", cantrips: 0, prepared: 2, slots: 2, level2: { prepared: 3, slots: 2 }, alwaysPrepared: ["hunters-mark"], free: { spellId: "hunters-mark", uses: 2 } },
+  sorcerer: { ability: "CHA", cantrips: 4, prepared: 2, slots: 2, level2: { prepared: 4, slots: 3 } },
+  warlock: { ability: "CHA", cantrips: 2, prepared: 2, slots: 1, level2: { prepared: 3, slots: 2 } },
+  wizard: { ability: "INT", cantrips: 3, prepared: 4, slots: 2, level2: { prepared: 5, slots: 3 } },
 };
+
+/** Nombre de sorts mineurs et préparés et d'emplacements de niveau 1 d'une classe à un niveau (1 ou 2). */
+export function spellCountsFor(classId: string, level = 1): { cantrips: number; prepared: number; slots: number } {
+  const cfg = CLASS_SPELLCASTING[classId];
+  if (!cfg) return { cantrips: 0, prepared: 0, slots: 0 };
+  return level >= 2 ? { cantrips: cfg.cantrips, ...cfg.level2 } : { cantrips: cfg.cantrips, prepared: cfg.prepared, slots: cfg.slots };
+}
 
 /** Sorts qu'une classe peut choisir : mineurs ou de niveau 1 (hors sorts toujours préparés). */
 export function spellsFor(classId: string, level: 0 | 1): SpellDef[] {

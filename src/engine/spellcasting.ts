@@ -1,4 +1,4 @@
-import { CLASS_SPELLCASTING, SPELL_BY_ID, rangeMeters, type SpellDef } from "../data/spells";
+import { CLASS_SPELLCASTING, SPELL_BY_ID, rangeMeters, spellCountsFor, type SpellDef } from "../data/spells";
 import { rollD20, rollDie, type Rng } from "./dice";
 import { areaCells } from "./areas";
 import { hasLineOfSight } from "./battlefield";
@@ -17,7 +17,9 @@ export interface CastingInput {
   conSaveBonus: number;
   unarmored: boolean;
   spells: { cantrips: string[]; prepared: string[] };
-  invocation?: string;
+  invocations?: string[];
+  /** Niveau du personnage (1 par défaut). */
+  level?: number;
 }
 
 /** Capacité d'incantation d'un personnage de niveau 1 : DD, bonus d'attaque, emplacements, sorts connus. */
@@ -31,19 +33,19 @@ export function castingFor(input: CastingInput): Spellcasting | undefined {
     attackBonus: input.proficiencyBonus + mod,
     saveDc: 8 + input.proficiencyBonus + mod,
     cantrips: [...input.spells.cantrips],
-    prepared: [...(cfg.alwaysPrepared ?? []), ...input.spells.prepared],
-    slots: { max: cfg.slots, used: 0 },
-    free: cfg.free ? [{ spellId: cfg.free.spellId, uses: cfg.free.uses, max: cfg.free.uses }] : [],
+    prepared: [...new Set([...(cfg.alwaysPrepared ?? []), ...(input.classId === "paladin" && (input.level ?? 1) >= 2 ? ["divine-smite"] : []), ...input.spells.prepared])],
+    slots: { max: spellCountsFor(input.classId, input.level ?? 1).slots, used: 0 },
+    free: [...(cfg.free ? [{ spellId: cfg.free.spellId, uses: cfg.free.uses, max: cfg.free.uses }] : []), ...(input.classId === "paladin" && (input.level ?? 1) >= 2 ? [{ spellId: "divine-smite", uses: 1, max: 1 }] : [])],
     concentrationBonus: input.conSaveBonus,
     unarmored: input.unarmored,
-    invocation: input.invocation,
+    invocations: input.invocations,
   };
 }
 
 /** Portée d'un sort pour ce lanceur : la Lance occulte triple celle de la Décharge occulte. */
 export function spellRange(spell: SpellDef, caster: Pick<Combatant, "spellcasting">): number | undefined {
   const base = rangeMeters(spell);
-  return base !== undefined && spell.id === "eldritch-blast" && caster.spellcasting?.invocation === "eldritch-spear" ? base * 3 : base;
+  return base !== undefined && spell.id === "eldritch-blast" && caster.spellcasting?.invocations?.includes("eldritch-spear") ? base * 3 : base;
 }
 
 
@@ -74,7 +76,7 @@ function turnRestriction(c: Combatant, spell: SpellDef): string | undefined {
 
 function targetKind(spell: SpellDef): "enemy" | "self" {
   const k = spell.effect.kind;
-  return k === "heal" || k === "mage-armor" || k === "ac-bonus" || k === "bless" ? "self" : "enemy";
+  return k === "heal" || k === "mage-armor" || k === "ac-bonus" || k === "bless" || k === "smite" ? "self" : "enemy";
 }
 
 /** Sorts jouables de ce combattant, avec ce qui les empêche éventuellement. */
@@ -103,6 +105,10 @@ export function spellOptionsFor(state: CombatState, c: Combatant): SpellOption[]
       else if (13 + c.initiativeBonus <= c.ac) reason = "Sans effet : votre CA est déjà aussi bonne";
     }
     if (!reason && kind === "ac-bonus" && c.concentrating?.spellId === id) reason = "Déjà actif";
+    if (!reason && kind === "smite") {
+      const hit = c.turnState.lastHit ? state.combatants.find((x) => x.id === c.turnState.lastHit) : undefined;
+      if (!hit || hit.dead) reason = "Touchez d'abord une créature au corps à corps avec une arme";
+    }
     if (!reason && targetKind(spell) === "enemy" && !enemiesAlive) reason = "Aucune cible";
     const detail = spell.level === 0 ? "sort mineur" : hasFree ? `gratuit ${free!.uses}/${free!.max}` : `emplacement ${slotsLeft}/${sc.slots.max}`;
     out.push({ id, name: spell.name, level: spell.level, time: spell.time as "action" | "bonus", target: targetKind(spell), detail, available: !reason, reason });
@@ -166,7 +172,7 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
     case "attack": {
       const attack: AttackDef = {
         // Décharge agonisante : le modificateur d'incantation s'ajoute aux dégâts de la Décharge occulte.
-        name: spell.name, toHit: sc.attackBonus, damage: { count: e.dice[0], sides: e.dice[1], bonus: spell.id === "eldritch-blast" && sc.invocation === "agonizing-blast" ? sc.modifier : 0 },
+        name: spell.name, toHit: sc.attackBonus, damage: { count: e.dice[0], sides: e.dice[1], bonus: spell.id === "eldritch-blast" && sc.invocations?.includes("agonizing-blast") ? sc.modifier : 0 },
         damageType: e.damageType, ranged: !e.melee, ability: sc.ability, spell: true,
         ...(spellRange(spell, cur) !== undefined ? { range: [spellRange(spell, cur)!, spellRange(spell, cur)!] as [number, number] } : {}),
       };
@@ -261,6 +267,17 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
       cur.ac += e.bonus;
       cur.acBonus = e.bonus;
       state.log.push(`${cur.name} : CA ${cur.ac}.`);
+      break;
+    }
+    case "smite": {
+      const victim = state.combatants.find((x) => x.id === cur.turnState.lastHit)!;
+      const dmg = rollDamageDetailed({ count: e.dice[0], sides: e.dice[1], bonus: 0 }, false, rng);
+      state.log.push(`${cur.name} frappe ${victim.name} d'un châtiment divin : ${dmg.total} dégâts (${e.damageType}).`);
+      applyDamage(state, victim, dmg.total, false);
+      pushRoll(state, {
+        kind: "damage", actorId: cur.id, actorName: cur.name, side: cur.side, title: `${spell.name} : dégâts (${e.damageType})`,
+        sides: e.dice[1], dice: dmg.dice, modifier: 0, total: dmg.total, outcome: "hit",
+      });
       break;
     }
     case "bless": {

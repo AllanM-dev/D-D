@@ -43,7 +43,8 @@
 - [ ] Carte : personnages non joueurs, objets, portes verrouillées, pièges, plusieurs cartes reliées
 - [x] Format de scénario (scènes, choix conditionnés par des drapeaux, tests de compétence, combats, or) ; lieux et personnages « ! » sur la carte, portes verrouillées ; première quête « Les morts de Brumeval » (maire, aubergiste, porte de la crypte)
 - [x] Une aventure courte jouable de bout en bout : « Les morts de Brumeval » (village, crypte à deux cartes reliées, deux fins possibles, récompense en or) ; cartes reliées par des passages, zones explorées gardées par carte
-- [ ] Aventure : expérience et montée de niveau, inventaire et butin, autres aventures
+- [x] Expérience et montée de niveau (niveaux 1 à 2) : points d'expérience des ennemis et des quêtes, écran de passage de niveau (PV, dé de vie, sorts, expertise, style de combat), capacités du niveau 2 (Fougue, Attaque téméraire, Action ruse, Concentration du moine, Source de magie, Châtiment divin…)
+- [ ] Niveaux 3 et suivants : sorts de niveau 2, sous-classes ; capacités du niveau 2 pas encore jouables (Conduit divin, Forme sauvage, Métamagie…) ; autres aventures
 - [x] Inventaire et butin : sac à dos, or, potions de soin (hors combat et en action bonus), butin des ennemis et des coffres, boutique de l'aubergiste, objets de quête ; section Aide → Objets
 - [x] Équipement : équiper et ranger armes, armure et bouclier (CA, vitesse et attaques recalculées), armes et armures du SRD en boutique et en butin, forge de Brumeval, maîtrise d'armure, propriétés Légère (deux armes), Lourde, Deux mains, Allonge
 - [ ] Équipement : objets magiques, poids porté, munitions comptées, maîtrises d'armes 2024, réparation

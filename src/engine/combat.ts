@@ -55,7 +55,12 @@ export interface AttackDef {
 }
 
 /** Capacités de classe utilisables en combat (toutes en action bonus). */
-export type FeatureId = "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts" | "potion" | "offhand" | "bardic-inspiration";
+export type FeatureId =
+  | "second-wind" | "rage" | "lay-on-hands" | "innate-sorcery" | "martial-arts" | "potion" | "offhand" | "bardic-inspiration"
+  // niveau 2
+  | "action-surge" | "reckless" | "cunning-action" | "focus" | "sorcery-points";
+/** Choix proposés au joueur : les capacités, plus les usages de Concentration du moine, d'Action ruse et de Source de magie. */
+export type FeatureOptionId = FeatureId | "flurry" | "patient-defense" | "step-of-wind" | "cunning-dash" | "cunning-disengage" | "font-slot" | "font-points";
 
 export interface FeatureUse {
   id: FeatureId;
@@ -66,7 +71,7 @@ export interface FeatureUse {
   unlimited?: boolean;
 }
 
-export const FEATURE_LABELS: Record<FeatureId, string> = {
+export const FEATURE_LABELS: Record<FeatureOptionId, string> = {
   "second-wind": "Second souffle",
   rage: "Rage",
   "lay-on-hands": "Imposition des mains",
@@ -75,6 +80,18 @@ export const FEATURE_LABELS: Record<FeatureId, string> = {
   potion: "Boire une potion de soin",
   offhand: "Attaque à la seconde arme",
   "bardic-inspiration": "Inspiration bardique",
+  "action-surge": "Fougue",
+  reckless: "Attaque téméraire",
+  "cunning-action": "Action ruse",
+  focus: "Points de concentration",
+  "sorcery-points": "Points de sorcellerie",
+  flurry: "Déluge de coups",
+  "patient-defense": "Défense patiente",
+  "step-of-wind": "Pas du vent",
+  "cunning-dash": "Action ruse : foncer",
+  "cunning-disengage": "Action ruse : se désengager",
+  "font-slot": "Créer un emplacement de sort",
+  "font-points": "Convertir un emplacement en point",
 };
 
 /** Capacité d'incantation d'un combattant (voir `spellcasting.ts`). */
@@ -94,7 +111,7 @@ export interface Spellcasting {
   /** Ne porte pas d'armure (condition de l'Armure du mage). */
   unarmored: boolean;
   /** Invocation occulte de l'occultiste (Décharge agonisante, Lance occulte). */
-  invocation?: string;
+  invocations?: string[];
 }
 
 /** Marque sur une cible (Maléfice, Marque du chasseur) : dégâts supplémentaires à chaque coup. */
@@ -121,6 +138,10 @@ export interface TurnState {
   reaction?: boolean;
   /** Cases parcourues ce tour. */
   moved?: number;
+  /** Cible touchée au corps à corps par une arme ce tour (Châtiment divin). */
+  lastHit?: string;
+  /** Fougue déjà utilisée ce tour. */
+  surged?: boolean;
   /** Seconde arme légère utilisable en action bonus (après une attaque avec une arme légère). */
   offhand?: AttackDef["offhand"];
   /** Attaque sournoise déjà utilisée ce tour. */
@@ -162,6 +183,8 @@ export interface Combatant {
   innateSorcery: boolean;
   innateUntilRound: number;
   turnState: TurnState;
+  /** Expérience que vaut ce monstre s'il est vaincu. */
+  xp?: number;
   /** Clé d'illustration (`class:fighter`, `monster:goblin`…). */
   art?: string;
   /** Clé du personnage 2D affiché sur les cartes (`hero:elf:wizard`, `monster:goblin`). */
@@ -172,6 +195,10 @@ export interface Combatant {
   mark?: Mark;
   /** Bonus de CA d'un sort (Bouclier de la foi), à retirer quand il se termine. */
   acBonus: number;
+  /** Attaque téméraire : avantage à ses attaques de Force au corps à corps, et avantage aux attaques contre lui, jusqu'au début de son prochain tour. */
+  reckless?: boolean;
+  /** Sens du danger (barbare niveau 2) : avantage aux jets de sauvegarde de Dextérité. */
+  dangerSense?: boolean;
   /** Éclair guidé : la prochaine attaque contre ce combattant a l'avantage. */
   guided: boolean;
   guidedUntilRound: number;
@@ -263,7 +290,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "sprite" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor" | "sneakDice" | "traits">>;
+  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "sprite" | "dangerSense" | "xp" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor" | "sneakDice" | "traits">>;
 
 const MAX_STEPS = 500; // garde-fou contre toute boucle infinie
 /** Durée de la Rage et de la Magie innée : 1 minute = 10 rounds de 6 secondes. */
@@ -516,8 +543,10 @@ export function rollSave(state: CombatState, target: Combatant, ability: Ability
     return { success: false, total: 0 };
   }
   const disadvantage = ability === "DEX" && hasCondition(target, "restrained");
+  // Sens du danger : avantage aux jets de sauvegarde de Dextérité (sauf si l'on est neutralisé).
+  const dangerSense = ability === "DEX" && !!target.dangerSense && !isIncapacitated(target);
   const mod = target.saveMods?.[ability] ?? 0;
-  const roll = rollD20(mod, disadvantage ? "disadvantage" : "normal", rng);
+  const roll = rollD20(mod, disadvantage && !dangerSense ? "disadvantage" : dangerSense && !disadvantage ? "advantage" : "normal", rng);
   // Bénédiction : +1d4 aux jets de sauvegarde.
   const bless = target.blessed && target.side === "party" ? rollDie(4, rng) : 0;
   let success = roll.total + bless >= dc;
@@ -532,12 +561,12 @@ export function rollSave(state: CombatState, target: Combatant, ability: Ability
     }
   }
   state.log.push(
-    `${target.name} : sauvegarde de ${ABILITY_FR[ability]} ${roll.natural}${mod >= 0 ? "+" : ""}${mod}${bless ? ` + ${bless} (Bénédiction)` : ""} = ${roll.total + bless} contre DD ${dc}${disadvantage ? " (désavantage : entravé)" : ""} — ${success ? "réussie" : "ratée"}.`,
+    `${target.name} : sauvegarde de ${ABILITY_FR[ability]} ${roll.natural}${mod >= 0 ? "+" : ""}${mod}${bless ? ` + ${bless} (Bénédiction)` : ""} = ${roll.total + bless} contre DD ${dc}${disadvantage && !dangerSense ? " (désavantage : entravé)" : ""}${dangerSense && !disadvantage ? " (avantage : sens du danger)" : ""} — ${success ? "réussie" : "ratée"}.`,
   );
   pushRoll(state, {
     kind: "save", actorId: target.id, actorName: target.name, side: target.side, title: name,
     sides: 20, dice: roll.rolls, keptIndex: roll.rolls.indexOf(roll.natural), modifier: mod, total: roll.total + bless + inspired, dc, outcome: success ? "success" : "failure",
-    ...(disadvantage || inspired || bless ? { note: [disadvantage ? "Désavantage : entravé" : "", bless ? `Bénédiction +${bless}` : "", inspired ? `Inspiration bardique +${inspired}` : ""].filter(Boolean).join(" · ") } : {}),
+    ...(disadvantage || dangerSense || inspired || bless ? { note: [disadvantage && !dangerSense ? "Désavantage : entravé" : "", dangerSense && !disadvantage ? "Avantage : sens du danger" : "", bless ? `Bénédiction +${bless}` : "", inspired ? `Inspiration bardique +${inspired}` : ""].filter(Boolean).join(" · ") } : {}),
   });
   return { success, total: roll.total + bless };
 }
@@ -567,12 +596,15 @@ export function resolveAttack(
   const vexed = attacker.vexTargetId === target.id && (attacker.vexUntilRound ?? 0) >= state.round;
   const pack = !!attacker.traits?.includes("pack-tactics") && !!state.arena && !!target.pos &&
     state.combatants.some((a) => a.side === attacker.side && a.id !== attacker.id && !a.dead && !isIncapacitated(a) && a.pos && cellDistance(a.pos, target.pos!) <= 1);
-  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell) || guidedAdvantage || vexed || pack || cm.advantage.length > 0;
+  // Attaque téméraire : avantage à ses attaques de Force au corps à corps, et avantage à ceux qui l'attaquent.
+  const recklessAttack = !!attacker.reckless && melee && attack.ability === "STR";
+  const recklessExposed = !!target.reckless;
+  const advantage = (unconscious && melee) || (attacker.innateSorcery && !!attack.spell) || guidedAdvantage || vexed || pack || recklessAttack || recklessExposed || cm.advantage.length > 0;
   // Désavantage : cible qui esquive, attaquant visé par Moquerie cruelle, ou états (empoisonné, effrayé…).
   const rangeDis = attackCheck(state, attacker, target, attack).disadvantage;
   const disadvantage = target.dodging || attacker.mocked || cm.disadvantage.length > 0 || rangeDis.length > 0;
   const reasons = [
-    advantage && !disadvantage ? `Avantage : ${[unconscious && melee ? "cible inconsciente" : "", attacker.innateSorcery && attack.spell ? "Magie innée" : "", guidedAdvantage ? "cible éclairée" : "", vexed ? "gêne (maîtrise)" : "", pack ? "tactique de meute" : "", ...cm.advantage].filter(Boolean).join(", ")}` : "",
+    advantage && !disadvantage ? `Avantage : ${[unconscious && melee ? "cible inconsciente" : "", attacker.innateSorcery && attack.spell ? "Magie innée" : "", guidedAdvantage ? "cible éclairée" : "", vexed ? "gêne (maîtrise)" : "", pack ? "tactique de meute" : "", recklessAttack ? "attaque téméraire" : "", recklessExposed ? "cible téméraire" : "", ...cm.advantage].filter(Boolean).join(", ")}` : "",
     disadvantage && !advantage ? `Désavantage : ${[target.dodging ? "cible qui esquive" : "", attacker.mocked ? "moquerie" : "", ...cm.disadvantage, ...rangeDis].filter(Boolean).join(", ")}` : "",
     advantage && disadvantage ? "Avantage et désavantage s'annulent" : "",
   ].filter(Boolean);
@@ -621,6 +653,7 @@ function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng): Attac
       attacker.inspiration = undefined;
     }
   }
+  if (hit && attacker.side === "party" && melee && !attack.spell) attacker.turnState.lastHit = target.id;
   const shownTotal = roll.total + bless + inspired;
   const label = `${attacker.name} attaque ${target.name} (${attack.name}) : ${roll.natural}${attack.toHit >= 0 ? "+" : ""}${attack.toHit}${bless ? ` + ${bless} (Bénédiction)` : ""}${inspired ? ` + ${inspired} (inspiration bardique)` : ""} = ${shownTotal} contre CA ${target.ac}`;
   // Un coup au corps à corps contre une cible inconsciente est toujours un critique.
@@ -1199,6 +1232,7 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
     if (state.status !== "ongoing") return;
     const cur = currentCombatant(state);
     cur.dodging = false;
+    cur.reckless = false;
     cur.turnState = { action: false, bonus: false, attacked: false, spells: [], moved: 0 };
     if (cur.shielded) {
       cur.ac -= cur.shielded;
@@ -1277,10 +1311,12 @@ export function assertPlayerTurn(state: CombatState): Combatant {
 }
 
 const feature = (c: Combatant, id: FeatureId) => c.features.find((f) => f.id === id);
+/** Points de concentration (moine) ou de sorcellerie (ensorceleur) restants. */
+const points = (c: Combatant, id: "focus" | "sorcery-points") => feature(c, id)?.uses ?? 0;
 const hasUses = (f: FeatureUse | undefined): f is FeatureUse => !!f && (!!f.unlimited || f.uses > 0);
 
 export interface FeatureOption {
-  id: FeatureId;
+  id: FeatureOptionId;
   label: string;
   /** Précision affichée (utilisations restantes…). */
   detail: string;
@@ -1322,6 +1358,33 @@ export function availableBonus(state: CombatState, c: Combatant): FeatureOption[
     else if (f.id === "innate-sorcery" && !c.innateSorcery) out.push({ id: f.id, label, detail: `${f.uses}/${f.max}` });
     else if (f.id === "martial-arts" && c.turnState.attacked && enemiesAlive && c.attacks.some((a) => a.unarmed))
       out.push({ id: f.id, label, detail: "après l'action Attaquer", needsTarget: true });
+  }
+  // Fougue : une action de plus ce tour, quand la première est dépensée.
+  const surge = feature(c, "action-surge");
+  if (hasUses(surge) && c.turnState.action && !c.turnState.surged) out.push({ id: "action-surge", label: FEATURE_LABELS["action-surge"], detail: `${surge.uses}/${surge.max} · une action de plus` });
+  // Attaque téméraire : avant la première attaque du tour, sans coûter d'action.
+  if (feature(c, "reckless") && !c.turnState.action && !c.turnState.attacked && !c.reckless) out.push({ id: "reckless", label: FEATURE_LABELS.reckless, detail: "avantage à vos attaques de Force, et aux attaques contre vous" });
+  if (bonusFree) {
+    // Action ruse (roublard).
+    if (feature(c, "cunning-action")) {
+      if (!c.turnState.dashed) out.push({ id: "cunning-dash", label: FEATURE_LABELS["cunning-dash"], detail: "action bonus" });
+      if (!c.turnState.disengaged) out.push({ id: "cunning-disengage", label: FEATURE_LABELS["cunning-disengage"], detail: "action bonus" });
+    }
+    // Concentration (moine) : un point pour chaque usage.
+    const focus = points(c, "focus");
+    if (feature(c, "focus") && focus > 0) {
+      if (c.turnState.attacked && enemiesAlive && c.attacks.some((a) => a.unarmed))
+        out.push({ id: "flurry", label: FEATURE_LABELS.flurry, detail: `1 point (${focus} restant${focus > 1 ? "s" : ""}) · deux frappes à mains nues`, needsTarget: true });
+      if (!c.dodging) out.push({ id: "patient-defense", label: FEATURE_LABELS["patient-defense"], detail: `1 point (${focus} restant${focus > 1 ? "s" : ""}) · esquive` });
+      if (!c.turnState.dashed || !c.turnState.disengaged) out.push({ id: "step-of-wind", label: FEATURE_LABELS["step-of-wind"], detail: `1 point (${focus} restant${focus > 1 ? "s" : ""}) · foncer et se désengager` });
+    }
+    // Source de magie (ensorceleur) : convertir des emplacements de sort et des points de sorcellerie.
+    const sp = feature(c, "sorcery-points");
+    const slots = c.spellcasting?.slots;
+    if (sp && slots) {
+      if (sp.uses >= 2 && slots.used > 0) out.push({ id: "font-slot", label: FEATURE_LABELS["font-slot"], detail: `2 points (${sp.uses}/${sp.max}) → 1 emplacement de niveau 1` });
+      if (sp.uses < sp.max && slots.used < slots.max) out.push({ id: "font-points", label: FEATURE_LABELS["font-points"], detail: `1 emplacement de niveau 1 → 1 point (${sp.uses}/${sp.max})` });
+    }
   }
   // Combat à deux armes : après une attaque avec une arme légère, une attaque avec une seconde arme légère.
   const off = c.turnState.offhand;
@@ -1419,11 +1482,11 @@ export interface FeatureChoice {
 }
 
 /** Utilise une capacité de classe (action bonus). */
-export function useFeature(state: CombatState, id: FeatureId, rng: Rng = Math.random, choice: FeatureChoice = {}) {
+export function useFeature(state: CombatState, id: FeatureOptionId, rng: Rng = Math.random, choice: FeatureChoice = {}) {
   const cur = assertPlayerTurn(state);
   const option = availableBonus(state, cur).find((o) => o.id === id);
   if (!option) throw new Error(`${FEATURE_LABELS[id]} n'est pas utilisable maintenant.`);
-  const f = feature(cur, id)!;
+  const f = feature(cur, id as FeatureId)!;
 
   switch (id) {
     case "second-wind": {
@@ -1485,6 +1548,68 @@ export function useFeature(state: CombatState, id: FeatureId, rng: Rng = Math.ra
       resolveAttack(state, cur, target, strike, rng);
       afterPlayerAction(state, rng);
       return;
+    }
+    case "action-surge":
+      f.uses -= 1;
+      cur.turnState.action = false;
+      cur.turnState.surged = true;
+      state.log.push(`${cur.name} puise dans ses réserves : une action de plus ce tour (Fougue).`);
+      break;
+    case "reckless":
+      cur.reckless = true;
+      state.log.push(`${cur.name} attaque sans se protéger : avantage à ses attaques de Force au corps à corps, mais aussi aux attaques contre lui jusqu'à son prochain tour.`);
+      break;
+    case "cunning-dash":
+      cur.turnState.bonus = true;
+      cur.turnState.dashed = true;
+      state.log.push(`${cur.name} fonce (Action ruse) : déplacement doublé (${fm(movementLeft(cur, state) * CELL_METERS)} m possibles).`);
+      break;
+    case "cunning-disengage":
+      cur.turnState.bonus = true;
+      cur.turnState.disengaged = true;
+      state.log.push(`${cur.name} se désengage (Action ruse) : aucune attaque d'opportunité ce tour.`);
+      break;
+    case "patient-defense":
+      feature(cur, "focus")!.uses -= 1;
+      cur.turnState.bonus = true;
+      cur.dodging = true;
+      state.log.push(`${cur.name} adopte la Défense patiente : désavantage aux attaques contre lui jusqu'à son prochain tour.`);
+      break;
+    case "step-of-wind":
+      feature(cur, "focus")!.uses -= 1;
+      cur.turnState.bonus = true;
+      cur.turnState.dashed = true;
+      cur.turnState.disengaged = true;
+      state.log.push(`${cur.name} file comme le vent : il fonce et se désengage (${fm(movementLeft(cur, state) * CELL_METERS)} m possibles).`);
+      break;
+    case "flurry": {
+      const target = enemyTarget(state, choice.targetId ?? "");
+      const strike = cur.attacks.find((a) => a.unarmed)!;
+      const check = attackCheck(state, cur, target, strike);
+      if (!check.ok) throw new Error(check.reason);
+      feature(cur, "focus")!.uses -= 1;
+      cur.turnState.bonus = true;
+      state.log.push(`${cur.name} se lance dans un déluge de coups !`);
+      resolveAttack(state, cur, target, strike, rng);
+      if (!target.dead && state.status === "ongoing") resolveAttack(state, cur, target, strike, rng);
+      afterPlayerAction(state, rng);
+      return;
+    }
+    case "font-slot": {
+      const sc = cur.spellcasting!;
+      feature(cur, "sorcery-points")!.uses -= 2;
+      sc.slots.used -= 1;
+      cur.turnState.bonus = true;
+      state.log.push(`${cur.name} transforme 2 points de sorcellerie en un emplacement de sort de niveau 1.`);
+      break;
+    }
+    case "font-points": {
+      const sc = cur.spellcasting!;
+      feature(cur, "sorcery-points")!.uses += 1;
+      sc.slots.used += 1;
+      cur.turnState.bonus = true;
+      state.log.push(`${cur.name} convertit un emplacement de sort de niveau 1 en 1 point de sorcellerie.`);
+      break;
     }
     case "martial-arts": {
       const target = enemyTarget(state, choice.targetId ?? "");
