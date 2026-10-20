@@ -6,6 +6,10 @@ Ce projet n'est ni approuvé ni affilié à Wizards of the Coast. Seul le conten
 
 Les statistiques des monstres du bestiaire de départ proviennent du System Reference Document 5.1 (Wizards of the Coast LLC), également sous licence Creative Commons Attribution 4.0 International.
 
+## Musique et bruitages
+
+La musique d'ambiance et les effets sonores sont générés par le code de l'application (`src/ui/audio/`, Web Audio) : aucun fichier audio n'est embarqué, aucun contenu sonore de tiers n'est utilisé. Ils relèvent de la licence du code du projet.
+
 ## Illustrations
 
 Les illustrations des classes, espèces, historiques et monstres utilisent des icônes de [game-icons.net](https://game-icons.net) (Lorc, Delapouite et autres contributeurs), sous licence Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/by/3.0/). Les icônes ont été recolorées et placées sur un badge. Seules les icônes utilisées sont embarquées (`src/data/game-icons.generated.ts`, produit par `scripts/extract-icons.mjs`). L'attribution est aussi affichée dans l'application (menu → Crédits).

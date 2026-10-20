@@ -8,5 +8,10 @@ import { createPinia } from "pinia";
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
+import { useSound } from "./stores/sound";
+import { installSound } from "./ui/audio";
 
-createApp(App).use(IonicVue).use(createPinia()).use(router).mount("#app");
+const app = createApp(App).use(IonicVue).use(createPinia()).use(router);
+const sound = useSound();
+installSound(router, () => sound.settings);
+app.mount("#app");

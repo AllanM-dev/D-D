@@ -90,6 +90,7 @@ import {
 } from "../engine/exploration";
 import { vitalsOf } from "../engine/rest";
 import { useCharacters } from "../stores/characters";
+import { moodForMap, playSfx, setMood } from "../ui/audio";
 import { formatMeters } from "../ui/format";
 import { tileBackground } from "../ui/tileArt";
 import "../ui/tiles.css";
@@ -112,6 +113,9 @@ watch(character, (c) => { if (c && !c.exploration) store.setExploration(c.id, st
 
 const message = ref("");
 onIonViewWillEnter(() => { message.value = ""; });
+// Musique : le village et ses environs, ou la crypte (aussi quand on passe de l'un à l'autre).
+onIonViewWillEnter(() => setMood(moodForMap(map.value.id)));
+watch(() => map.value.id, (id) => setMood(moodForMap(id)));
 const walked = ref(0);
 const scroller = ref<HTMLElement | null>(null);
 let walking = false;
@@ -268,6 +272,7 @@ async function go(target: Cell) {
     if (!cur) { message.value = "Le chemin est coupé."; break; }
     if (cur.path.length === 0) { arrived = true; break; }
     const res = stepTo(next, cur.path[0], flags.value);
+    playSfx("step");
     steps += 1;
     walked.value += 1;
     store.setExploration(characterId.value, next);

@@ -240,6 +240,7 @@ import {
   type Combatant, type CombatState, type FeatureOptionId, type RollEvent,
 } from "../engine/combat";
 import { useCharacters } from "../stores/characters";
+import { playSfx, sfxForRoll } from "../ui/audio";
 import { ROLL_BUTTON_LABEL, formatMeters, signed } from "../ui/format";
 
 const route = useRoute();
@@ -302,6 +303,12 @@ function skipAll() {
   nextRoll();
 }
 
+/** Bruitage d'un jet joué sans scène de dés (ceux des ennemis, ou tous quand l'animation est coupée). */
+function sound(ev: RollEvent) {
+  const sfx = sfxForRoll(ev);
+  if (sfx) playSfx(sfx);
+}
+
 /** Met l'affichage (PV, journal) à l'état qui suit ce jet. */
 function reveal(ev: RollEvent) {
   // L'initiative est déjà affichée (liste triée) : on ne remplace l'affichage qu'à partir des attaques.
@@ -323,11 +330,13 @@ async function play(events: RollEvent[]) {
     if (ev.kind === "move") {
       // Déplacement : pas de dés, l'affichage suit simplement (avec une courte pause).
       reveal(ev);
+      if (!skipping) playSfx("step");
       if (!skipping) await sleep(450);
       continue;
     }
     if (!animateDice.value || skipping) {
       reveal(ev);
+      if (!skipping) sound(ev);
     } else if (mine) {
       const next = queue[0];
       const nextMine = !!next && next.side === "party";
@@ -340,6 +349,7 @@ async function play(events: RollEvent[]) {
     } else {
       auto = false;
       reveal(ev);
+      sound(ev);
       if (ev.kind !== "initiative") await sleep(500);
     }
   }
@@ -411,6 +421,7 @@ async function start(e: EncounterDef) {
 // Le combat terminé, les PV et ressources restantes sont reportés sur le personnage.
 watch(() => state.value?.status, (st) => {
   if (!st || st === "ongoing" || !character.value) return;
+  playSfx(st === "victory" ? "victory" : "defeat");
   store.setVitals(character.value.id, vitalsAfterCombat(character.value, state.value!));
   // Venu de la carte : l'ennemi vaincu disparaît ; en cas de défaite, le héros se réveille au départ.
   const ex = character.value.exploration;
@@ -437,6 +448,7 @@ watch(() => state.value?.status, (st) => {
       const loot = enemyLoot(enemyParam.value);
       lootText.value = describeLoot(loot);
       store.addLoot(character.value.id, loot);
+      if (loot.gold) setTimeout(() => playSfx("coin"), 900);
     }
   }
   // Expérience : seulement pour les ennemis vaincus d'un combat de l'aventure (pas l'entraînement, pas les fuyards).
@@ -550,7 +562,7 @@ const zoneNames = (e: Combatant) => {
   const hit = areaTargets(state.value, hero.value, spell, e);
   return `${hit.length} ennemi${hit.length > 1 ? "s" : ""} touché${hit.length > 1 ? "s" : ""} (${hit.map((t) => t.name).join(", ")})`;
 };
-const cast = (id: string, targetId?: string) => act((s) => castSpell(s, id, Math.random, { targetId }));
+const cast = (id: string, targetId?: string) => { playSfx("spell"); return act((s) => castSpell(s, id, Math.random, { targetId })); };
 const spellName = (id: string) => SPELL_BY_ID[id]?.name ?? id;
 const isMarked = (id: string) => !!state.value?.combatants.some((x) => x.mark?.targetId === id);
 const bonusStrike = (id: FeatureOptionId, targetId: string) => act((s) => useFeature(s, id, Math.random, { targetId }));

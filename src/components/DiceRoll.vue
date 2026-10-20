@@ -33,6 +33,7 @@
 import { IonButton } from "@ionic/vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type { RollEvent } from "../engine/combat";
+import { playSfx, sfxForRoll } from "../ui/audio";
 import { ROLL_BUTTON_LABEL, signed } from "../ui/format";
 
 const props = defineProps<{
@@ -91,6 +92,7 @@ const outcomeText = computed(() => {
 
 function roll() {
   phase.value = "rolling";
+  playSfx("dice");
   if (!reducedMotion) {
     tick = setInterval(() => {
       randoms.value = props.event.dice.map(() => 1 + Math.floor(Math.random() * props.event.sides));
@@ -104,6 +106,8 @@ function settle() {
   clearInterval(tick);
   clearTimeout(timer);
   phase.value = "settled";
+  const sfx = sfxForRoll(props.event);
+  if (sfx) playSfx(sfx);
 }
 
 function finish() {

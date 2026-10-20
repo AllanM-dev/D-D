@@ -87,6 +87,7 @@ import { SKILLS, type SkillId } from "../data/skills";
 import { SPELL_BY_ID, isPlayable, spellCountsFor } from "../data/spells";
 import { canLevelUp, hpGainFor, levelUp, levelUpNeeds, validateLevelUp, xpOf } from "../engine/levelup";
 import { useCharacters } from "../stores/characters";
+import { playSfx } from "../ui/audio";
 import { heroSpriteKey } from "../ui/sprites";
 
 const route = useRoute();
@@ -128,6 +129,7 @@ const errors = computed(() => (c.value ? validateLevelUp(c.value, choices.value)
 function confirm() {
   if (!c.value || errors.value.length) return;
   store.replace(levelUp(clone(c.value), choices.value).character);
+  playSfx("levelup");
   router.replace(`/character/${id.value}`);
 }
 </script>

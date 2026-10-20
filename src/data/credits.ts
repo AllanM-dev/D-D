@@ -34,6 +34,11 @@ export const CREDITS: Credit[] = [
     ],
   },
   {
+    title: "Musique et bruitages",
+    text: "La musique d'ambiance et les effets sonores sont des créations originales de ce projet : ils sont composés et synthétisés en direct par l'application (Web Audio), sans aucun enregistrement ni fichier audio de tiers.",
+    links: [],
+  },
+  {
     title: "Technologies",
     text: "L'application est construite avec Vue, Ionic et Capacitor, trois logiciels libres sous licence MIT.",
     links: [],
