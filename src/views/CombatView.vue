@@ -15,7 +15,7 @@
     <!-- Choix de la rencontre -->
     <ion-content v-else-if="!state" class="ion-padding">
       <p>{{ character.name }} · {{ character.classDef.name }} · {{ vitals.hp }}/{{ character.maxHp }} PV · CA {{ character.armorClass }}</p>
-      <p v-if="companion" class="hint">{{ companion.name }} ({{ companion.roleLabel.toLowerCase() }}) se bat à vos côtés et joue tout seul. Changez de compagnon sur la fiche du personnage.</p>
+      <p v-if="companion" class="hint">{{ companion.name }} ({{ companion.roleLabel.toLowerCase() }}) se bat à vos côtés et agit de son propre chef. Changez de compagnon sur la fiche du personnage. Avec un compagnon, les rencontres reçoivent des renforts et l’expérience des combats est partagée.</p>
       <p class="hint">
         Équipement : {{ outfit }}. Vous choisirez votre arme ou votre sort à chaque attaque.
         Vous combattez avec les PV et les ressources qu'il vous reste : reposez-vous entre deux combats (fiche du personnage).
@@ -28,13 +28,14 @@
             <h2>{{ e.name }}</h2>
             <p>{{ describe(e) }}</p>
           </ion-label>
-          <ion-badge slot="end" :color="badge[e.difficulty]">{{ e.difficulty }}</ion-badge>
+          <ion-badge slot="end" :color="badge[difficultyOf(e)]">{{ difficultyOf(e) }}</ion-badge>
         </ion-item>
       </ion-list>
     </ion-content>
 
     <!-- Combat -->
     <ion-content v-else class="ion-padding">
+      <p v-if="reinforceNotice" class="hint reinforce">{{ reinforceNotice }} (renforts : vous êtes deux)</p>
       <ion-list inset>
         <ion-item v-for="c in orderedCombatants" :key="c.id" :class="{ active: c.id === currentId && !busy && state.status === 'ongoing' }">
           <Illustration v-if="c.art" slot="start" :art="c.art" :size="44" />
@@ -198,7 +199,7 @@
       <div v-else-if="finished" class="result" :class="state.status">
         <h2>{{ state.status === "victory" ? "Victoire !" : "Défaite…" }}</h2>
         <p v-if="lootText && state.status === 'victory'" class="loot">Butin : {{ lootText }}</p>
-        <p v-if="xpGained && state.status === 'victory'" class="loot">Expérience : +{{ xpGained }} points.</p>
+        <p v-if="xpGained && state.status === 'victory'" class="loot">Expérience : +{{ xpGained }} points<template v-if="fightParty > 1"> (votre part : l'expérience est partagée avec {{ companion?.name }})</template>.</p>
         <ion-button v-if="canLevel && state.status === 'victory'" expand="block" color="success" :router-link="`/levelup/${characterId}`">Monter au niveau {{ (character?.level ?? 1) + 1 }}</ion-button>
         <template v-if="fromStory">
           <p v-if="state.status === 'defeat'" class="hint">Vous perdez connaissance… (1 PV).</p>
@@ -243,7 +244,8 @@ import { buildSetup } from "../engine/arena";
 import { CELL_METERS, placeAt, type Cell } from "../engine/exploration";
 import { areaTargets, castSpell, healTargets, spellRange } from "../engine/spellcasting";
 import { useRoute } from "vue-router";
-import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
+import { ENCOUNTERS, buildEnemies, encounterMonsters, type EncounterDef } from "../data/encounters";
+import { encounterDifficulty, xpShare, type Difficulty } from "../engine/encounter";
 import { MONSTERS } from "../data/monsters";
 import { characterToCombatant } from "../engine/attacks";
 import { defeatEnemy, livingEnemies as mapEnemies, retreatToStart } from "../engine/exploration";
@@ -276,10 +278,16 @@ const state = ref<CombatState | null>(null);
 const movePreview = ref<{ target: Cell; path: Cell[]; ok: boolean } | null>(null);
 const moveMessage = ref("");
 
-const badge = { Facile: "success", Moyen: "warning", Difficile: "danger" } as const;
-
+const badge: Record<Difficulty, string> = { Facile: "success", Moyen: "warning", Difficile: "danger", "Très difficile": "danger" };
+/** Membres du groupe : le héros, et son compagnon s'il en a un. */
+const partySize = computed(() => (companion.value ? 2 : 1));
+const difficultyOf = (e: EncounterDef) => encounterDifficulty(e, character.value?.level ?? 1, partySize.value);
 const describe = (e: EncounterDef) =>
-  e.monsters.map((m) => `${m.count} × ${MONSTERS.find((x) => x.id === m.monsterId)!.name}`).join(", ");
+  encounterMonsters(e, partySize.value).map((m) => `${m.count} × ${MONSTERS.find((x) => x.id === m.monsterId)!.name}`).join(", ")
+  + (partySize.value > 1 ? " (renforts compris)" : "");
+/** Taille du groupe au début du combat en cours (l'expérience est partagée entre ses membres). */
+const fightParty = ref(1);
+const reinforceNotice = ref("");
 
 // --- animation des dés : l'état du moteur est déjà à jour, mais l'affichage est rejoué jet par jet
 const PREF_KEY = "dd-mobile.animateDice";
@@ -415,7 +423,10 @@ async function start(e: EncounterDef) {
   const c = character.value!;
   const party = characterToCombatant(c);
   const ally = companionCombatant(c);
-  const enemies = buildEnemies(e);
+  fightParty.value = ally ? 2 : 1;
+  // Avec un compagnon, la rencontre reçoit ses renforts.
+  reinforceNotice.value = ally && e.reinforcements.length ? e.reinforceText : "";
+  const enemies = buildEnemies(e, fightParty.value);
   // Sur le terrain : depuis la carte, le combat se joue sur la carte, chacun à sa place ; sinon dans une clairière.
   const fromTrip = fromMap.value || fromStory.value;
   // Position réelle de l'ennemi : il a pu quitter son poste pour poursuivre le héros.
@@ -473,7 +484,8 @@ watch(() => state.value?.status, (st) => {
   // Expérience : seulement pour les ennemis vaincus d'un combat de l'aventure (pas l'entraînement, pas les fuyards).
   if ((fromMap.value || fromStory.value) && st === "victory") {
     const gained = state.value!.combatants.filter((x) => x.side === "enemies" && x.dead && !x.fled).reduce((n, x) => n + (x.xp ?? 0), 0);
-    if (gained > 0) { xpGained.value = gained; store.addExperience(character.value.id, gained); }
+    const share = xpShare(gained, fightParty.value);
+    if (share > 0) { xpGained.value = share; store.addExperience(character.value.id, share); }
   }
   // L'ennemi vaincu laisse un drapeau dans l'histoire (`defeated:<id>`).
   if ((fromMap.value || fromStory.value) && st === "victory" && enemyParam.value) {

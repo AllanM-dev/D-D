@@ -78,6 +78,6 @@ describe("tactiques des monstres", () => {
 
   it("tous les monstres lâches sont des monstres du bestiaire, et les rencontres se construisent", () => {
     for (const m of MONSTERS) for (const t of m.traits ?? []) expect(["pack-tactics", "undead-fortitude", "aggressive", "archer", "coward"]).toContain(t);
-    expect(buildEnemies({ id: "x", name: "x", difficulty: "Facile", monsters: [{ monsterId: "bandit", count: 2 }] })).toHaveLength(2);
+    expect(buildEnemies({ id: "x", name: "x", monsters: [{ monsterId: "bandit", count: 2 }], reinforcements: [], reinforceText: "" })).toHaveLength(2);
   });
 });
