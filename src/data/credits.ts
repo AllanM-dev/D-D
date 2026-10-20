@@ -21,7 +21,7 @@ export const CREDITS: Credit[] = [
   },
   {
     title: "Monstres : System Reference Document 5.1",
-    text: "Les statistiques des monstres du bestiaire de départ proviennent du SRD 5.1 de Wizards of the Coast, également sous licence CC BY 4.0.",
+    text: "Les statistiques des monstres du bestiaire de départ, et celles des compagnons (garde, acolyte, éclaireur, bandit), proviennent du SRD 5.1 de Wizards of the Coast, également sous licence CC BY 4.0.",
     links: [{ label: "Licence CC BY 4.0", url: "https://creativecommons.org/licenses/by/4.0/legalcode" }],
   },
   {

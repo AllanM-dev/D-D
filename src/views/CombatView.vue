@@ -15,6 +15,7 @@
     <!-- Choix de la rencontre -->
     <ion-content v-else-if="!state" class="ion-padding">
       <p>{{ character.name }} · {{ character.classDef.name }} · {{ vitals.hp }}/{{ character.maxHp }} PV · CA {{ character.armorClass }}</p>
+      <p v-if="companion" class="hint">{{ companion.name }} ({{ companion.roleLabel.toLowerCase() }}) se bat à vos côtés et joue tout seul. Changez de compagnon sur la fiche du personnage.</p>
       <p class="hint">
         Équipement : {{ outfit }}. Vous choisirez votre arme ou votre sort à chaque attaque.
         Vous combattez avec les PV et les ressources qu'il vous reste : reposez-vous entre deux combats (fiche du personnage).
@@ -37,15 +38,17 @@
       <ion-list inset>
         <ion-item v-for="c in orderedCombatants" :key="c.id" :class="{ active: c.id === currentId && !busy && state.status === 'ongoing' }">
           <Illustration v-if="c.art" slot="start" :art="c.art" :size="44" />
+          <Sprite v-else-if="c.ally && c.sprite" slot="start" :sprite="c.sprite" :size="44" />
           <ion-label>
             <h2>
-              <span v-if="c.id === currentId && !busy && state.status === 'ongoing'">▶ </span>{{ c.name }}
+              <span v-if="c.id === currentId && !busy && state.status === 'ongoing'">▶ </span>{{ c.name }}<template v-if="c.ally"> <small>(compagnon)</small></template>
               <small>CA {{ c.ac }} · init {{ c.initiative }}</small>
             </h2>
             <ion-progress-bar :value="c.maxHp ? c.hp / c.maxHp : 0" :color="c.side === 'party' ? 'success' : 'danger'" />
             <p>
               <template v-if="c.fled">🏃 En fuite</template>
               <template v-else-if="c.dead">☠ Mort</template>
+              <template v-else-if="c.hp === 0 && c.ally">Hors de combat (se relèvera après le combat)</template>
               <template v-else-if="c.hp === 0 && c.side === 'party'">
                 {{ c.stable ? "Inconscient, stable" : `À terre · jets de mort ${c.deathSaves.successes}✓ ${c.deathSaves.failures}✗` }}
               </template>
@@ -147,6 +150,18 @@
                 <p v-else-if="zoneNames(e)" class="hint zone">Zone : {{ zoneNames(e) }}</p>
               </template>
             </template>
+            <template v-else-if="healAllies.length">
+              <!-- Sort de soin : sur soi ou sur un compagnon -->
+              <ion-button expand="block" color="tertiary" :disabled="(hero?.hp ?? 0) >= (hero?.maxHp ?? 0)" @click="cast(pickedSpell.id)">
+                {{ pickedSpell.name }} sur vous{{ pickedSpell.time === "bonus" ? " (action bonus)" : "" }}
+              </ion-button>
+              <template v-for="a in healAllies" :key="a.id">
+                <ion-button expand="block" color="tertiary" :disabled="!healStatus(a).ok" @click="cast(pickedSpell.id, a.id)">
+                  {{ pickedSpell.name }} sur {{ a.name }} ({{ a.hp }}/{{ a.maxHp }} PV)
+                </ion-button>
+                <p v-if="!healStatus(a).ok" class="hint">{{ healStatus(a).reason }}</p>
+              </template>
+            </template>
             <ion-button v-else expand="block" color="tertiary" @click="cast(pickedSpell.id)">
               Lancer {{ pickedSpell.name }}{{ pickedSpell.time === "bonus" ? " (action bonus)" : "" }}
             </ion-button>
@@ -219,12 +234,14 @@ import { clone } from "../engine/clone";
 import CombatGrid from "../components/CombatGrid.vue";
 import DiceRoll from "../components/DiceRoll.vue";
 import Illustration from "../components/Illustration.vue";
+import Sprite from "../components/Sprite.vue";
+import { activeCompanion, companionCombatant } from "../engine/companions";
 import { artKey } from "../data/illustrations";
 import { SPELL_BY_ID } from "../data/spells";
 import { MAP_BY_ID } from "../data/maps";
 import { buildSetup } from "../engine/arena";
 import { CELL_METERS, placeAt, type Cell } from "../engine/exploration";
-import { areaTargets, castSpell, spellRange } from "../engine/spellcasting";
+import { areaTargets, castSpell, healTargets, spellRange } from "../engine/spellcasting";
 import { useRoute } from "vue-router";
 import { ENCOUNTERS, buildEnemies, type EncounterDef } from "../data/encounters";
 import { MONSTERS } from "../data/monsters";
@@ -326,7 +343,7 @@ async function play(events: RollEvent[]) {
   let auto = false; // vrai si le joueur vient d'appuyer sur « Lancer… » pour ce jet
   while (queue.length) {
     const ev = queue.shift()!;
-    const mine = ev.side === "party";
+    const mine = ev.actorId === characterId.value; // les jets du compagnon se jouent comme ceux des ennemis
     if (ev.kind === "move") {
       // Déplacement : pas de dés, l'affichage suit simplement (avec une courte pause).
       reveal(ev);
@@ -339,7 +356,7 @@ async function play(events: RollEvent[]) {
       if (!skipping) sound(ev);
     } else if (mine) {
       const next = queue[0];
-      const nextMine = !!next && next.side === "party";
+      const nextMine = !!next && next.actorId === characterId.value;
       nextLabel.value = nextMine ? ROLL_BUTTON_LABEL[next.kind] : null;
       startMode.value = auto ? "auto" : "button";
       await showRoll(ev);
@@ -397,23 +414,25 @@ async function start(e: EncounterDef) {
   moveMessage.value = "";
   const c = character.value!;
   const party = characterToCombatant(c);
+  const ally = companionCombatant(c);
   const enemies = buildEnemies(e);
   // Sur le terrain : depuis la carte, le combat se joue sur la carte, chacun à sa place ; sinon dans une clairière.
   const fromTrip = fromMap.value || fromStory.value;
   // Position réelle de l'ennemi : il a pu quitter son poste pour poursuivre le héros.
   const mapDef = MAP_BY_ID[c.exploration?.mapId ?? ""];
   const enemyCell = fromTrip && mapDef && c.exploration ? mapEnemies(mapDef, c.exploration).find((x) => x.id === enemyParam.value) : undefined;
-  const setup = buildSetup(enemies.length, fromTrip && c.exploration ? { exploration: c.exploration, enemyCell } : undefined);
+  const setup = buildSetup(enemies.length, fromTrip && c.exploration ? { exploration: c.exploration, enemyCell } : undefined, ally ? 1 : 0);
   party.pos = setup.hero;
+  if (ally) ally.pos = setup.allies[0] ?? setup.hero;
   enemies.forEach((en, i) => { en.pos = setup.enemies[i]; });
-  const s = startCombat([party], enemies, Math.random, setup.arena);
+  const s = startCombat(ally ? [party, ally] : [party], enemies, Math.random, setup.arena);
   state.value = s;
   // Affichage de départ : tout le monde à pleins PV et à sa place de départ (les ennemis qui jouent en premier avancent après leur jet).
   const fresh: Combatant[] = clone(s.combatants);
   const startHp = vitalsOf(c).hp;
   for (const f of fresh) {
-    const start = f.side === "party" ? setup.hero : setup.enemies[enemies.findIndex((en) => en.id === f.id)];
-    Object.assign(f, { hp: f.side === "party" ? startHp : f.maxHp, dead: false, stable: false, dodging: false, deathSaves: { successes: 0, failures: 0 }, pos: start });
+    const start = f.id === c.id ? setup.hero : f.ally ? setup.allies[0] ?? setup.hero : setup.enemies[enemies.findIndex((en) => en.id === f.id)];
+    Object.assign(f, { hp: f.id === c.id ? startHp : f.ally ? ally!.hp ?? f.maxHp : f.maxHp, dead: false, stable: false, dodging: false, deathSaves: { successes: 0, failures: 0 }, pos: start });
   }
   shown.value = { combatants: fresh, logLen: 0, round: 1 };
   await play(s.rolls);
@@ -428,7 +447,7 @@ watch(() => state.value?.status, (st) => {
   if ((fromMap.value || fromStory.value) && ex) {
     if (st === "victory") {
       // Le héros reste là où le combat l'a mené ; l'ennemi vaincu disparaît de la carte.
-      const h = state.value!.combatants.find((x) => x.side === "party");
+      const h = state.value!.combatants.find((x) => x.id === character.value!.id);
       const placed = h?.pos ? placeAt(ex, h.pos) : ex;
       store.setExploration(character.value.id, enemyParam.value ? defeatEnemy(placed, enemyParam.value) : placed);
     }
@@ -499,7 +518,18 @@ const disengage = () => act((s) => playerDisengage(s));
 const endTurn = () => act((s) => playerEndTurn(s));
 
 // --- terrain : déplacement en deux temps, portées
-const hero = computed(() => state.value?.combatants.find((c) => c.side === "party"));
+const hero = computed(() => state.value?.combatants.find((c) => c.id === characterId.value));
+const companion = computed(() => (character.value ? activeCompanion(character.value) : undefined));
+/** Compagnons qu'un sort de soin peut viser (encore en vie, même à 0 PV). */
+const healAllies = computed(() => {
+  const sp = pickedSpell.value && SPELL_BY_ID[pickedSpell.value.id];
+  if (!sp || sp.effect.kind !== "heal" || !state.value || !hero.value) return [];
+  return healTargets(state.value, hero.value).filter((t) => t.id !== hero.value!.id);
+});
+function healStatus(a: Combatant): TargetCheck {
+  if (a.hp >= a.maxHp) return { ok: false, reason: `${a.name} a tous ses PV.`, disadvantage: [], meters: 0 };
+  return state.value && hero.value && pickedSpell.value ? spellTargetCheck(state.value, hero.value, a, spellRange(SPELL_BY_ID[pickedSpell.value.id], hero.value)) : NO_CHECK;
+}
 const NO_CHECK: TargetCheck = { ok: true, disadvantage: [], meters: 0 };
 const attackStatus = (e: Combatant) =>
   state.value && hero.value ? attackCheck(state.value, hero.value, e, attacks.value[attackChoice.value] ?? attacks.value[0]) : NO_CHECK;

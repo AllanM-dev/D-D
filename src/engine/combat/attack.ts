@@ -12,7 +12,7 @@ import type { AttackContext, AttackDef, AttackResult, Combatant, CombatState, Re
 /** Réactions (sorts) que ce combattant peut utiliser maintenant : Bouclier quand l'attaque touche, Représailles infernales après des dégâts. */
 export function reactionOptions(c: Combatant, stage: "hit" | "damage"): ReactionOption[] {
   const sc = c.spellcasting;
-  if (!sc || c.side !== "party" || !isConscious(c) || isIncapacitated(c) || c.turnState.reaction || c.untrainedArmor) return [];
+  if (!sc || c.side !== "party" || c.ally || !isConscious(c) || isIncapacitated(c) || c.turnState.reaction || c.untrainedArmor) return [];
   if (sc.slots.max - sc.slots.used <= 0) return [];
   const id = stage === "hit" ? "shield" : "hellish-rebuke";
   if (!sc.prepared.includes(id)) return [];
@@ -52,8 +52,10 @@ export function resolveAttack(
   else if (disadvantage && !advantage) mode = "disadvantage";
 
   const roll = rollD20(attack.toHit, mode, rng);
+  const allyNear = !!state.arena && !!target.pos && state.combatants.some((a) =>
+    a.side === attacker.side && a.id !== attacker.id && isConscious(a) && !isIncapacitated(a) && !!a.pos && cellDistance(a.pos, target.pos!) <= 1);
   const ctx: AttackContext = {
-    attackerId: attacker.id, targetId: target.id, attack, reasons, melee, advantaged: advantage && !disadvantage,
+    attackerId: attacker.id, targetId: target.id, attack, reasons, melee, advantaged: advantage && !disadvantage, flanked: allyNear && !disadvantage,
     roll: { natural: roll.natural, rolls: roll.rolls, total: roll.total, critical: roll.critical, fumble: roll.fumble },
   };
   // Un ennemi qui touche un héros capable de réagir (Bouclier) attend la décision du joueur avant les dégâts.
@@ -163,7 +165,7 @@ export function completeAttack(state: CombatState, ctx: AttackContext, rng: Rng)
   }
 
   // Attaque sournoise : une fois par tour, arme à finesse ou à distance, avec l'avantage.
-  if (attacker.sneakDice && attack.sneak && ctx.advantaged && !attacker.turnState.sneakUsed && !target.dead) {
+  if (attacker.sneakDice && attack.sneak && (ctx.advantaged || ctx.flanked) && !attacker.turnState.sneakUsed && !target.dead) {
     attacker.turnState.sneakUsed = true;
     const extra = rollDamageDetailed({ count: attacker.sneakDice, sides: 6, bonus: 0 }, crit, rng);
     state.log.push(`Attaque sournoise : ${extra.total} dégâts supplémentaires.`);

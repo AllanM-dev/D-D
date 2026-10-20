@@ -8,8 +8,9 @@ import { ITEMS, ITEM_KIND_NAMES } from "../data/items";
 import { MONSTERS } from "../data/monsters";
 import { SPELLS, isPlayable } from "../data/spells";
 import { BACKGROUND_TEXT, WEAPON_PROPERTY_TEXT } from "../data/help";
+import { COMPANIONS, COMPANION_BY_ID } from "../data/companions";
 
-export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors" | "spells" | "conditions" | "items" | "monsters";
+export type HelpKind = "classes" | "species" | "backgrounds" | "weapons" | "armors" | "spells" | "conditions" | "items" | "monsters" | "companions";
 
 export const HELP_KINDS: Record<HelpKind, { title: string; singular: string }> = {
   classes: { title: "Classes", singular: "Classe" },
@@ -21,6 +22,7 @@ export const HELP_KINDS: Record<HelpKind, { title: string; singular: string }> =
   conditions: { title: "États", singular: "État" },
   items: { title: "Objets", singular: "Objet" },
   monsters: { title: "Bestiaire", singular: "Monstre" },
+  companions: { title: "Compagnons", singular: "Compagnon" },
 };
 
 export const isHelpKind = (k: string): k is HelpKind => k in HELP_KINDS;
@@ -43,6 +45,8 @@ export function helpEntries(kind: HelpKind): { id: string; name: string; summary
       }));
   if (kind === "monsters")
     return MONSTERS.map((m) => ({ id: m.id, name: m.name, summary: `${m.maxHp} PV · CA ${m.ac} · ${String(m.speed).replace(".", ",")} m · ${m.text}` }));
+  if (kind === "companions")
+    return COMPANIONS.map((c) => ({ id: c.id, name: c.name, summary: `${c.roleLabel} · ${c.title} · ${c.hp} PV · CA ${c.ac}` }));
   if (kind === "items")
     return ITEMS.map((i) => ({ id: i.id, name: i.name, summary: `${ITEM_KIND_NAMES[i.kind]}${i.value ? ` · ${i.value} po` : ""} · ${i.text}` }));
   if (kind === "conditions")
@@ -54,6 +58,9 @@ export function helpEntries(kind: HelpKind): { id: string; name: string; summary
     }));
   return BACKGROUNDS.map((b) => ({ id: b.id, name: b.name, summary: BACKGROUND_TEXT[b.id] }));
 }
+
+/** Personnage dessiné d'une entrée d'aide (les compagnons). */
+export const helpSprite = (kind: HelpKind | string, id: string): string | undefined => (kind === "companions" ? COMPANION_BY_ID[id]?.sprite : undefined);
 
 /** Illustration d'une entrée d'aide (les armes et armures n'en ont pas). */
 export function helpArt(kind: HelpKind | string, id: string): string | undefined {

@@ -106,6 +106,8 @@ export interface Character {
   inventory?: Record<string, number>;
   /** Armes dont la maîtrise est active (identifiants d'armes) ; absent = choix par défaut d'après l'équipement. */
   masteries?: string[];
+  /** Compagnon choisi parmi ceux recrutés (`aucun` : voyager seul) ; absent = le premier recruté (voir `companions.ts`). */
+  companion?: string;
 }
 
 const ORDERS_BY_CLASS = new Set(["cleric", "druid"]);

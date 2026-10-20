@@ -99,7 +99,7 @@ export function spellOptionsFor(state: CombatState, c: Combatant): SpellOption[]
     else if (spell.level >= 1 && !hasFree && slotsLeft <= 0) reason = "Plus d'emplacement de sort";
     else reason = turnRestriction(c, spell);
     const kind = spell.effect.kind;
-    if (!reason && kind === "heal" && c.hp >= c.maxHp) reason = "Points de vie au maximum";
+    if (!reason && kind === "heal" && !healTargets(state, c).some((t) => t.hp < t.maxHp)) reason = "Points de vie au maximum";
     if (!reason && kind === "mage-armor") {
       if (!sc.unarmored) reason = "Réservé à qui ne porte pas d'armure";
       else if (13 + c.initiativeBonus <= c.ac) reason = "Sans effet : votre CA est déjà aussi bonne";
@@ -115,6 +115,10 @@ export function spellOptionsFor(state: CombatState, c: Combatant): SpellOption[]
   }
   return out;
 }
+
+/** Qui un sort de soin peut viser : le lanceur et ses compagnons encore en vie (à 0 PV compris). */
+export const healTargets = (state: CombatState, caster: Combatant): Combatant[] =>
+  state.combatants.filter((c) => c.id === caster.id || (c.side === caster.side && c.ally && !c.dead));
 
 /** Un sort à action bonus est-il utilisable maintenant ? (le tour reste alors ouvert) */
 export function hasBonusSpell(state: CombatState, c: Combatant): boolean {
@@ -144,11 +148,15 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
   const option = spellOptionsFor(state, cur).find((o) => o.id === spellId);
   if (!sc || !spell || !option) throw new Error("Sort inconnu ou non préparé.");
   if (!option.available) throw new Error(option.reason ?? "Ce sort est impossible maintenant.");
-  const target = option.target === "enemy" ? enemyTarget(state, choice.targetId ?? "") : cur;
-  if (option.target === "enemy") {
+  // Un sort de soin peut viser un compagnon (à portée) ; les autres sorts « sur soi » visent le lanceur.
+  const healTarget = spell.effect.kind === "heal" && choice.targetId ? healTargets(state, cur).find((t) => t.id === choice.targetId) : undefined;
+  if (spell.effect.kind === "heal" && choice.targetId && !healTarget) throw new Error("Cible de soin invalide.");
+  const target = option.target === "enemy" ? enemyTarget(state, choice.targetId ?? "") : healTarget ?? cur;
+  if (option.target === "enemy" || target !== cur) {
     const check = spellTargetCheck(state, cur, target, spellRange(spell, cur));
     if (!check.ok) throw new Error(check.reason);
   }
+  if (spell.effect.kind === "heal" && target.hp >= target.maxHp) throw new Error(`${target.name} a déjà tous ses PV.`);
 
   // Coût : lancer gratuit d'abord, sinon un emplacement.
   if (spell.level >= 1) {
@@ -251,9 +259,9 @@ export function castSpell(state: CombatState, spellId: string, rng: Rng = Math.r
     case "heal": {
       const dice = Array.from({ length: e.dice[0] }, () => rollDie(e.dice[1], rng));
       const total = dice.reduce((a, b) => a + b, sc.modifier);
-      healCombatant(state, cur, Math.max(0, total));
+      healCombatant(state, target, Math.max(0, total));
       pushRoll(state, {
-        kind: "heal", actorId: cur.id, actorName: cur.name, side: cur.side, title: `${spell.name} de ${cur.name}`,
+        kind: "heal", actorId: cur.id, actorName: cur.name, side: cur.side, title: `${spell.name} de ${cur.name}${target !== cur ? ` sur ${target.name}` : ""}`,
         sides: e.dice[1], dice, modifier: sc.modifier, total: Math.max(0, total), outcome: "success",
       });
       break;

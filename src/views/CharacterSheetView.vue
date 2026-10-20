@@ -68,6 +68,31 @@
       </ion-list>
 
       <ion-list inset>
+        <ion-list-header><ion-label>Compagnons</ion-label></ion-list-header>
+        <ion-item v-if="!recruited.length" lines="none">
+          <ion-label class="ion-text-wrap">
+            <p>Personne ne vous accompagne pour l'instant. Au fil de l'enquête, des habitants de Brumeval pourraient vous suivre : la maire connaît du monde, un moine dîne à l'auberge, et la fille du fermier sait tirer à l'arc… Voir Aide → Compagnons.</p>
+          </ion-label>
+        </ion-item>
+        <ion-item v-for="r in recruited" :key="r.def.id" lines="full">
+          <Sprite slot="start" :sprite="r.def.sprite" :size="48" :label="r.def.name" />
+          <ion-label class="ion-text-wrap">
+            <h3>{{ r.def.name }} · {{ r.def.roleLabel }} <ion-badge v-if="r.advice.recommended" color="success" class="rec">Recommandé</ion-badge></h3>
+            <p>{{ r.vitals.hp }}/{{ r.max }} PV · CA {{ r.def.ac }}<template v-if="r.def.healing"> · {{ r.def.healing.name }} {{ r.vitals.heals }}/{{ r.def.healing.uses }}</template></p>
+            <p>{{ r.advice.reason }}</p>
+            <ion-button v-if="active?.id === r.def.id" size="small" fill="solid" color="success" disabled>Avec vous</ion-button>
+            <ion-button v-else size="small" fill="outline" @click="store.setCompanion(c.id, r.def.id)">Emmener {{ r.def.name }}</ion-button>
+          </ion-label>
+        </ion-item>
+        <ion-item v-if="recruited.length" lines="none">
+          <ion-label class="ion-text-wrap">
+            <p>Un seul compagnon vous suit à la fois ; les autres vous attendent au village. Ses PV et ses soins reviennent avec vos repos.</p>
+            <ion-button v-if="active" size="small" fill="clear" @click="store.setCompanion(c.id, NO_COMPANION)">Voyager seul</ion-button>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+
+      <ion-list inset>
         <ion-list-header><ion-label>Sac à dos</ion-label></ion-list-header>
         <ion-item lines="full"><ion-label>Pièces d'or</ion-label><ion-note slot="end">{{ c.equipment.gold }} po</ion-note></ion-item>
         <ion-item v-for="b in bag" :key="b.def.id" lines="full">
@@ -212,7 +237,7 @@
 
 <script setup lang="ts">
 import {
-  IonBackButton, IonButton, IonCheckbox, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader,
+  IonBackButton, IonBadge, IonButton, IonCheckbox, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader,
   IonMenuButton, IonNote, IonPage, IonProgressBar, IonTitle, IonToolbar, useIonRouter,
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
@@ -238,6 +263,7 @@ import { CLASS_FEATURE_TEXT, FEATURE_STATUS } from "../data/help";
 import { ABILITIES } from "../engine/rules";
 import { ABILITY_NAMES, fmtNumber, formatMeters, signed } from "../ui/format";
 import { useCharacters } from "../stores/characters";
+import { NO_COMPANION, activeCompanion, companionAdvice, companionMaxHp, companionVitals, recruitedCompanions } from "../engine/companions";
 
 const store = useCharacters();
 const router = useIonRouter();
@@ -249,6 +275,14 @@ const casting = computed(() =>
     : undefined,
 );
 const vitals = computed(() => vitalsOf(c.value!));
+const active = computed(() => (c.value ? activeCompanion(c.value) : undefined));
+const recruited = computed(() => {
+  const ch = c.value;
+  if (!ch) return [];
+  return recruitedCompanions(ch).map((def) => ({
+    def, vitals: companionVitals(ch, def), max: companionMaxHp(def, ch.level), advice: companionAdvice(ch.classDef.id, def.id, ch.classDef.name),
+  }));
+});
 const resources = computed(() => {
   const ch = c.value!;
   const out = featuresFor(ch.classDef.id, ch.level, ch.modifiers)
@@ -343,5 +377,6 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .rest-row { display: flex; align-items: center; gap: 8px; padding: 4px 16px 10px; }
 .rest-row .grow { flex: 1; }
 .report { font-size: 0.9rem; }
+.rec { margin-left: 6px; vertical-align: middle; font-size: 0.7rem; }
 .warn { color: var(--ion-color-warning, #ffc409); font-size: 0.9rem; }
 </style>

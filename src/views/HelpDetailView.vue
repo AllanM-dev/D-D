@@ -9,6 +9,7 @@
     </ion-header>
     <ion-content class="ion-padding">
       <div v-if="heroArt" class="hero-art"><Illustration :art="heroArt" :size="104" :label="title" /></div>
+      <div v-else-if="comp" class="hero-art"><Sprite :sprite="comp.sprite" :size="104" :label="comp.name" /></div>
 
       <!-- Classe -->
       <template v-if="cls">
@@ -145,6 +146,40 @@
         <p v-if="mon.notApplied" class="status todo"><strong>Pas encore appliqué.</strong> {{ mon.notApplied }}</p>
       </template>
 
+      <!-- Compagnon -->
+      <template v-else-if="comp">
+        <p><strong>{{ comp.title }}</strong> · {{ comp.roleLabel }}</p>
+        <p>{{ comp.description }}</p>
+        <ion-list inset>
+          <ion-item><ion-label>Points de vie</ion-label><ion-note slot="end">{{ comp.hp }} (+{{ comp.hpPerLevel }} par niveau du héros)</ion-note></ion-item>
+          <ion-item><ion-label>Classe d'armure</ion-label><ion-note slot="end">{{ comp.ac }}</ion-note></ion-item>
+          <ion-item><ion-label>Vitesse</ion-label><ion-note slot="end">{{ formatMeters(comp.speed) }}</ion-note></ion-item>
+          <ion-item><ion-label>Initiative</ion-label><ion-note slot="end">{{ signed(comp.initiativeBonus) }}</ion-note></ion-item>
+        </ion-list>
+        <h3>En combat</h3>
+        <p>{{ TACTIC_TEXT[comp.tactic] }}</p>
+        <ion-list inset>
+          <ion-item v-for="a in comp.attacks" :key="a.name" lines="full">
+            <ion-label class="ion-text-wrap">
+              {{ a.name }}
+              <p>{{ signed(a.toHit) }} au toucher · {{ a.damage.count }}d{{ a.damage.sides }}{{ a.damage.bonus ? signed(a.damage.bonus) : "" }} {{ a.damageType }} · {{ a.ranged ? `à distance (${formatMeters(a.range?.[0] ?? 0)} / ${formatMeters(a.range?.[1] ?? 0)})` : "corps à corps" }}</p>
+            </ion-label>
+          </ion-item>
+          <ion-item v-if="comp.cantrip" lines="full">
+            <ion-label class="ion-text-wrap">{{ comp.cantrip.name }}<p>Sort mineur, {{ formatMeters(comp.cantrip.rangeM) }} : jet de sauvegarde de {{ ABILITY_NAMES[comp.cantrip.ability] }} DD {{ comp.cantrip.dc }}, sinon {{ comp.cantrip.dice[0] }}d{{ comp.cantrip.dice[1] }} dégâts {{ comp.cantrip.damageType }}.</p></ion-label>
+          </ion-item>
+          <ion-item v-if="comp.healing" lines="full">
+            <ion-label class="ion-text-wrap">{{ comp.healing.name }}<p>Au contact : {{ comp.healing.dice[0] }}d{{ comp.healing.dice[1] }} + {{ comp.healing.bonus }} PV, {{ comp.healing.uses }} fois par repos long. Relève un allié à 0 PV.</p></ion-label>
+          </ion-item>
+        </ion-list>
+        <h3>Le rencontrer</h3>
+        <p>{{ comp.recruitHint }}</p>
+        <h3>Pour quels personnages ?</h3>
+        <p>Recommandé pour : {{ recommendedFor.join(", ") }}. Il apporte ce qui manque à ces classes ; avec les autres, il fait un peu doublon, mais reste utile.</p>
+        <p class="hint">Statistiques : {{ comp.source }}, converties en mètres.</p>
+        <p v-if="comp.notApplied.length" class="status todo"><strong>Pas appliqué.</strong> {{ comp.notApplied.join(" ; ") }}.</p>
+      </template>
+
       <!-- Objet -->
       <template v-else-if="item">
         <ion-list inset>
@@ -276,6 +311,9 @@ import { SKILLS, type SkillId } from "../data/skills";
 import { SPECIES } from "../data/species";
 import { KEY_ABILITY_COUNT } from "../engine/advice";
 import Illustration from "../components/Illustration.vue";
+import Sprite from "../components/Sprite.vue";
+import { COMPANION_BY_ID } from "../data/companions";
+import { companionAdvice } from "../engine/companions";
 import { ABILITY_NAMES, fmtNumber, formatMeters, signed } from "../ui/format";
 import { helpArt } from "../ui/helpLists";
 
@@ -287,6 +325,14 @@ const sp = computed(() => (kind.value === "species" ? SPECIES.find((s) => s.id =
 const bg = computed(() => (kind.value === "backgrounds" ? BACKGROUNDS.find((b) => b.id === id.value) : undefined));
 const sp2 = computed(() => (kind.value === "spells" ? SPELL_BY_ID[id.value] : undefined));
 const mon = computed(() => (kind.value === "monsters" ? MONSTERS.find((m) => m.id === id.value) : undefined));
+const comp = computed(() => (kind.value === "companions" ? COMPANION_BY_ID[id.value] : undefined));
+const recommendedFor = computed(() => (comp.value ? CLASSES.filter((c) => companionAdvice(c.id, comp.value!.id).recommended).map((c) => c.name) : []));
+const TACTIC_TEXT: Record<string, string> = {
+  defender: "Elle joue toute seule à son tour : elle va au contact de l'ennemi le plus proche de vous et le frappe, pour vous couvrir.",
+  healer: "Il joue tout seul à son tour : il soigne d'abord le membre du groupe le plus mal en point (sous la moitié de ses PV, lui compris), s'il peut l'atteindre ; sinon il lance Flamme sacrée sur l'ennemi le plus proche, et se bat au gourdin en dernier recours.",
+  archer: "Elle joue toute seule à son tour : elle tire à l'arc sur l'ennemi le plus proche et, si on l'approche, recule pour continuer à tirer.",
+  skirmisher: "Il joue tout seul à son tour : arbalète quand l'ennemi est loin, cimeterre quand il est au contact.",
+};
 const item = computed(() => (kind.value === "items" ? ITEM_BY_ID[id.value] : undefined));
 const cond = computed(() => (kind.value === "conditions" ? CONDITION_BY_ID[id.value] : undefined));
 const spellCfg = computed(() => (cls.value ? CLASS_SPELLCASTING[cls.value.id] : undefined));
@@ -295,7 +341,7 @@ const className = (id: string) => CLASSES.find((c) => c.id === id)?.name ?? id;
 const wp = computed(() => (kind.value === "weapons" ? WEAPONS.find((w) => w.id === id.value) : undefined));
 const ar = computed(() => (kind.value === "armors" ? ARMORS.find((a) => a.id === id.value) : undefined));
 const heroArt = computed(() => helpArt(kind.value, id.value));
-const title = computed(() => cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? sp2.value?.name ?? cond.value?.name ?? item.value?.name ?? mon.value?.name ?? "Aide");
+const title = computed(() => comp.value?.name ?? cls.value?.name ?? sp.value?.name ?? bg.value?.name ?? wp.value?.name ?? ar.value?.name ?? sp2.value?.name ?? cond.value?.name ?? item.value?.name ?? mon.value?.name ?? "Aide");
 const training = computed(() => CLASS_TRAINING[cls.value?.id ?? ""]);
 const kits = computed(() => (cls.value ? kitsFor(cls.value.id) : []));
 const kitLines = (k: Kit) =>
