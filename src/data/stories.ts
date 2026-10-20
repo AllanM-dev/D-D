@@ -93,6 +93,7 @@ const maire: Scene[] = [
       { text: "Je reviens de la crypte : la menace est écartée.", requires: { flags: ["defeated:ghoul-1", "recompense-haute"], notFlags: ["quete-terminee"] }, goto: "maire-fin", set: ["quete-terminee"], gold: 50, xp: 100 },
       { text: "Je reviens de la crypte : la menace est écartée.", requires: { flags: ["defeated:ghoul-1"], notFlags: ["quete-terminee", "recompense-haute"] }, goto: "maire-fin", set: ["quete-terminee"], gold: 20, xp: 100 },
       { text: "Où trouver la clé de la crypte ?", requires: { flags: ["quete-acceptee"], notFlags: ["cle-crypte"] }, goto: "maire-cle" },
+      { text: "Le village pourrait-il me prêter quelqu'un pour m'accompagner ?", requires: { flags: ["quete-acceptee"], notFlags: ["compagnon:ysolde", "quete-terminee"] }, goto: "maire-ysolde" },
       { text: "Je vous laisse.", end: true },
     ],
   },
@@ -134,6 +135,31 @@ const maire: Scene[] = [
     choices: [{ text: "D'accord, j'enquête.", goto: "maire", set: ["quete-acceptee"] }],
   },
   {
+    id: "maire-ysolde",
+    title: "Odile, la maire",
+    text: [
+      "Odile réfléchit un instant, puis désigne la fenêtre : sur le pont, une garde en cotte de mailles, lance à l'épaule, surveille la route. « Ysolde. Dix ans qu'elle garde ce pont, et pas un loup n'est passé. Elle connaît le village mieux que personne. »",
+    ],
+    textIf: [
+      { requires: { notFlags: ["recompense-haute"] }, text: ["« Je peux vous la prêter jusqu'à ce que cette affaire soit réglée. Brumeval paiera sa solde, c'est bien le moins. »"] },
+      { requires: { flags: ["recompense-haute"] }, text: ["Elle grimace. « Mais avec les cinquante pièces que je vous ai promises, la caisse du village est vide : je ne peux pas payer sa solde en plus. Si vous la voulez, payez-la vous-même… ou rendez-moi une part de votre récompense. »"] },
+    ],
+    choices: [
+      { text: "Volontiers : qu'Ysolde vienne avec moi.", requires: { notFlags: ["recompense-haute"] }, goto: "maire-ysolde-ok", set: ["compagnon:ysolde"] },
+      { text: "Payer la solde d'Ysolde de ma poche (15 pièces d'or).", requires: { flags: ["recompense-haute"], minGold: 15 }, goto: "maire-ysolde-ok", gold: -15, set: ["compagnon:ysolde"] },
+      { text: "Renoncer à trente pièces de ma récompense pour qu'Ysolde vienne.", requires: { flags: ["recompense-haute"] }, goto: "maire-ysolde-ok", unset: ["recompense-haute"], set: ["compagnon:ysolde"] },
+      { text: "Je préfère m'en passer.", goto: "maire" },
+    ],
+  },
+  {
+    id: "maire-ysolde-ok",
+    title: "Ysolde, la garde du pont",
+    text: [
+      "Odile fait signe par la fenêtre. Quelques instants plus tard, Ysolde pousse la porte, salue d'un hochement de tête et cale son bouclier sur son épaule. « La maire dit que je vous suis. Restez derrière moi quand ça tourne mal, et tout ira bien. »",
+    ],
+    choices: [{ text: "Repartir avec Ysolde.", goto: "maire" }],
+  },
+  {
     id: "maire-cle",
     title: "Odile, la maire",
     text: ["« L'aubergiste, Thibaud. Il tient l'auberge près du chemin, au centre du village. Il est un peu bourru, mais il connaît chaque pierre du village. »"],
@@ -147,7 +173,9 @@ const maire: Scene[] = [
     ],
     textIf: [
       { requires: { flags: ["goule-apaisee"] }, text: ["Vous lui dites que le gardien est mort en paix, qu'il s'agissait du père de Thibaud. Odile ferme les yeux. « Gédéon… Il nous aura protégés jusqu'au bout. Vous avez fait plus que nous vous demandions. »"] },
-      { requires: { flags: ["pillard-avoue"] }, text: ["« Et ce pillard… on l'a laissé filer ? Soit. Il paraît qu'il a quitté la région, la queue entre les jambes. »"] },
+      { requires: { flags: ["pillard-avoue"], notFlags: ["compagnon:corentin"] }, text: ["« Et ce pillard… on l'a laissé filer ? Soit. Il paraît qu'il a quitté la région, la queue entre les jambes. »"] },
+      { requires: { flags: ["compagnon:corentin"] }, text: ["Elle jette un regard méfiant à Corentin, puis soupire. « Celui qui a ouvert la tombe a aidé à la refermer. Brumeval lui pardonnera… avec le temps. »"] },
+      { requires: { flags: ["compagnon:ysolde"] }, text: ["« Ysolde m'a raconté. Elle dit qu'on ne l'avait jamais aussi bien commandée. Venant d'elle, c'est un compliment. »"] },
       { requires: { flags: ["pendentif-rendu"] }, text: ["Elle sourit tristement. « Vous avez rendu à Thibaud ce qu'il avait perdu de plus cher. Cela ne se paie pas. »"] },
       { requires: { flags: ["recompense-haute"] }, text: ["« Cinquante pièces d'or, comme promis. C'est peu pour ce que vous avez fait. Brumeval n'oubliera pas. »"] },
       { requires: { notFlags: ["recompense-haute"] }, text: ["« Vingt pièces d'or. C'est peu pour ce que vous avez fait. Brumeval n'oubliera pas. »"] },
@@ -175,6 +203,7 @@ const aubergiste: Scene[] = [
       { text: "Je crois avoir quelque chose qui appartient à votre père : un pendentif d'argent.", requires: { items: ["pendentif-gedeon"], notFlags: ["pendentif-rendu"] }, goto: "aubergiste-pendentif" },
       { text: "Observer la salle d'un œil attentif.", requires: { notFlags: ["indice-cave"] }, check: { skill: "perception", dc: 11, success: "aubergiste-indice", failure: "aubergiste-rien", onSuccess: { set: ["indice-cave"] } } },
       { text: "Écouter les rumeurs du village.", goto: "aubergiste-rumeurs" },
+      { text: "Aborder le moine qui dîne seul près du feu.", requires: { notFlags: ["compagnon:anselme"] }, goto: "anselme" },
       { text: "Voir ce que Thibaud vend et achète.", shop: "auberge" },
       { text: "Je vous laisse.", end: true },
     ],
@@ -213,6 +242,39 @@ const aubergiste: Scene[] = [
       { requires: { flags: ["cle-crypte"], notFlags: ["defeated:ghoul-1"] }, text: ["« Si vous descendez, dites-lui que j'ai son pendentif. Dites-lui que je ne l'ai pas oublié. »"] },
     ],
     choices: [{ text: "Accepter la bourse qu'il vous presse dans la main.", requires: { items: ["pendentif-gedeon"] }, goto: "aubergiste", set: ["pendentif-rendu"], gold: 25, xp: 25, items: { "pendentif-gedeon": -1 } }],
+  },
+  {
+    id: "anselme",
+    title: "Frère Anselme",
+    text: [
+      "Près du feu, un moine en robe de bure trempe son pain dans une soupe claire. Il lève vers vous des yeux calmes. « Frère Anselme. Je vais de village en village prier pour les morts qu'on oublie. Et ici, j'ai l'impression que les morts ne dorment pas. »",
+      "« J'aimerais descendre dans cette crypte. Mais je ne suis pas un guerrier, et je ne suivrai que quelqu'un qui sait ce qui l'attend en bas. »",
+    ],
+    textIf: [
+      { requires: { flags: ["anselme-hesite"] }, text: ["« Revenez quand vous en saurez davantage. Je ne descends pas les yeux fermés. »"] },
+    ],
+    choices: [
+      { text: "Lui raconter l'histoire de Gédéon, le gardien qui n'est jamais remonté.", requires: { flags: ["pere-disparu"] }, goto: "anselme-ok", set: ["compagnon:anselme"] },
+      { text: "Lui parler du tunnel sous la tombe et du sceau fendu.", requires: { flags: ["tunnel-vu"] }, goto: "anselme-ok", set: ["compagnon:anselme"] },
+      {
+        text: "Le convaincre que le village a besoin de lui, maintenant.",
+        requires: { notFlags: ["anselme-hesite"] },
+        check: { skill: "persuasion", dc: 13, success: "anselme-ok", failure: "anselme-ko", onSuccess: { set: ["compagnon:anselme"] }, onFailure: { set: ["anselme-hesite"] } },
+      },
+      { text: "Le laisser à son repas.", goto: "aubergiste" },
+    ],
+  },
+  {
+    id: "anselme-ok",
+    title: "Frère Anselme",
+    text: ["Anselme repose sa cuillère et se lève. « Alors ce n'est pas un hasard si nos routes se croisent. Je viens. Je soignerai vos blessures ; vous me protégerez des griffes. »"],
+    choices: [{ text: "Revenir au comptoir avec Anselme.", goto: "aubergiste" }],
+  },
+  {
+    id: "anselme-ko",
+    title: "Frère Anselme",
+    text: ["Anselme sourit tristement. « Vous parlez bien, mais vous ne savez rien de plus que moi. Interrogez les gens d'ici : quelqu'un, forcément, sait qui repose dans cette crypte. »"],
+    choices: [{ text: "Revenir au comptoir.", goto: "aubergiste" }],
   },
   {
     id: "aubergiste-indice",
@@ -333,7 +395,8 @@ const moulin: Scene[] = [
     ],
     textIf: [
       { requires: { flags: ["indice-moulin"] }, text: ["« Je vous ai tout dit. Trouvez ce voleur avant qu'il ne s'en prenne à autre chose que ma pelle. »"] },
-      { requires: { flags: ["pillard-avoue"] }, text: ["« On dit que vous avez parlé au pillard. S'il repasse par chez moi, je lui apprendrai à voler une pelle ! »"] },
+      { requires: { flags: ["pillard-avoue"], notFlags: ["compagnon:corentin"] }, text: ["« On dit que vous avez parlé au pillard. S'il repasse par chez moi, je lui apprendrai à voler une pelle ! »"] },
+      { requires: { flags: ["compagnon:corentin"] }, text: ["Elle fixe Corentin, les poings sur les hanches. Il baisse les yeux et marmonne qu'il rapportera la pelle. « Et la lanterne ! » ajoute-t-elle."] },
     ],
     choices: [
       { text: "La maire m'envoie : avez-vous remarqué quelque chose d'étrange ?", requires: { flags: ["quete-acceptee"], notFlags: ["indice-moulin"] }, goto: "meuniere-recit" },
@@ -386,6 +449,7 @@ const ferme: Scene[] = [
     choices: [
       { text: "Que s'est-il passé ici ?", requires: { notFlags: ["loup-signale"] }, goto: "fermier-loup" },
       { text: "Le loup de la forêt ne fera plus de mal à vos bêtes.", requires: { flags: ["defeated:wolf-1", "loup-signale"], notFlags: ["indice-ferme"] }, goto: "fermier-merci", gold: 10, xp: 25, set: ["indice-ferme"] },
+      { text: "Parler à Mila, la chasseuse.", requires: { flags: ["indice-ferme"], notFlags: ["compagnon:mila"] }, goto: "mila" },
       { text: "Je repasserai.", end: true },
     ],
   },
@@ -404,7 +468,28 @@ const ferme: Scene[] = [
       "Hugues vous serre la main avec une force de forgeron. « Dix pièces, c'est tout ce que j'ai de côté. Prenez-les. »",
       "Puis il baisse la voix. « La nuit dernière, j'ai vu une lueur au vieux cimetière : une lanterne, et quelqu'un qui creusait. Pas un mort : il jurait comme un charretier. Allez voir du côté de la tombe du fond. »",
     ],
-    choices: [{ text: "Merci, Hugues.", goto: "fermier" }],
+    choices: [
+      { text: "Merci, Hugues.", goto: "fermier" },
+      { text: "Qui est cette jeune femme, l'arc à la main, qui vous regarde depuis la grange ?", requires: { notFlags: ["compagnon:mila"] }, goto: "mila" },
+    ],
+  },
+  {
+    id: "mila",
+    title: "Mila, la chasseuse",
+    text: [
+      "La fille d'Hugues s'avance, un arc long à l'épaule, un carquois plein dans le dos. « Mila. Trois semaines que je traque ce loup, et c'est vous qui l'avez eu. » Elle n'a pas l'air vexée : plutôt curieuse.",
+      "« Ce n'était pas un loup ordinaire. Il fuyait quelque chose, du côté de la crypte. Je veux savoir quoi. Vous y allez, n'est-ce pas ? »",
+    ],
+    choices: [
+      { text: "Venez avec moi : un arc de plus ne sera pas de trop.", goto: "mila-ok", set: ["compagnon:mila"] },
+      { text: "Pas pour l'instant.", goto: "fermier" },
+    ],
+  },
+  {
+    id: "mila-ok",
+    title: "Mila, la chasseuse",
+    text: ["Mila vérifie la corde de son arc. « Je reste en retrait et je tire sur ce qui vous menace. Si ça s'approche de moi, je recule : ne vous vexez pas. » Hugues soupire, mais la serre dans ses bras avant de vous laisser partir."],
+    choices: [{ text: "Repartir avec Mila.", goto: "fermier" }],
   },
 ];
 
@@ -433,7 +518,27 @@ const cimetiere: Scene[] = [
       "Surpris, le pillard lâche son sac et lève les mains. « Je… je cherchais seulement de quoi manger ! J'ai creusé sous la tombe, et j'ai débouché dans un couloir de pierre. Il y avait un sceau fendu, des runes… J'y ai touché, et la nuit suivante, tout s'est mis à bouger là-dessous. »",
       "Il vous tend un pendentif d'argent. « Je l'ai pris sur un squelette. Je n'en veux plus. Laissez-moi partir, je quitte la région ! » Il file entre les tombes sans se retourner.",
     ],
-    choices: [{ text: "Garder le pendentif et le laisser fuir.", end: true }],
+    choices: [
+      { text: "Garder le pendentif et le laisser fuir.", end: true },
+      {
+        text: "Le retenir : « Tu as réveillé ce qui dort là-dessous. Aide-moi à le rendormir. »",
+        check: { skill: "persuasion", dc: 12, success: "corentin-ok", failure: "corentin-fuite", onSuccess: { set: ["compagnon:corentin"] } },
+      },
+    ],
+  },
+  {
+    id: "corentin-ok",
+    title: "Corentin, le pillard",
+    text: [
+      "L'homme s'arrête, les épaules basses. « Corentin. Je m'appelle Corentin. » Il ramasse son arbalète, la regarde longtemps, puis la passe à son épaule. « Vous avez raison. Je n'arriverai plus à dormir tant que ce truc rôdera. Je viens. Je vise bien, et je sais me battre de près, s'il le faut. »",
+    ],
+    choices: [{ text: "Repartir avec Corentin.", end: true }],
+  },
+  {
+    id: "corentin-fuite",
+    title: "La tombe éventrée",
+    text: ["Il secoue la tête, terrifié. « Non, non, non. Je ne redescends pas là-dedans ! » Et il file entre les tombes sans se retourner."],
+    choices: [{ text: "Le laisser partir.", end: true }],
   },
   {
     id: "tombe-alerte",

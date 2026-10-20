@@ -63,6 +63,11 @@ export const useCharacters = defineStore("characters", () => {
     const i = list.value.findIndex((x) => x.id === c.id);
     if (i >= 0) { list.value[i] = c; persist(); }
   };
+  /** Choisit le compagnon qui accompagne le héros (`aucun` : voyager seul). */
+  const setCompanion = (id: string, companion: string) => {
+    const c = list.value.find((x) => x.id === id);
+    if (c) { c.companion = companion; persist(); }
+  };
   /** Ajoute un butin (or et objets) au personnage. */
   const addLoot = (id: string, loot: Loot) => {
     const c = list.value.find((x) => x.id === id);
@@ -101,7 +106,7 @@ export const useCharacters = defineStore("characters", () => {
   };
   const get = (id: string) => list.value.find((c) => c.id === id);
 
-  return { list, add, remove, get, addExperience, replace, setVitals, setExploration, setStory, addLoot, setInventory, applyLoadout, exportAll, importAll };
+  return { list, add, remove, get, addExperience, replace, setCompanion, setVitals, setExploration, setStory, addLoot, setInventory, applyLoadout, exportAll, importAll };
 });
 
 export function newId(): string {

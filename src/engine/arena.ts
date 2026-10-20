@@ -7,6 +7,8 @@ export interface Setup {
   hero: Cell;
   /** Position de chaque ennemi, dans l'ordre de la rencontre. */
   enemies: Cell[];
+  /** Position de chaque compagnon : à côté du héros. */
+  allies: Cell[];
 }
 
 const key = (c: Cell) => `${c.x},${c.y}`;
@@ -15,7 +17,7 @@ const key = (c: Cell) => `${c.x},${c.y}`;
  * Prépare le terrain d'un combat. Lancé depuis la carte, le combat se déroule sur la carte, le héros et l'ennemi
  * à leur place ; sinon (combat libre) dans une clairière. Les ennemis supplémentaires se placent autour du premier.
  */
-export function buildSetup(enemyCount: number, from?: { exploration: ExplorationState; enemyCell?: Cell }): Setup {
+export function buildSetup(enemyCount: number, from?: { exploration: ExplorationState; enemyCell?: Cell }, allyCount = 0): Setup {
   let arena: Arena = CLEARING;
   let hero: Cell = { x: 1, y: 4 };
   let anchor: Cell | undefined = { x: 9, y: 4 };
@@ -40,5 +42,12 @@ export function buildSetup(enemyCount: number, from?: { exploration: Exploration
     cells.push(next);
     occupied.add(key(next));
   }
-  return { arena, hero, enemies: cells.slice(0, enemyCount) };
+  const allies: Cell[] = [];
+  for (let i = 0; i < allyCount; i++) {
+    const near = freeCellsNear(arena, hero, occupied, 1)[0];
+    if (!near) break;
+    allies.push(near);
+    occupied.add(key(near));
+  }
+  return { arena, hero, enemies: cells.slice(0, enemyCount), allies };
 }

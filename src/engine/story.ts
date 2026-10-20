@@ -1,4 +1,5 @@
 import { STORY_BY_ID, type Choice, type Effects, type Requires, type Scene, type StoryDef } from "../data/stories";
+import { COMPANION_BY_ID } from "../data/companions";
 import { ENCOUNTERS } from "../data/encounters";
 import { getItem } from "../data/items";
 import { SHOP_BY_ID } from "../data/shops";
@@ -167,6 +168,9 @@ export function validateStory(story: StoryDef, startScene: string): string[] {
         else if (n < 0 && !c.requires?.items?.includes(item)) errors.push(`${story.id}/${id}#${i} : un choix qui retire ${item} doit l'exiger`);
       }
       if (c.fight && !ENCOUNTERS.some((e) => e.id === c.fight!.encounterId)) errors.push(`${story.id}/${id}#${i} : rencontre inconnue`);
+      for (const f of [...(c.set ?? []), ...(c.check?.onSuccess?.set ?? []), ...(c.check?.onFailure?.set ?? [])]) {
+        if (f.startsWith("compagnon:") && !COMPANION_BY_ID[f.slice("compagnon:".length)]) errors.push(`${story.id}/${id}#${i} : compagnon inconnu ${f}`);
+      }
     });
   }
   return errors;

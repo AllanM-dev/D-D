@@ -15,6 +15,12 @@
       <p class="purse">{{ character.equipment.gold }} po<template v-if="potions"> · {{ potions }} potion{{ potions > 1 ? "s" : "" }} de soin</template></p>
       <h2>{{ scene.title }}</h2>
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+      <div v-if="swap" class="swap" role="status">
+        <p>{{ swap.recruit.name }} vous attend. Un seul compagnon vous suit à la fois : emmener {{ swap.recruit.name }} à la place de {{ swap.current.name }} ?</p>
+        <p class="advice">{{ adviceFor(swap.recruit.id).reason }}</p>
+        <ion-button size="small" @click="takeRecruit">Emmener {{ swap.recruit.name }}</ion-button>
+        <ion-button size="small" fill="outline" @click="swap = null">Garder {{ swap.current.name }}</ion-button>
+      </div>
       <p v-for="(p, i) in paragraphs" :key="i" class="para">{{ p }}</p>
 
       <!-- Test de compétence en cours -->
@@ -23,11 +29,17 @@
       </template>
 
       <div v-else class="choices">
-        <ion-button v-for="c in choices" :key="c.index" expand="block" :color="c.choice.fight ? 'danger' : 'primary'" @click="choose(c.index)">
-          {{ c.choice.text }}
-          <span v-if="c.choice.check" class="tag"> ({{ skillName(c.choice.check.skill) }})</span>
-          <span v-else-if="c.choice.fight" class="tag"> (combat)</span>
-        </ion-button>
+        <template v-for="c in choices" :key="c.index">
+          <ion-button expand="block" :color="c.choice.fight ? 'danger' : 'primary'" @click="choose(c.index)">
+            {{ c.choice.text }}
+            <span v-if="c.choice.check" class="tag"> ({{ skillName(c.choice.check.skill) }})</span>
+            <span v-else-if="c.choice.fight" class="tag"> (combat)</span>
+          </ion-button>
+          <!-- Choix qui fait recruter un compagnon : ce qu'il apporte à ce personnage -->
+          <p v-if="recruitOf(c.choice)" class="advice" :class="{ rec: adviceFor(recruitOf(c.choice)!.id).recommended }">
+            {{ recruitOf(c.choice)!.name }}, {{ recruitOf(c.choice)!.roleLabel.toLowerCase() }}{{ adviceFor(recruitOf(c.choice)!.id).recommended ? " — recommandé" : "" }}. {{ adviceFor(recruitOf(c.choice)!.id).reason }}
+          </p>
+        </template>
       </div>
     </ion-content>
   </ion-page>
@@ -43,6 +55,10 @@ import { defeatEnemy } from "../engine/exploration";
 import type { RollEvent } from "../engine/combat";
 import { availableChoices, enterScene, resolveChoice, sceneText, skillName, type ChoiceOutcome } from "../engine/story";
 import { useCharacters } from "../stores/characters";
+import type { Choice } from "../data/stories";
+import type { CompanionDef } from "../data/companions";
+import { activeCompanion, companionAdvice, recruitedBy } from "../engine/companions";
+import { playSfx } from "../ui/audio";
 
 const route = useRoute();
 const router = useIonRouter();
@@ -64,6 +80,14 @@ const animate = ref((() => { try { return localStorage.getItem(PREF_KEY) !== "0"
 watch(animate, (v) => { try { localStorage.setItem(PREF_KEY, v ? "1" : "0"); } catch { /* stockage indisponible */ } });
 
 const notice = ref("");
+/** Compagnon tout juste recruté alors qu'un autre accompagne déjà le héros : le joueur choisit. */
+const swap = ref<{ recruit: CompanionDef; current: CompanionDef } | null>(null);
+const recruitOf = (c: Choice) => recruitedBy(c);
+const adviceFor = (id: string) => companionAdvice(character.value!.classDef.id, id, character.value!.classDef.name);
+function takeRecruit() {
+  if (swap.value) store.setCompanion(characterId.value, swap.value.recruit.id);
+  swap.value = null;
+}
 const roll = ref<{ event: RollEvent; outcome: ChoiceOutcome } | null>(null);
 
 // La vue peut être réutilisée par le routeur : on suit l'adresse (la scène demandée change).
@@ -115,8 +139,18 @@ const afterRoll = () => { const r = roll.value; roll.value = null; if (r) procee
 function proceed(o: ChoiceOutcome) {
   if (o.check) notice.value = `${skillName(o.check.skill)} : ${o.check.total} contre DD ${o.check.dc} — ${o.check.success ? "réussi" : "raté"}.`;
   if (o.xp > 0) notice.value = `${notice.value ? notice.value + " " : ""}+${o.xp} points d'expérience.`;
+  // Un compagnon rejoint le héros : il l'accompagne tout de suite, sauf si un autre le fait déjà (le joueur choisit).
+  const before = character.value ? activeCompanion(character.value) : undefined;
+  const joined = o.flags.filter((f) => f.startsWith("compagnon:") && !flags.value.includes(f));
   store.setStory(characterId.value, { flags: o.flags, gold: o.gold, items: o.items, xp: o.xp });
   const id = characterId.value;
+  for (const f of joined) {
+    const recruit = recruitedBy({ set: [f] })!;
+    notice.value = `${notice.value ? notice.value + " " : ""}${recruit.name} rejoint votre groupe.`;
+    playSfx("levelup");
+    if (before && before.id !== recruit.id) swap.value = { recruit, current: before };
+    else store.setCompanion(id, recruit.id);
+  }
   const ex = character.value?.exploration;
   if (ex && o.defeated.length) store.setExploration(id, o.defeated.reduce(defeatEnemy, ex));
   if (o.shop) {
@@ -140,4 +174,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .choices ion-button { --white-space: normal; text-transform: none; }
 .notice { font-style: italic; opacity: 0.85; border-left: 3px solid var(--ion-color-primary, #3880ff); padding-left: 8px; }
 .tag { opacity: 0.8; font-size: 0.85em; margin-left: 4px; }
+.advice { font-size: 0.85rem; opacity: 0.85; margin: 2px 8px 10px; }
+.advice.rec { color: var(--ion-color-success); opacity: 1; }
+.swap { border: 1px solid var(--ion-color-primary, #3880ff); border-radius: 10px; padding: 8px 12px; margin: 8px 0; }
 </style>

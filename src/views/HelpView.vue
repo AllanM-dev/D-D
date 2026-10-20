@@ -34,6 +34,7 @@ const sections = [
   { path: "/help/species", title: "Espèces", text: "Les 9 espèces : taille, vitesse et traits." },
   { path: "/help/spells", title: "Sorts", text: "Sorts mineurs et de niveau 1 : effet, portée, durée, et ce que le jeu applique." },
   { path: "/help/conditions", title: "États", text: "Empoisonné, à terre, paralysé… : ce qu'ils font et lesquels le jeu applique." },
+  { path: "/help/companions", title: "Compagnons", text: "Les habitants qui peuvent vous accompagner : rôle, combat, où les rencontrer, pour quels personnages." },
   { path: "/help/monsters", title: "Bestiaire", text: "Les monstres que vous affrontez : PV, CA, vitesse, attaques et capacités spéciales." },
   { path: "/help/items", title: "Objets", text: "Potions, trésors et objets de quête : ce qu'ils font et où les trouver." },
   { path: "/help/weapons", title: "Armes", text: "Dégâts, portée et propriétés des armes de départ." },

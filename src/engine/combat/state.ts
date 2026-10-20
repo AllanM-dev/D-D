@@ -61,7 +61,8 @@ export function updateStatus(state: CombatState) {
   if (state.combatants.filter((c) => c.side === "enemies").every((c) => c.dead)) {
     state.status = "victory";
     state.log.push("Victoire ! Tous les ennemis sont vaincus.");
-  } else if (party.every((c) => c.dead || (c.hp === 0 && c.stable))) {
+  } else if (party.filter((c) => !c.ally).every((c) => c.dead) || party.every((c) => c.dead || (c.hp === 0 && c.stable))) {
+    // Défaite : le héros est mort, ou plus personne du groupe n'est debout (compagnons compris).
     state.status = "defeat";
     state.log.push("Défaite… plus personne ne peut se battre.");
   }
@@ -112,7 +113,11 @@ export function applyDamage(state: CombatState, target: Combatant, amount: numbe
     target.hp = Math.max(0, target.hp - amount);
     if (target.hp > 0) return;
     endConcentration(state, target, "perd connaissance");
-    if (target.side === "enemies") {
+    if (target.ally) {
+      // Un compagnon à 0 PV est hors de combat : pas de jets de mort, il se relèvera après le combat.
+      target.stable = true;
+      state.log.push(`${target.name} s'effondre, hors de combat.`);
+    } else if (target.side === "enemies") {
       target.dead = true;
       state.log.push(`${target.name} est vaincu.`);
     } else if (overflow >= target.maxHp) {
@@ -125,6 +130,7 @@ export function applyDamage(state: CombatState, target: Combatant, amount: numbe
     }
     return;
   }
+  if (target.ally) return; // déjà hors de combat
   // Déjà à 0 PV : chaque coup reçu = 1 échec aux jets de mort (2 si critique).
   target.stable = false;
   if (amount >= target.maxHp) target.deathSaves.failures = 3;

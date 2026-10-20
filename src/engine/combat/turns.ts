@@ -2,7 +2,7 @@
 import { SPELL_BY_ID } from "../../data/spells";
 import type { Arena } from "../battlefield";
 import { rollD20, type Rng } from "../dice";
-import { enemyTurn } from "./ai";
+import { aiTurn } from "./ai";
 import { completeAttack } from "./attack";
 import { endOfTurnConditions, isIncapacitated, rollSave, startOfTurnConditions } from "./conditions";
 import { MAX_STEPS, SHIELD_BONUS, applyDamage, currentCombatant, getCombatant, isConscious, makeCombatant, pushRoll, rollDamageDetailed, updateStatus, type RollInit } from "./state";
@@ -143,8 +143,8 @@ export function processTurns(state: CombatState, rng: Rng = Math.random) {
       state.log.push(`${cur.name} est neutralisé et passe son tour.`);
       endOfTurnConditions(state, cur, rng);
       advanceTurn(state);
-    } else if (cur.side === "enemies") {
-      enemyTurn(state, cur, rng);
+    } else if (cur.side === "enemies" || cur.ally) {
+      aiTurn(state, cur, rng); // ennemis et compagnons jouent tout seuls
       if (state.pending) return; // le joueur décide d'une réaction
       endOfTurnConditions(state, cur, rng);
       advanceTurn(state);
@@ -164,6 +164,6 @@ export function endTurn(state: CombatState, rng: Rng) {
 export function assertPlayerTurn(state: CombatState): Combatant {
   if (state.status !== "ongoing") throw new Error("Le combat est terminé.");
   const cur = currentCombatant(state);
-  if (cur.side !== "party" || !isConscious(cur)) throw new Error("Ce n'est pas le tour d'un personnage du joueur.");
+  if (cur.side !== "party" || cur.ally || !isConscious(cur)) throw new Error("Ce n'est pas le tour d'un personnage du joueur.");
   return cur;
 }

@@ -4,6 +4,7 @@ import { getCombatant, type CombatState, type FeatureId } from "./combat";
 import { rollDie, type Rng } from "./dice";
 import { featuresFor } from "./features";
 import { castingFor } from "./spellcasting";
+import { companionMaxHp, companionVitalsAfterCombat, recruitedCompanions, type CompanionVitals } from "./companions";
 
 /** État du personnage entre deux combats : PV et ressources dépensées. */
 export interface Vitals {
@@ -18,6 +19,8 @@ export interface Vitals {
   free: Record<string, number>;
   /** Récupération arcanique déjà utilisée depuis le dernier repos long. */
   arcaneUsed: boolean;
+  /** PV et soins restants des compagnons (absent : au maximum), voir `companions.ts`. */
+  companions?: Record<string, CompanionVitals>;
 }
 
 export const hitDiceMax = (c: Character) => c.level;
@@ -50,7 +53,8 @@ export function vitalsAfterCombat(c: Character, state: CombatState): Vitals {
   for (const f of me.features) if (!f.unlimited && f.id !== "potion") features[f.id] = f.uses;
   const free = { ...before.free };
   for (const f of me.spellcasting?.free ?? []) free[f.spellId] = f.uses;
-  return { ...before, hp: Math.max(1, me.hp), features, slotsUsed: me.spellcasting?.slots.used ?? before.slotsUsed, free };
+  const companions = companionVitalsAfterCombat(c, state);
+  return { ...before, hp: Math.max(1, me.hp), features, slotsUsed: me.spellcasting?.slots.used ?? before.slotsUsed, free, ...(companions ? { companions } : {}) };
 }
 
 export interface HitDieRoll { die: number; sides: number; modifier: number; healed: number }
@@ -106,6 +110,14 @@ export function shortRest(c: Character, spend: number, rng: Rng = Math.random): 
       recovered.push("1 emplacement de sort (Récupération arcanique)");
     }
   }
+  // Les compagnons blessés se reposent aussi : ils récupèrent la moitié de leurs PV maximum.
+  for (const def of recruitedCompanions(c)) {
+    const max = companionMaxHp(def, c.level);
+    const cur = v.companions?.[def.id];
+    if (!cur || cur.hp >= max) continue;
+    v.companions = { ...v.companions, [def.id]: { ...cur, hp: Math.min(max, cur.hp + Math.floor(max / 2)) } };
+    recovered.push(`${def.name} : ${Math.min(max, cur.hp + Math.floor(max / 2)) - cur.hp} PV`);
+  }
   return { vitals: v, rolls, healed, recovered };
 }
 
@@ -121,5 +133,6 @@ export function longRest(c: Character): RestResult {
     return before.slotsUsed > 0;
   });
   if (regained > 0) recovered.push(`${regained} dé${regained > 1 ? "s" : ""} de vie`);
+  if (before.companions && Object.keys(before.companions).length) recovered.push("vos compagnons sont remis sur pied");
   return { vitals: v, rolls: [], healed: c.maxHp - before.hp, recovered };
 }

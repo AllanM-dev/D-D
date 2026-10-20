@@ -1,11 +1,13 @@
-/** Tour des ennemis : choix de la cible et de l'attaque, approche, fuite, tir à distance. */
+/** Tours joués par l'ordinateur (ennemis et compagnons) : choix de la cible et de l'attaque, approche, fuite, tir à distance, soins. */
 import { reachableWithin, hasLineOfSight, pathBetween, speedCells } from "../battlefield";
 import type { Rng } from "../dice";
 import { CELL_METERS, cellDistance, type Cell } from "../exploration";
+import { rollDie } from "../dice";
 import { resolveAttack } from "./attack";
 import { hasCondition, removeCondition, rollSave } from "./conditions";
-import { AROUND, SPEED_DEFAULT, attackCheck, attackRange, cellKey, fm, movementLeft, occupiedCells } from "./geometry";
-import { isConscious, pushRoll } from "./state";
+import { AROUND, SPEED_DEFAULT, attackCheck, attackRange, cellKey, fm, movementLeft, occupiedCells, spellTargetCheck } from "./geometry";
+import { ABILITY_FR } from "./labels";
+import { applyDamage, healCombatant, isConscious, pushRoll, rollDamageDetailed } from "./state";
 import type { AttackDef, Combatant, CombatState } from "./types";
 
 /** Un ennemi s'approche de sa cible aussi loin que sa vitesse le permet. */
@@ -103,10 +105,67 @@ function enemyKite(state: CombatState, enemy: Combatant, target: Combatant, shot
   moveEvent(state, enemy, `${enemy.name} recule`, best.steps);
 }
 
-export function enemyTurn(state: CombatState, enemy: Combatant, rng: Rng) {
-  const party = state.combatants.filter((c) => c.side === "party" && !c.dead);
-  const conscious = party.filter(isConscious);
-  const pool = conscious.length ? conscious : party.filter((c) => !c.stable);
+/** Un compagnon soigneur soigne le membre du groupe le plus mal en point (à 0 PV ou sous la moitié de ses PV). */
+function allyHeal(state: CombatState, ally: Combatant, rng: Rng): boolean {
+  const heal = ally.healing;
+  if (!heal || heal.uses <= 0) return false;
+  const hurt = state.combatants
+    .filter((c) => c.side === ally.side && !c.dead && c.hp <= c.maxHp / 2)
+    .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp || (a.ally ? 1 : 0) - (b.ally ? 1 : 0))[0];
+  if (!hurt) return false;
+  if (state.arena && ally.pos && hurt.pos && hurt.id !== ally.id && cellDistance(ally.pos, hurt.pos) > 1) {
+    enemyApproach(state, ally, hurt);
+    if (cellDistance(ally.pos!, hurt.pos) > 1) return false; // trop loin : il agira autrement ce tour
+  }
+  heal.uses -= 1;
+  const dice = Array.from({ length: heal.dice[0] }, () => rollDie(heal.dice[1], rng));
+  state.log.push(`${ally.name} lance ${heal.name} sur ${hurt.id === ally.id ? "lui-même" : hurt.name}.`);
+  const healed = healCombatant(state, hurt, dice.reduce((a, b) => a + b, heal.bonus));
+  pushRoll(state, {
+    kind: "heal", actorId: ally.id, actorName: ally.name, side: ally.side, title: `${heal.name} de ${ally.name}`,
+    sides: heal.dice[1], dice, modifier: heal.bonus, total: healed, outcome: "success",
+  });
+  return true;
+}
+
+/** Un compagnon lance son sort mineur (Flamme sacrée) sur un ennemi à portée et en vue, en s'approchant au besoin. */
+function allyCantrip(state: CombatState, ally: Combatant, target: Combatant, rng: Rng): boolean {
+  const sp = ally.cantrip;
+  if (!sp) return false;
+  if (!spellTargetCheck(state, ally, target, sp.rangeM).ok) {
+    enemyApproach(state, ally, target, { name: sp.name, toHit: 0, damage: { count: 0, sides: 0, bonus: 0 }, damageType: sp.damageType, ranged: true, spell: true, range: [sp.rangeM, sp.rangeM] });
+    if (!spellTargetCheck(state, ally, target, sp.rangeM).ok) return false;
+  }
+  state.log.push(`${ally.name} lance ${sp.name} sur ${target.name}.`);
+  const { success } = rollSave(state, target, sp.ability, sp.dc, rng, `${target.name} : sauvegarde de ${ABILITY_FR[sp.ability]} contre ${sp.name}`);
+  if (success) {
+    state.log.push(`${target.name} esquive la flamme.`);
+    return true;
+  }
+  const dmg = rollDamageDetailed({ count: sp.dice[0], sides: sp.dice[1], bonus: 0 }, false, rng);
+  state.log.push(`${sp.name} : ${dmg.total} dégâts (${sp.damageType}).`);
+  applyDamage(state, target, dmg.total, false);
+  pushRoll(state, {
+    kind: "damage", actorId: ally.id, actorName: ally.name, side: ally.side, title: `${sp.name} : dégâts (${sp.damageType})`,
+    sides: sp.dice[1], dice: dmg.dice, modifier: 0, total: dmg.total, outcome: "hit",
+  });
+  return true;
+}
+
+/**
+ * Tour d'un combattant joué par l'ordinateur : les ennemis, et les compagnons du héros (qui visent les ennemis).
+ * La défenseuse frappe l'ennemi le plus proche du héros ; le soigneur soigne d'abord, puis lance son sort mineur.
+ */
+export function aiTurn(state: CombatState, enemy: Combatant, rng: Rng) {
+  let pool: Combatant[];
+  if (enemy.side === "enemies") {
+    const party = state.combatants.filter((c) => c.side === "party" && !c.dead);
+    const conscious = party.filter(isConscious);
+    pool = conscious.length ? conscious : party.filter((c) => !c.stable);
+  } else {
+    pool = state.combatants.filter((c) => c.side !== enemy.side && !c.dead && isConscious(c));
+  }
+  if (enemy.ally && !enemy.conditions.some((x) => x.escape) && allyHeal(state, enemy, rng)) return;
   if (!pool.length || !enemy.attacks.length) {
     state.log.push(`${enemy.name} n'a personne à attaquer.`);
     return;
@@ -120,7 +179,10 @@ export function enemyTurn(state: CombatState, enemy: Combatant, rng: Rng) {
   }
   // Lâche : à un quart de ses PV ou moins, il fuit s'il le peut.
   if (state.arena && enemy.traits?.includes("coward") && enemy.hp <= enemy.maxHp / 4 && enemyFlee(state, enemy, pool)) return;
-  const target = nearestTarget(state, enemy, pool, rng);
+  const hero = enemy.tactic === "defender" ? state.combatants.find((c) => c.side === enemy.side && !c.ally && !c.dead) : undefined;
+  // Défenseuse : l'ennemi le plus proche du héros (pour le protéger) ; sinon la cible la plus proche.
+  const target = hero ? nearestTarget(state, hero, pool, rng) : nearestTarget(state, enemy, pool, rng);
+  if (enemy.cantrip && allyCantrip(state, enemy, target, rng)) return;
   // Une attaque qui entrave (toile) est lancée de loin sur une cible libre ; sinon une attaque au hasard parmi celles de mêlée.
   const netter = enemy.attacks.find((a) => a.rider?.condition === "restrained");
   const melee = enemy.attacks.filter((a) => !attackRange(a) && a.rider?.condition !== "restrained");

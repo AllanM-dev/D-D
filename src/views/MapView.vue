@@ -58,6 +58,7 @@
         <li><span class="swatch enemy-sw"></span> Ennemi (socle rouge)</li>
         <li><span class="swatch folk-sw"></span> Habitant ou animal (socle gris) : touchez-le pour l'écouter</li>
         <li><span class="swatch hero-sw"></span> Vous (socle bleu)</li>
+        <li v-if="companionName"><span class="swatch ally-sw"></span> {{ companionName }}, votre compagnon (socle vert)</li>
         <li><span class="swatch fog-sw"></span> Zone inexplorée</li>
       </ul>
 
@@ -86,11 +87,12 @@ import { folkLine, folkStep, startFolk, type FolkPos } from "../engine/folk";
 import { MAP_BY_ID } from "../data/maps";
 import { MONSTERS } from "../data/monsters";
 import {
-  cellMeters, key, liveSpots, livingEnemies, lockedCells, parseMap, planPath, startExploration, stepTo, travelTo, visibleCells, type Cell, type ExplorationState,
+  cellMeters, key, liveSpots, livingEnemies, lockedCells, parseMap, planPath, startExploration, stepTo, travelTo, visibleCells, walkable, type Cell, type ExplorationState,
 } from "../engine/exploration";
 import { vitalsOf } from "../engine/rest";
 import { useCharacters } from "../stores/characters";
 import { moodForMap, playSfx, setMood } from "../ui/audio";
+import { activeCompanion } from "../engine/companions";
 import { formatMeters } from "../ui/format";
 import { tileBackground } from "../ui/tileArt";
 import "../ui/tiles.css";
@@ -151,6 +153,7 @@ const doorHint = (x: number, y: number) => {
   return sp && !visible.value.has(`${sp.x},${sp.y}`) ? `${sp.label} : entrez par cette porte` : "";
 };
 const heroMoving = ref(false);
+const companionName = computed(() => (character.value ? activeCompanion(character.value)?.name : undefined));
 
 // --- habitants qui se promènent : décor vivant, ils ne gênent pas la marche
 const folkPos = ref<FolkPos[]>([]);
@@ -178,12 +181,31 @@ const actors = computed(() => {
   const villagers = folkPos.value
     .filter((f) => visible.value.has(key(f)))
     .map((f) => { const d = folkDef(f.id)!; return { id: f.id, kind: "folk" as const, x: f.x, y: f.y, sprite: folkSpriteKey(d.sprite), name: d.name }; });
+  // Le compagnon suit le héros à un pas derrière lui (simple décor : il ne bloque rien).
+  const comp = activeCompanion(character.value);
+  const cell = comp ? followerCell() : undefined;
+  const ally = comp && cell ? [{ id: "ally", kind: "ally" as const, x: cell.x, y: cell.y, sprite: comp.sprite, name: comp.name }] : [];
   return [
     ...villagers,
     ...foes,
+    ...ally,
     { id: "hero", kind: "hero" as const, x: ex.value.x, y: ex.value.y, sprite: heroSpriteKey(character.value.species.id, character.value.classDef.id), name: character.value.name },
   ];
 });
+/** Case où le héros se trouvait avant son dernier pas (le compagnon s'y place). */
+const trail = ref<Cell | null>(null);
+watch(() => map.value.id, () => { trail.value = null; });
+function followerCell(): Cell | undefined {
+  const e = ex.value!;
+  const t = trail.value;
+  if (t && (t.x !== e.x || t.y !== e.y) && Math.max(Math.abs(t.x - e.x), Math.abs(t.y - e.y)) === 1) return t;
+  // Pas encore de pas : une case libre à côté du héros.
+  for (const [dx, dy] of [[0, 1], [-1, 0], [1, 0], [0, -1], [-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+    const c = { x: e.x + dx, y: e.y + dy };
+    if (walkable(grid.value, c)) return c;
+  }
+  return undefined;
+}
 const isNpc = (id: string) => NPC_SPRITES.includes(id);
 const spotAt = (x: number, y: number) =>
   liveSpots(map.value, flags.value).find((s) => s.x === x && s.y === y && visible.value.has(`${x},${y}`));
@@ -271,6 +293,7 @@ async function go(target: Cell) {
     const cur = planPath(next, dest, flags.value);
     if (!cur) { message.value = "Le chemin est coupé."; break; }
     if (cur.path.length === 0) { arrived = true; break; }
+    trail.value = { x: next.x, y: next.y };
     const res = stepTo(next, cur.path[0], flags.value);
     playSfx("step");
     steps += 1;
@@ -331,6 +354,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .actor.hero .base { box-shadow: 0 0 0 2px #4aa3ff; }
 .actor.enemy .base { box-shadow: 0 0 0 2px #e0554f; }
 .actor.folk .base { box-shadow: 0 0 0 1.5px #9aa0a8; }
+.actor.ally .base { box-shadow: 0 0 0 2px #5fd08a; }
 @keyframes idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
 @keyframes step { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-3px) rotate(2deg); } }
 @media (prefers-reduced-motion: reduce) { .actor { transition: none; } .actor :deep(.sprite) { animation: none !important; } }
@@ -350,6 +374,7 @@ ion-content { --padding-start: 16px; --padding-end: 16px; }
 .enemy-sw { background: #f44; border-radius: 50%; }
 .folk-sw { background: #9aa0a8; border-radius: 50%; }
 .hero-sw { background: #4aa3ff; border-radius: 50%; }
+.ally-sw { background: #5fd08a; border-radius: 50%; }
 .fog-sw { background: #000; border: 1px solid #888; }
 .message { min-height: 1.4em; margin: 10px 0 0; }
 .hint { opacity: 0.75; font-size: 0.85rem; }

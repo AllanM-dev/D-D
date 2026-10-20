@@ -209,6 +209,14 @@ export interface Combatant {
   immunities?: ConditionId[];
   /** Modificateurs de caractéristiques pour les jets de sauvegarde (monstres). */
   saveMods?: Partial<Record<Ability, number>>;
+  /** Compagnon du héros : il joue tout seul et, à 0 PV, il est hors de combat sans jamais mourir. */
+  ally?: boolean;
+  /** Façon de combattre d'un compagnon. */
+  tactic?: "defender" | "healer" | "archer" | "skirmisher";
+  /** Soins d'un compagnon : utilisations restantes, dés et bonus (portée : au contact). */
+  healing?: { name: string; uses: number; dice: [number, number]; bonus: number };
+  /** Sort mineur d'un compagnon, à jet de sauvegarde (Flamme sacrée). */
+  cantrip?: { name: string; ability: Ability; dc: number; dice: [number, number]; damageType: string; rangeM: number };
 }
 
 /** Capacités de monstres gérées par le moteur. */
@@ -266,7 +274,7 @@ export interface CombatState {
 }
 
 export type CombatantInit = Pick<Combatant, "id" | "name" | "side" | "maxHp" | "ac" | "initiativeBonus" | "attacks"> &
-  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "sprite" | "dangerSense" | "xp" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor" | "sneakDice" | "traits">>;
+  Partial<Pick<Combatant, "hp" | "level" | "features" | "art" | "sprite" | "dangerSense" | "xp" | "spellcasting" | "saveMods" | "tags" | "immunities" | "pos" | "speed" | "untrainedArmor" | "sneakDice" | "traits" | "ally" | "tactic" | "healing" | "cantrip">>;
 
 
 export interface AttackResult {
@@ -287,6 +295,8 @@ export interface AttackContext {
   melee: boolean;
   /** L'attaque a l'avantage (net) : condition de l'Attaque sournoise. */
   advantaged?: boolean;
+  /** Un allié de l'attaquant, en état d'agir, est au contact de la cible, sans désavantage : autre condition de l'Attaque sournoise. */
+  flanked?: boolean;
 }
 
 export interface ReactionOption {

@@ -243,7 +243,7 @@ const resourceOf = (d: BonusDef, c: Combatant): FeatureUse | undefined => (d.nee
 
 /** Options utilisables par ce combattant maintenant. Celles qui coûtent l'action bonus disparaissent quand elle est prise. */
 export function availableBonus(state: CombatState, c: Combatant): FeatureOption[] {
-  if (c.side !== "party" || !isConscious(c)) return [];
+  if (c.side !== "party" || c.ally || !isConscious(c)) return [];
   const missing = c.maxHp - c.hp;
   const enemiesAlive = state.combatants.some((x) => x.side === "enemies" && !x.dead);
   const out: FeatureOption[] = [];

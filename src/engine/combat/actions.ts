@@ -90,7 +90,7 @@ export interface PlayerOptions {
 export function playerOptions(state: CombatState): PlayerOptions {
   if (state.status !== "ongoing") return { canAct: false, bonus: [], spells: [], canEnd: false };
   const cur = currentCombatant(state);
-  if (cur.side !== "party" || !isConscious(cur)) return { canAct: false, bonus: [], spells: [], canEnd: false };
+  if (cur.side !== "party" || cur.ally || !isConscious(cur)) return { canAct: false, bonus: [], spells: [], canEnd: false };
   return {
     canAct: !cur.turnState.action,
     bonus: availableBonus(state, cur),

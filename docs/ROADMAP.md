@@ -57,6 +57,7 @@
 - [x] Première quête allongée : enquête au village avant la crypte (meunière, fermier et son loup, pillard du cimetière), pendentif à rendre à l'aubergiste
 - [x] Village agrandi (34 × 24 cases) et vivant : quartier du marché, moulin, fermes, cimetière, puits, clôtures ; 12 habitants et animaux qui se promènent et parlent
 - [x] Apparence (lot 3) : maisons du village à toit de tuiles et planchers de bois, animations (marche du héros, approche des ennemis, coup reçu, chute), aperçu du personnage à la création et sur la fiche
+- [x] Compagnons : 4 compagnons recrutés selon les choix de l'enquête (garde, moine, chasseuse, pillard repenti), conseil selon la classe du héros, un compagnon actif choisi sur la fiche, combat automatique (défense, soins, tir), PV gardés et repos, suiveur sur la carte, section Aide → Compagnons
 - [x] Son : musique d'ambiance générée selon le lieu (accueil, village, crypte, histoire, combat) et bruitages synthétisés (dés, coups, blessures, soins, sorts, pas, or, victoire, défaite, niveau), écran « Réglages (son) »
 - [ ] Confort : mode sombre/clair réglable, tailles de texte, sauvegarde dans le nuage
 

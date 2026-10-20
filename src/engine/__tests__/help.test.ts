@@ -1,4 +1,5 @@
 import { MONSTERS } from "../../data/monsters";
+import { COMPANIONS } from "../../data/companions";
 import { ITEMS } from "../../data/items";
 import { CONDITIONS } from "../../data/conditions";
 import { describe, expect, it } from "vitest";
@@ -58,7 +59,7 @@ describe("contenu de la page Aide", () => {
     }
   });
   it("liste toutes les entrées de chaque section d'aide", () => {
-    const counts: Record<HelpKind, number> = { classes: CLASSES.length, species: SPECIES.length, backgrounds: BACKGROUNDS.length, weapons: WEAPONS.length, armors: ARMORS.length, spells: SPELLS.length, conditions: CONDITIONS.length, items: ITEMS.length, monsters: MONSTERS.length };
+    const counts: Record<HelpKind, number> = { classes: CLASSES.length, species: SPECIES.length, backgrounds: BACKGROUNDS.length, weapons: WEAPONS.length, armors: ARMORS.length, spells: SPELLS.length, conditions: CONDITIONS.length, items: ITEMS.length, monsters: MONSTERS.length, companions: COMPANIONS.length };
     for (const k of Object.keys(HELP_KINDS) as HelpKind[]) {
       const entries = helpEntries(k);
       expect(entries.length, k).toBe(counts[k]);
@@ -81,11 +82,11 @@ describe("contenu de la page Aide", () => {
     for (const c of CLASSES)
       for (const f of featuresFor(c.id))
         for (const n of names[f.id]) expect(FEATURE_STATUS[c.id][n]?.status, `${c.id}/${n}`).toBe("applied");
-    // … et rien n'est « appliqué » sans être branché (hors Défense sans armure, calculée dans la CA).
+    // … et rien n'est « appliqué » sans être branché (hors capacités calculées ailleurs : CA, équipement, choix, dés d'Attaque sournoise).
     const wired = new Set(CLASSES.flatMap((c) => featuresFor(c.id).flatMap((f) => names[f.id].map((n) => `${c.id}/${n}`))));
     for (const [cid, feats] of Object.entries(FEATURE_STATUS))
       for (const [n, v] of Object.entries(feats))
-        if (v.status === "applied" && !["Défense sans armure", "Maîtrise des armes", "Ordre divin", "Ordre primordial", "Style de combat", "Expertise", "Invocations occultes"].includes(n)) expect(wired.has(`${cid}/${n}`), `${cid}/${n}`).toBe(true);
+        if (v.status === "applied" && !["Défense sans armure", "Maîtrise des armes", "Ordre divin", "Ordre primordial", "Style de combat", "Expertise", "Invocations occultes", "Attaque sournoise"].includes(n)) expect(wired.has(`${cid}/${n}`), `${cid}/${n}`).toBe(true);
   });
   it("chaque capacité appliquée ou partielle a une explication de ce que fait le jeu", () => {
     for (const feats of Object.values(FEATURE_STATUS))

@@ -207,6 +207,14 @@ const FOLK: Record<string, () => string> = {
   poule: chicken,
 };
 
+/** Compagnons recrutables (voir `companions.ts`). */
+const COMPANION_ART: Record<string, () => string> = {
+  ysolde: () => human({ skin: "#e8bc94", top: "#9aa2b2", trim: "#3f6fb0", pants: "#4a5060", style: "helm", cloak: "#3f6fb0", held: spear, offhand: shield("#3f6fb0", `<path d="M7.2 15.4v9.6M3.8 19h6.8" stroke="#e8d28a" stroke-width="1.2"/>`) }),
+  anselme: () => human({ skin: "#e0b08a", top: "#7a5a3a", trim: "#c9a84a", robe: true, style: "bald", face: "old", held: club, extraFront: `<circle cx="16" cy="17.6" r="1.2" fill="#e8d28a"/><path d="M16 15.6v4M14.4 17.2h3.2" stroke="#e8d28a" stroke-width=".9"/>` }),
+  mila: () => human({ skin: "#eec59a", top: "#4a6a3a", trim: "#8a5a2a", pants: "#5a4a2a", style: "long", hair: "#b0602a", held: bow, extraBack: `<rect x="7" y="9" width="3" height="10" rx="1" fill="#8a5a2a" ${o()} transform="rotate(-20 8 14)"/>` }),
+  corentin: () => human({ skin: "#e0aa7e", top: "#6a3a2a", trim: "#3a2018", pants: "#3a3a44", style: "hood", cloak: "#4a2a22", beard: "#4a2e1a", held: sword("#c4c9d4") }),
+};
+
 const cache = new Map<string, string>();
 
 function draw(key: string): string | null {
@@ -224,6 +232,7 @@ function draw(key: string): string | null {
   }
   if (kind === "npc") return NPCS[a]?.() ?? null;
   if (kind === "folk") return FOLK[a]?.() ?? null;
+  if (kind === "companion") return COMPANION_ART[a]?.() ?? null;
   return null;
 }
 
@@ -249,3 +258,4 @@ export const folkSpriteKey = (id: string) => `folk:${id}`;
 export const MONSTER_SPRITES = [...Object.keys(MONSTERS), "wolf", "giant-rat", "giant-spider"];
 export const SPECIES_SPRITES = Object.keys(SPECIES);
 export const CLASS_SPRITES = Object.keys(CLASSES);
+export const COMPANION_SPRITES = Object.keys(COMPANION_ART);
