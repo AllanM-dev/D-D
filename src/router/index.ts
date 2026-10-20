@@ -8,6 +8,7 @@ import HelpListView from "../views/HelpListView.vue";
 import HelpRulesView from "../views/HelpRulesView.vue";
 import HelpView from "../views/HelpView.vue";
 import HomeView from "../views/HomeView.vue";
+import SettingsView from "../views/SettingsView.vue";
 import MapView from "../views/MapView.vue";
 import LevelUpView from "../views/LevelUpView.vue";
 import ShopView from "../views/ShopView.vue";
@@ -24,6 +25,7 @@ export default createRouter({
     { path: "/story/:id", component: StoryView },
     { path: "/shop/:id", component: ShopView },
     { path: "/levelup/:id", component: LevelUpView },
+    { path: "/settings", component: SettingsView },
     { path: "/credits", component: CreditsView },
     { path: "/help", component: HelpView },
     { path: "/help/rules", component: HelpRulesView },

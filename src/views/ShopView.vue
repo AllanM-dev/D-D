@@ -53,6 +53,7 @@ import { getItem } from "../data/items";
 import { SHOP_BY_ID } from "../data/shops";
 import { armorTrained, isWeaponProficient } from "../engine/equipment";
 import { buy, buyPrice, sell, sellPrice, sellable } from "../engine/shop";
+import { playSfx } from "../ui/audio";
 import { useCharacters } from "../stores/characters";
 
 const route = useRoute();
@@ -97,6 +98,7 @@ function doBuy(id: string) {
   try {
     const t = buy(character.value!, shop.value.id, id);
     store.addLoot(characterId.value, { gold: t.gold, items: t.items });
+    playSfx("coin");
     message.value = `Acheté : ${getItem(id)!.name} (${-t.gold} po).`;
   } catch (e) { message.value = (e as Error).message; }
 }
@@ -104,6 +106,7 @@ function doSell(id: string) {
   try {
     const t = sell(character.value!, shop.value.id, id);
     store.addLoot(characterId.value, { gold: t.gold, items: t.items });
+    playSfx("coin");
     message.value = `Vendu : ${getItem(id)!.name} (+${t.gold} po).`;
   } catch (e) { message.value = (e as Error).message; }
 }

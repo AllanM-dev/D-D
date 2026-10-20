@@ -36,6 +36,7 @@ const items = [
   { path: "/help/weapons", label: "Armes", sub: true },
   { path: "/help/armors", label: "Armures", sub: true },
   { path: "/help/abilities", label: "Caractéristiques", sub: true },
+  { path: "/settings", label: "Réglages (son)", sub: false },
   { path: "/credits", label: "Crédits", sub: false },
 ];
 </script>
