@@ -1,4 +1,4 @@
-import { INVOCATIONS, ORDER_SKILLS, hasExtraCantrip } from "../data/class-choices";
+import { INVOCATIONS } from "../data/class-choices";
 import { ENCOUNTERS } from "../data/encounters";
 import { FIGHTING_STYLES, isFightingStyle, type FightingStyleId } from "../data/fighting-styles";
 import { MAX_LEVEL, RETRO_FLAG_XP, xpForNext } from "../data/levels";
@@ -8,9 +8,10 @@ import type { SkillId } from "../data/skills";
 import { CLASS_SPELLCASTING, spellCountsFor, spellsFor } from "../data/spells";
 import { invocationsOf, type Character } from "./character";
 import { featuresFor } from "./features";
-import { refreshStats } from "./loadout";
+import { hpGainFor, recompute } from "./derive";
 import { vitalsOf, type Vitals } from "./rest";
-import { proficiencyBonus } from "./rules";
+
+export { hpGainFor };
 
 export const xpOf = (c: Pick<Character, "xp">) => c.xp ?? 0;
 
@@ -99,21 +100,6 @@ export function validateLevelUp(c: Character, choices: LevelUpChoices): string[]
   return errors;
 }
 
-/** PV gagnés : la moyenne du dé de vie (valeur fixe de 2024) plus le modificateur de Constitution, au moins 1. */
-export const hpGainFor = (c: Pick<Character, "classDef" | "modifiers">) => Math.max(1, Math.floor(c.classDef.hitDie / 2) + 1 + c.modifiers.CON);
-
-/** Compétences recalculées : maîtrise, expertise, bonus de l'ordre « sort mineur en plus » et Touche-à-tout. */
-function refreshSkills(c: Character): Character["skills"] {
-  const prof = c.proficiencyBonus;
-  const orderSkills = hasExtraCantrip(c.order) ? ORDER_SKILLS[c.order!] : [];
-  const orderBonus = Math.max(1, c.modifiers.WIS);
-  return c.skills.map((s) => ({
-    ...s,
-    bonus: c.modifiers[s.ability] + (s.proficient ? prof : 0) + (s.expert ? prof : 0) + (orderSkills.includes(s.id) ? orderBonus : 0)
-      + (c.jackOfAllTrades && !s.proficient ? Math.floor(prof / 2) : 0),
-  }));
-}
-
 export interface LevelUpResult {
   character: Character;
   hpGain: number;
@@ -127,24 +113,14 @@ export function levelUp(c: Character, choices: LevelUpChoices = {}): LevelUpResu
   const hpGain = hpGainFor(c);
   const next = c.level + 1;
   const id = c.classDef.id;
-  const out: Character = { ...c, level: next, maxHp: c.maxHp + hpGain, proficiencyBonus: proficiencyBonus(next) };
-  // Compétences : expertise choisie, Touche-à-tout du barde.
-  if (choices.expertise?.length) {
-    out.skills = c.skills.map((s) => (choices.expertise!.includes(s.id) ? { ...s, expert: true } : s));
-    out.expertise = [...(c.expertise ?? []), ...choices.expertise];
-  }
-  if (id === "bard") {
-    out.jackOfAllTrades = true;
-    out.initiative = c.initiative + Math.floor(out.proficiencyBonus / 2);
-  }
-  out.skills = refreshSkills(out);
-  out.passivePerception = 10 + (out.skills.find((s) => s.id === "perception")?.bonus ?? 0);
-  // Style de combat (paladin, rôdeur), invocations supplémentaires (occultiste), sorts préparés.
-  if (choices.fightingStyle) out.fightingStyle = choices.fightingStyle;
-  if (id === "warlock") out.invocations = [...new Set([...invocationsOf(c), ...INVOCATIONS.map((i) => i.id)])];
-  if (choices.spells?.length && c.spells) out.spells = { cantrips: [...c.spells.cantrips], prepared: [...c.spells.prepared, ...choices.spells] };
-  // CA, vitesse et attaques (Déplacement sans armure, style de combat).
-  Object.assign(out, refreshStats(out));
+  // Les choix du niveau : expertise, style de combat (paladin, rôdeur), invocations (occultiste), sorts préparés.
+  const chosen: Character = { ...c, level: next };
+  if (choices.expertise?.length) chosen.expertise = [...(c.expertise ?? []), ...choices.expertise];
+  if (choices.fightingStyle) chosen.fightingStyle = choices.fightingStyle;
+  if (id === "warlock") chosen.invocations = [...new Set([...invocationsOf(c), ...INVOCATIONS.map((i) => i.id)])];
+  if (choices.spells?.length && c.spells) chosen.spells = { cantrips: [...c.spells.cantrips], prepared: [...c.spells.prepared, ...choices.spells] };
+  // PV, maîtrise, compétences (Touche-à-tout), initiative, CA, vitesse et attaques en découlent.
+  const out = recompute(chosen);
   // Ressources : les nouvelles capacités arrivent pleines, les réserves qui grandissent gagnent la différence.
   const old = new Map(featuresFor(id, c.level, c.modifiers).map((f) => [f.id, f.max]));
   const features: Vitals["features"] = { ...before.features };
